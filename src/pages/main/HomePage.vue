@@ -31,7 +31,7 @@
 
     <div v-if="currentView === 'profiles'" class="profiles-view">
       <div class="filters">
-        <select v-model="filters.district" @change="loadProfiles">
+        <select v-model="filters.District" @change="loadProfiles">
           <option value="">All Districts</option>
           <option v-for="district in districts" :key="district" :value="district">
             {{ district }}
@@ -150,7 +150,7 @@ export default {
     }
 
     const filters = reactive({
-      district: '',
+      District: '',
       type: '',
       year: ''
     })

@@ -23,7 +23,7 @@
     <div class="profile-info">
       <p><strong>RegID:</strong> {{ profile.id }}</p>
       <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
-      <p><strong>District:</strong> {{ profile.basicInfo?.district || 'N/A' }}</p>
+      <p><strong>District:</strong> {{ profile.basicInfo?.District || 'N/A' }}</p>
       <p><strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}</p>
     </div>
     
