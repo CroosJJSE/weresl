@@ -8,7 +8,7 @@
     />
     
     <div class="profile-header">
-      <h3>{{ profile.basicInfo?.name || 'Unknown' }}</h3>
+      <h3>{{ profile.Name || profile.basicInfo?.Name || 'Unknown' }}</h3>
       <div class="profile-types">
         <span 
           v-for="type in profileTypes" 
@@ -21,10 +21,10 @@
     </div>
     
     <div class="profile-info">
-      <p><strong>RegID:</strong> {{ profile.id }}</p>
-      <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
-      <p><strong>District:</strong> {{ profile.basicInfo?.district || 'N/A' }}</p>
-      <p><strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}</p>
+      <p><strong>RegID:</strong> {{ profile.Reg_ID || profile.id }}</p>
+      <p><strong>Age:</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}</p>
+      <p><strong>District:</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}</p>
+      <p><strong>Phone:</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}</p>
     </div>
     
     <div v-if="profile.computed" class="profile-stats">

@@ -50,11 +50,8 @@ export default {
   },
   emits: ['open-modal'],
   setup(props, { emit }) {
-    const PLACEHOLDER_IMAGE_URL = "https://drive.google.com/file/d/1ZgXsSuEMpzHS4as_wZ3ZRyR5Mpw9an05/view?usp=sharing"
-    const profileImageUrl = ref(PLACEHOLDER_IMAGE_URL)
+    const profileImageUrl = ref('/placeholder-profile.jpg')
     const imageLoading = ref(true)
-    const currentUrlIndex = ref(0)
-    const urlFormats = ref([])
 
     const profileTypes = computed(() => {
       return profileService.getProfileTypes(props.profile)
@@ -65,21 +62,8 @@ export default {
       return new Intl.NumberFormat('en-IN').format(amount)
     }
 
-    const handleImageError = (event) => {
-      console.log('Image failed to load for profile:', props.profile.id)
-      
-      // Try next URL format if available
-      if (currentUrlIndex.value < urlFormats.value.length - 1) {
-        currentUrlIndex.value++
-        const nextUrl = urlFormats.value[currentUrlIndex.value]
-        console.log('Trying next URL format:', nextUrl)
-        event.target.src = nextUrl
-        return
-      }
-      
-      // If all URLs failed, use placeholder
-      console.log('All URL formats failed, using placeholder')
-      event.target.src = PLACEHOLDER_IMAGE_URL
+    const handleImageError = () => {
+      profileImageUrl.value = '/placeholder-profile.jpg'
       imageLoading.value = false
     }
 
@@ -89,50 +73,17 @@ export default {
 
     const loadProfileImage = async () => {
       try {
-        // Wait a bit to ensure props are properly set
-        await new Promise(resolve => setTimeout(resolve, 0))
-        
-        if (!props.profile || !props.profile.id) {
-          console.log('Profile or profile.id is null/undefined:', props.profile)
-          profileImageUrl.value = PLACEHOLDER_IMAGE_URL
+        if (!props.profile || !props.profile.Image) {
+          profileImageUrl.value = '/placeholder-profile.jpg'
           return
         }
         
-        // Check if profile has an Image field with Google Drive URL
-        let fileId = null;
-        
-        if (props.profile.Image) {
-          // Extract file ID from the Image URL (like the original system)
-          const match = props.profile.Image.match(/[-\w]{25,}/);
-          if (match) {
-            fileId = match[0];
-            console.log('Extracted file ID from Image URL:', fileId);
-          }
-        }
-        
-        // If no file ID from Image field, use placeholder
-        if (!fileId) {
-          console.log('No Image URL found for profile:', props.profile.id);
-          profileImageUrl.value = PLACEHOLDER_IMAGE_URL;
-          return;
-        }
-        
-        // Generate all possible URL formats for this profile
-        urlFormats.value = [
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w300`,
-          `https://drive.google.com/uc?export=view&id=${fileId}`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
-        ]
-        
-        console.log('Generated URL formats for profile:', props.profile.id, urlFormats.value)
-        
-        // Start with the first URL format
-        currentUrlIndex.value = 0
-        profileImageUrl.value = urlFormats.value[0]
+        // Use imageService to get the correct thumbnail URL (supports both Drive and Cloudinary)
+        const thumbnailUrl = await imageService.getProfileImageThumbnail(props.profile.Image)
+        profileImageUrl.value = thumbnailUrl
       } catch (error) {
         console.error('Error loading profile image:', error)
-        profileImageUrl.value = PLACEHOLDER_IMAGE_URL
+        profileImageUrl.value = '/placeholder-profile.jpg'
       }
     }
 
@@ -142,7 +93,7 @@ export default {
 
     // Watch for profile changes
     watch(() => props.profile, (newProfile) => {
-      if (newProfile && newProfile.id) {
+      if (newProfile) {
         loadProfileImage()
       }
     }, { immediate: true })
@@ -256,9 +207,7 @@ export default {
   margin: 3px 0;
 }
 
-@media screen and (max-width: 768px) {
-  .profile-box {
-    width: 90%;
-  }
+.profile-stats strong {
+  color: #333;
 }
 </style> 

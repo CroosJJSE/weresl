@@ -121,7 +121,7 @@ import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
 
 export default {
-  name: 'HomePage',
+  Name: 'HomePage',
   components: {
     ProfileCard,
     ProfileModal,

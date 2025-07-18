@@ -43,7 +43,7 @@ import { ref, onMounted } from 'vue'
 import { dbOperations } from '@/firebase/db.js'
 
 export default {
-  name: 'AdminPage',
+  Name: 'AdminPage',
   setup() {
     const systemLogs = ref([])
 

@@ -1,118 +1,89 @@
-// Image Service for Google Drive Integration
-// This service handles fetching images from your Google Drive folder
-
-const GOOGLE_DRIVE_FOLDER_ID = "1l8yBRcK_QHMSjrdxwYHgVjwyBSM"
+// Image Service for Google Drive and Cloudinary Integration
+// This service handles fetching images from Google Drive or Cloudinary
 
 export const imageService = {
-  // Get logo image from Google Drive
+  // Detect if the URL is a Google Drive link
+  isGoogleDriveUrl(url) {
+    return url && (url.includes('drive.google.com') || url.includes('googleusercontent.com'));
+  },
+
+  // Detect if the URL is a Cloudinary link
+  isCloudinaryUrl(url) {
+    return url && url.includes('res.cloudinary.com');
+  },
+
+  // Get logo image (static or placeholder)
   async getLogoImage() {
-    try {
-      const logoFileId = '1AEEWccjf_sMoXJgAaYIPZZm5rM-OCFe2' // Replace with actual file ID
-      
-      if (logoFileId === 'YOUR_LOGO_FILE_ID') {
-        // Return placeholder if not configured
-        return '/placeholder-logo.png'
-      }
-      
-      // Use thumbnail format like the original system
-      return `https://drive.google.com/thumbnail?id=${logoFileId}&sz=w400`
-    } catch (error) {
-      console.error('Error fetching logo:', error)
-      return '/placeholder-logo.png'
-    }
+    // Return the WERESL logo from Google Drive
+    return 'https://drive.google.com/thumbnail?id=1AEEWccjf_sMoXJgAaYIPZZm5rM-OCFe2';
   },
 
-  // Get profile image by RegID
-  async getProfileImage(regId) {
+  // Get profile image (direct or thumbnail, supports both providers)
+  async getProfileImage(url) {
     try {
-      // Use direct image URL instead of thumbnail to avoid CORS
-      const directUrl = `https://drive.google.com/uc?export=view&id=${regId}`
-      return directUrl
+      if (!url) return '/placeholder-profile.jpg';
+      if (this.isCloudinaryUrl(url)) {
+        // Use Cloudinary optimized direct URL
+        return this.convertCloudinaryToDirectUrl(url);
+      } else if (this.isGoogleDriveUrl(url)) {
+        // Use Google Drive direct URL
+        return this.convertDriveToDirectUrl(url);
+      }
+      return url;
     } catch (error) {
-      console.error('Error fetching profile image:', error)
-      return '/placeholder-profile.jpg'
-    }
-  },
-
-  // Get profile image with fallback options (extract file ID from existing URL)
-  async getProfileImageWithFallback(regId, driveUrl = null) {
-    try {
-      let fileId = null;
-      
-      // If we have a driveUrl (like the thumbnail URL from your data), extract the file ID
-      if (driveUrl) {
-        fileId = this.extractFileId(driveUrl);
-        console.log('Extracted file ID from URL:', fileId);
-      }
-      
-      // If no file ID from URL, try using regId as file ID
-      if (!fileId && regId) {
-        fileId = this.extractFileId(regId) || regId;
-        console.log('Using regId as file ID:', fileId);
-      }
-      
-      if (fileId) {
-        // Try multiple URL formats to find one that works
-        const urlFormats = [
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w300`,
-          `https://drive.google.com/uc?export=view&id=${fileId}`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
-        ];
-        
-        console.log('Trying URL formats for file ID:', fileId);
-        console.log('URL formats:', urlFormats);
-        
-        // Return the first format (thumbnail) as primary, let the image error handler try others
-        return urlFormats[0];
-      }
-      
-      return '/placeholder-profile.jpg';
-    } catch (error) {
-      console.error('Error fetching profile image with fallback:', error);
       return '/placeholder-profile.jpg';
     }
   },
 
-  // Get all images from Google Drive folder
-  async getAllImages() {
+  // Get profile image thumbnail (supports both providers)
+  async getProfileImageThumbnail(url) {
     try {
-      // This would list all images in your Google Drive folder
-      // For now, return placeholder data
-      return [
-        {
-          id: 'logo',
-          name: 'WERESL Logo',
-          url: 'https://drive.google.com/uc?export=view&id=YOUR_LOGO_FILE_ID',
-          type: 'logo'
-        },
-        {
-          id: 'placeholder',
-          name: 'Profile Placeholder',
-          url: '/placeholder-profile.jpg',
-          type: 'profile'
-        }
-      ]
+      if (!url) return '/placeholder-profile.jpg';
+      if (this.isCloudinaryUrl(url)) {
+        return this.convertCloudinaryToThumbnailUrl(url);
+      } else if (this.isGoogleDriveUrl(url)) {
+        return this.convertDriveToThumbnailUrl(url);
+      }
+      return url;
     } catch (error) {
-      console.error('Error fetching images:', error)
-      return []
+      return '/placeholder-profile.jpg';
     }
   },
 
-  // Extract file ID from Google Drive URL - using the same method as the original system
-  extractFileId(url) {
-    if (!url) return null;
-    const match = url.match(/[-\w]{25,}/);
-    return match ? match[0] : null;
-  },
-
-  // Convert Google Drive URL to direct image URL (no thumbnail to avoid CORS)
-  convertToDirectUrl(driveUrl) {
-    const fileId = this.extractFileId(driveUrl)
+  // Convert Google Drive URL to direct image URL
+  convertDriveToDirectUrl(driveUrl) {
+    const fileId = this.extractDriveFileId(driveUrl);
     if (fileId) {
-      return `https://drive.google.com/uc?export=view&id=${fileId}`
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
     }
-    return driveUrl
+    return driveUrl;
+  },
+
+  // Convert Google Drive URL to thumbnail URL
+  convertDriveToThumbnailUrl(driveUrl) {
+    const fileId = this.extractDriveFileId(driveUrl);
+    if (fileId) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`;
+    }
+    return driveUrl;
+  },
+
+  // Extract file ID from Google Drive URL
+  extractDriveFileId(url) {
+    const match = url.match(/\/d\/([\w-]+)/) || url.match(/id=([\w-]+)/);
+    return match ? match[1] : null;
+  },
+
+  // Convert Cloudinary URL to direct/optimized URL
+  convertCloudinaryToDirectUrl(cloudinaryUrl) {
+    if (!cloudinaryUrl) return cloudinaryUrl;
+    return cloudinaryUrl.replace('/upload/', '/upload/f_auto,q_auto/');
+  },
+
+  // Convert Cloudinary URL to thumbnail URL (200x200 crop)
+  convertCloudinaryToThumbnailUrl(cloudinaryUrl) {
+    if (!cloudinaryUrl) return cloudinaryUrl;
+    return cloudinaryUrl.replace('/upload/', '/upload/c_thumb,w_200,h_200/');
   },
 
   // Get placeholder images for development
@@ -121,23 +92,18 @@ export const imageService = {
       logo: '/placeholder-logo.png',
       profile: '/placeholder-profile.jpg',
       logoText: 'WERESL'
-    }
+    };
   },
 
-  // Test if an image URL is accessible (simplified to avoid CORS)
+  // Test if an image URL is accessible
   async testImageUrl(url) {
-    // Skip testing for Google Drive URLs to avoid CORS issues
-    if (url.includes('drive.google.com')) {
-      return true
-    }
-    
     try {
-      const response = await fetch(url, { method: 'HEAD' })
-      return response.ok
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
     } catch (error) {
-      return false
+      return false;
     }
   }
-}
+};
 
-export default imageService 
+export default imageService; 

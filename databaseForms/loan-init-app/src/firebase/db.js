@@ -26,14 +26,15 @@ export const dbOperations = {
     try {
       console.log('📝 Creating profile with data:', profileData)
         
-      // Use RegID as the document ID
-      const regId = profileData.regId
+      // Use Reg_ID as the document ID
+      const regId = profileData.Reg_ID
       const docRef = doc(db, 'profiles', regId)
       
-      // Add Payment_history as empty map
+      // Add RF_return_history and GIF as empty maps
       const profileWithDefaults = {
         ...profileData,
-        Payment_history: {},
+        RF_return_history: {},
+        GIF: {},
         createdAt: serverTimestamp(),
         lastUpdated: serverTimestamp()
       }
@@ -78,47 +79,15 @@ export const dbOperations = {
     try {
       console.log('🔍 Searching for RegID:', regId)
       
-      // First, let's get all profiles to see what fields exist
-      const allProfilesQuery = query(collection(db, 'profiles'))
-      const allProfilesSnapshot = await getDocs(allProfilesQuery)
+      // Search by Reg_ID field only
+      const q = query(collection(db, 'profiles'), where('Reg_ID', '==', regId))
+      const querySnapshot = await getDocs(q)
       
-      console.log('📊 Total profiles in database:', allProfilesSnapshot.size)
-      
-      // Log the first few profiles to see their structure
-      allProfilesSnapshot.docs.slice(0, 3).forEach((doc, index) => {
-        console.log(`📋 Profile ${index + 1} data:`, doc.data())
-      })
-      
-      // Try multiple possible field names for RegID
-      const possibleFieldNames = ['regId', 'reg_id', 'Reg_ID', 'regId', 'regID', 'registrationId', 'id']
-      
-      for (const fieldName of possibleFieldNames) {
-        console.log(`🔎 Trying field: ${fieldName}`)
-        const q = query(collection(db, 'profiles'), where(fieldName, '==', regId))
-        const querySnapshot = await getDocs(q)
-        
-        console.log(`📈 Found ${querySnapshot.size} profiles with ${fieldName} = ${regId}`)
-        
-        if (!querySnapshot.empty) {
-          const doc = querySnapshot.docs[0]
-          const profileData = { id: doc.id, ...doc.data() }
-          console.log('✅ Found profile:', profileData)
-          return profileData
-    }
-      }
-      
-      // If no exact match, try case-insensitive search
-      console.log('🔍 Trying case-insensitive search...')
-      const allProfiles = allProfilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      
-      const caseInsensitiveMatch = allProfiles.find(profile => {
-        const profileFields = Object.values(profile).map(val => String(val).toLowerCase())
-        return profileFields.includes(regId.toLowerCase())
-      })
-      
-      if (caseInsensitiveMatch) {
-        console.log('✅ Found case-insensitive match:', caseInsensitiveMatch)
-        return caseInsensitiveMatch
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const profileData = { id: doc.id, ...doc.data() }
+        console.log('✅ Found profile by Reg_ID:', profileData)
+        return profileData
       }
       
       console.log('❌ No profile found with RegID:', regId)
@@ -399,7 +368,7 @@ export const dbOperations = {
       const existingRegIds = []
       querySnapshot.docs.forEach(doc => {
         const data = doc.data()
-        const regId = data.regId || data.Reg_ID || data.reg_id || doc.id
+        const regId = data.Reg_ID || data.regId || data.reg_id || doc.id
         if (regId && regId.startsWith(districtCode)) {
           existingRegIds.push(regId)
         }
@@ -426,7 +395,7 @@ export const dbOperations = {
       throw error
     }
   }
-} 
+}
 
 export const utils = {
   generateRegId(district, existingIds = []) {
@@ -454,4 +423,4 @@ export const utils = {
     if (!regId) return ''
     return regId.substring(0, 3)
   }
-} 
+}

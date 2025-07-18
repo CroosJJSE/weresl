@@ -19,11 +19,11 @@
         </div>
 
         <div v-if="formData.registered === 'Yes'" class="form-group">
-          <label for="regId">Registration ID</label>
+          <label for="Reg_ID">Registration ID</label>
           <input 
             type="text" 
-            id="regId" 
-            v-model="formData.regId" 
+            id="Reg_ID" 
+            v-model="formData.Reg_ID" 
             placeholder="Enter RegID"
             required
           />
@@ -32,12 +32,12 @@
         <div v-if="formData.registered === 'No'" class="new-user-fields">
           <div class="form-row">
             <div class="form-group">
-              <label for="name">Full Name</label>
+              <label for="Name">Full Name</label>
               <input 
                 type="text" 
-                id="name" 
-                v-model="formData.basicInfo.name" 
-                placeholder="Enter full name"
+                id="Name" 
+                v-model="formData.basicInfo.Name" 
+                placeholder="Enter full Name"
                 required
               />
             </div>
@@ -56,22 +56,22 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="nic">NIC Number</label>
+              <label for="NIC">NIC Number</label>
               <input 
                 type="text" 
-                id="nic" 
-                v-model="formData.basicInfo.nic" 
+                id="NIC" 
+                v-model="formData.basicInfo.NIC" 
                 placeholder="Enter NIC number"
                 required
               />
             </div>
             <div class="form-group">
-              <label for="phone">Phone Number</label>
+              <label for="contact">Phone Number</label>
               <input 
                 type="tel" 
-                id="phone" 
-                v-model="formData.basicInfo.phone" 
-                placeholder="Enter phone number"
+                id="contact" 
+                v-model="formData.basicInfo.contact" 
+                placeholder="Enter contact number"
                 required
               />
             </div>
@@ -88,11 +88,11 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="address">Address</label>
+              <label for="Address">Address</label>
               <textarea 
-                id="address" 
-                v-model="formData.basicInfo.address" 
-                placeholder="Enter address"
+                id="Address" 
+                v-model="formData.basicInfo.Address" 
+                placeholder="Enter Address"
                 required
               ></textarea>
             </div>
@@ -235,7 +235,7 @@ import { ref, reactive } from 'vue'
 import { profileService } from '@/services/profile.js'
 
 export default {
-  name: 'LoanInitForm',
+  Name: 'LoanInitForm',
   setup() {
     const loading = ref(false)
     const error = ref(null)
@@ -252,14 +252,14 @@ export default {
 
     const formData = reactive({
       registered: '',
-      regId: '',
+      Reg_ID: '',
       basicInfo: {
-        name: '',
+        Name: '',
         age: '',
-        nic: '',
-        phone: '',
+        NIC: '',
+        contact: '',
         District: '',
-        address: '',
+        Address: '',
         totalChildren: '',
         schoolKids: ''
       },
@@ -289,7 +289,7 @@ export default {
     const validateForm = () => {
       const errors = []
 
-      if (formData.registered === 'Yes' && !formData.regId) {
+      if (formData.registered === 'Yes' && !formData.Reg_ID) {
         errors.push('Registration ID is required for registered users')
       }
 
@@ -331,8 +331,8 @@ export default {
 
         if (formData.registered === 'Yes') {
           // Add loan to existing profile
-          await profileService.addLoan(formData.regId, loanData)
-          success.value = `Loan added successfully to profile ${formData.regId}`
+          await profileService.addLoan(formData.Reg_ID, loanData)
+          success.value = `Loan added successfully to profile ${formData.Reg_ID}`
         } else {
           // Create new profile with loan
           const profileData = {
@@ -341,8 +341,8 @@ export default {
             imageFile: formData.imageFile
           }
           
-          const regId = await profileService.createProfile(profileData)
-          success.value = `New profile created successfully with RegID: ${regId}`
+          const Reg_ID = await profileService.createProfile(profileData)
+          success.value = `New profile created successfully with RegID: ${Reg_ID}`
         }
 
         resetForm()

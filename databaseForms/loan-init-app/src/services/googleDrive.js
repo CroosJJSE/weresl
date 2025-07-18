@@ -36,7 +36,7 @@ export const googleDriveService = {
   },
 
   // Upload file to Google Drive
-  async uploadFile(file, regId) {
+  async uploadFile(file, Reg_ID) {
     try {
       // Check if user is authenticated
       if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
@@ -44,11 +44,11 @@ export const googleDriveService = {
       }
 
       const timestamp = Date.now()
-      const fileName = `${regId}_${timestamp}.jpg`
+      const fileName = `${Reg_ID}_${timestamp}.jpg`
       
       // Create file metadata
       const metadata = {
-        name: fileName,
+        Name: fileName,
         parents: [GOOGLE_DRIVE_FOLDER_ID]
       }
 
@@ -125,12 +125,12 @@ export const googleDriveService = {
 
 // Fallback implementation for when Google Drive API is not available
 export const fallbackDriveService = {
-  async uploadFile(file, regId) {
+  async uploadFile(file, Reg_ID) {
     // For development/testing, return a placeholder URL
     const timestamp = Date.now()
-    const fileName = `${regId}_${timestamp}.jpg`
+    const fileName = `${Reg_ID}_${timestamp}.jpg`
     
-    console.log('Google Drive upload (fallback) for:', regId, fileName)
+    console.log('Google Drive upload (fallback) for:', Reg_ID, fileName)
     
     // Return a placeholder URL that would be the actual Google Drive thumbnail URL
     return `https://drive.google.com/thumbnail?id=placeholder_${fileName}&sz=w200-h200`

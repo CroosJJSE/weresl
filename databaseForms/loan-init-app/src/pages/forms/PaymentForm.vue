@@ -11,11 +11,11 @@
         
         <div class="form-row">
           <div class="form-group">
-            <label for="regId">Registration ID</label>
+            <label for="Reg_ID">Registration ID</label>
             <input 
               type="text" 
-              id="regId" 
-              v-model="formData.regId" 
+              id="Reg_ID" 
+              v-model="formData.Reg_ID" 
               placeholder="Enter RegID"
               required
             />
@@ -67,8 +67,8 @@
       <div v-if="profile" class="profile-preview">
         <h3>Profile Preview</h3>
         <div class="profile-info">
-          <p><strong>Name:</strong> {{ profile.basicInfo?.name }}</p>
-          <p><strong>District:</strong> {{ profile.basicInfo?.district }}</p>
+          <p><strong>Name:</strong> {{ profile.basicInfo?.Name }}</p>
+          <p><strong>District:</strong> {{ profile.basicInfo?.District || profile.District || 'N/A' }}</p>
           <p><strong>Active Loans:</strong> {{ profile.computed?.activeLoansCount || 0 }}</p>
           <p><strong>Total Loan Amount:</strong> Rs. {{ formatAmount(profile.computed?.totalLoanAmount || 0) }}</p>
           <p><strong>Remaining Amount:</strong> Rs. {{ formatAmount(profile.computed?.remainingLoanAmount || 0) }}</p>
@@ -98,7 +98,7 @@ import { ref, reactive, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 
 export default {
-  name: 'PaymentForm',
+  Name: 'PaymentForm',
   setup() {
     const loading = ref(false)
     const error = ref(null)
@@ -106,21 +106,21 @@ export default {
     const profile = ref(null)
 
     const formData = reactive({
-      regId: '',
+      Reg_ID: '',
       type: '',
       amount: '',
       details: '',
       date: new Date().toISOString().split('T')[0]
     })
 
-    const loadProfile = async (regId) => {
-      if (!regId) {
+    const loadProfile = async (Reg_ID) => {
+      if (!Reg_ID) {
         profile.value = null
         return
       }
 
       try {
-        profile.value = await profileService.getProfile(regId)
+        profile.value = await profileService.getProfile(Reg_ID)
       } catch (err) {
         console.error('Error loading profile:', err)
         profile.value = null
@@ -130,7 +130,7 @@ export default {
     const validateForm = () => {
       const errors = []
 
-      if (!formData.regId) {
+      if (!formData.Reg_ID) {
         errors.push('Registration ID is required')
       }
 
@@ -167,7 +167,7 @@ export default {
 
       try {
         const paymentData = {
-          regId: formData.regId,
+          Reg_ID: formData.Reg_ID,
           type: formData.type,
           amount: parseFloat(formData.amount) || 0,
           details: formData.details,
@@ -177,9 +177,9 @@ export default {
         await profileService.processPayment(paymentData)
         
         if (formData.type === 'RF') {
-          success.value = `RF payment of Rs. ${formData.amount} processed successfully for ${formData.regId}`
+          success.value = `RF payment of Rs. ${formData.amount} processed successfully for ${formData.Reg_ID}`
         } else {
-          success.value = `Grant "Give It Forward" entry processed successfully for ${formData.regId}`
+          success.value = `Grant "Give It Forward" entry processed successfully for ${formData.Reg_ID}`
         }
 
         resetForm()
@@ -209,7 +209,7 @@ export default {
     }
 
     // Watch for RegID changes to load profile
-    watch(() => formData.regId, (newRegId) => {
+    watch(() => formData.Reg_ID, (newRegId) => {
       if (newRegId) {
         loadProfile(newRegId)
       } else {

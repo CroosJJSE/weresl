@@ -169,8 +169,6 @@ export default {
   setup(props, { emit }) {
     const profileImageUrl = ref('/placeholder-profile.jpg')
     const imageLoading = ref(true)
-    const currentUrlIndex = ref(0)
-    const urlFormats = ref([])
 
     const profileTypes = computed(() => {
       return profileService.getProfileTypes(props.profile)
@@ -186,21 +184,8 @@ export default {
       return new Date(date).toLocaleDateString('en-IN')
     }
 
-    const handleImageError = (event) => {
-      console.log('Image failed to load for profile:', props.profile.id)
-      
-      // Try next URL format if available
-      if (currentUrlIndex.value < urlFormats.value.length - 1) {
-        currentUrlIndex.value++
-        const nextUrl = urlFormats.value[currentUrlIndex.value]
-        console.log('Trying next URL format:', nextUrl)
-        event.target.src = nextUrl
-        return
-      }
-      
-      // If all URLs failed, use placeholder
-      console.log('All URL formats failed, using placeholder')
-      event.target.src = '/placeholder-profile.jpg'
+    const handleImageError = () => {
+      profileImageUrl.value = '/placeholder-profile.jpg'
       imageLoading.value = false
     }
 
@@ -210,47 +195,14 @@ export default {
 
     const loadProfileImage = async () => {
       try {
-        // Wait a bit to ensure props are properly set
-        await new Promise(resolve => setTimeout(resolve, 0))
-        
-        if (!props.profile || !props.profile.id) {
-          console.log('Profile or profile.id is null/undefined:', props.profile)
+        if (!props.profile || !props.profile.Image) {
           profileImageUrl.value = '/placeholder-profile.jpg'
           return
         }
         
-        // Check if profile has an Image field with Google Drive URL
-        let fileId = null;
-        
-        if (props.profile.Image) {
-          // Extract file ID from the Image URL (like the original system)
-          const match = props.profile.Image.match(/[-\w]{25,}/);
-          if (match) {
-            fileId = match[0];
-            console.log('Extracted file ID from Image URL:', fileId);
-          }
-        }
-        
-        // If no file ID from Image field, use placeholder
-        if (!fileId) {
-          console.log('No Image URL found for profile:', props.profile.id);
-          profileImageUrl.value = '/placeholder-profile.jpg';
-          return;
-        }
-        
-        // Generate all possible URL formats for this profile
-        urlFormats.value = [
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w300`,
-          `https://drive.google.com/uc?export=view&id=${fileId}`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
-        ]
-        
-        console.log('Generated URL formats for profile:', props.profile.id, urlFormats.value)
-        
-        // Start with the first URL format
-        currentUrlIndex.value = 0
-        profileImageUrl.value = urlFormats.value[0]
+        // Use imageService to get the correct direct URL (supports both Drive and Cloudinary)
+        const directUrl = await imageService.getProfileImage(props.profile.Image)
+        profileImageUrl.value = directUrl
       } catch (error) {
         console.error('Error loading profile image:', error)
         profileImageUrl.value = '/placeholder-profile.jpg'

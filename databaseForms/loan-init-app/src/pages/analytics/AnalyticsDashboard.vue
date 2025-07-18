@@ -93,7 +93,7 @@ import { ref, computed, onMounted } from 'vue'
 import { dbOperations } from '@/firebase/db.js'
 
 export default {
-  name: 'AnalyticsDashboard',
+  Name: 'AnalyticsDashboard',
   setup() {
     const analytics = ref({
       stats: {},

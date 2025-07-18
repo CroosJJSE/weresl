@@ -19,9 +19,9 @@ export const profileService = {
   },
 
   // Get single profile
-  async getProfile(regId) {
+  async getProfile(Reg_ID) {
     try {
-      const profile = await dbOperations.getProfileByRegId(regId)
+      const profile = await dbOperations.getProfileByRegId(Reg_ID)
       if (!profile) return null
       
       return {
@@ -40,34 +40,34 @@ export const profileService = {
       console.log('📝 Starting profile creation...')
       
       // Generate RegID if not provided
-      if (!profileData.regId) {
+      if (!profileData.Reg_ID) {
         console.log('🔧 Generating RegID...')
         const existingProfiles = await dbOperations.getAllProfiles()
         const existingIds = existingProfiles.map(p => p.id)
-        profileData.regId = utils.generateRegId(profileData.basicInfo.District, existingIds)
-        console.log('✅ Generated RegID:', profileData.regId)
+        profileData.Reg_ID = utils.generateRegId(profileData.basicInfo.District, existingIds)
+        console.log('✅ Generated RegID:', profileData.Reg_ID)
       }
 
       // Process image if provided
       if (profileData.imageFile) {
         console.log('📤 Processing image upload...')
-        const imageUrl = await storageOperations.uploadImage(profileData.imageFile, profileData.regId)
-        profileData.Image = imageUrl // Use "Image" field name
+        const imageUrl = await storageOperations.uploadImage(profileData.imageFile, profileData.Reg_ID)
+        profileData.Image = imageUrl // Use "Image" field Name
         delete profileData.imageFile // Remove the file object, keep only the URL
         console.log('✅ Image processed and stored:', imageUrl)
       }
 
       console.log('📝 Creating profile with final data:', profileData)
-      const regId = await dbOperations.createProfile(profileData)
-      console.log('✅ Profile created successfully with RegID:', regId)
+      const Reg_ID = await dbOperations.createProfile(profileData)
+      console.log('✅ Profile created successfully with RegID:', Reg_ID)
       
       // Log operation
       await dbOperations.logOperation('CREATE_PROFILE', {
-        regId,
+        Reg_ID,
         basicInfo: profileData.basicInfo
       })
 
-      return regId
+      return Reg_ID
     } catch (error) {
       console.error('❌ Error creating profile:', error)
       throw error
@@ -75,24 +75,24 @@ export const profileService = {
   },
 
   // Update profile
-  async updateProfile(regId, updates) {
+  async updateProfile(Reg_ID, updates) {
     try {
       // Process image if provided
       if (updates.imageFile) {
-        const imageUrl = await storageOperations.uploadImage(updates.imageFile, regId)
+        const imageUrl = await storageOperations.uploadImage(updates.imageFile, Reg_ID)
         updates.imageUrl = imageUrl
         delete updates.imageFile
       }
 
-      await dbOperations.updateProfile(regId, updates)
+      await dbOperations.updateProfile(Reg_ID, updates)
       
       // Log operation
       await dbOperations.logOperation('UPDATE_PROFILE', {
-        regId,
+        Reg_ID,
         updates
       })
 
-      return regId
+      return Reg_ID
     } catch (error) {
       console.error('Error updating profile:', error)
       throw error
@@ -100,13 +100,13 @@ export const profileService = {
   },
 
   // Add loan to profile
-  async addLoan(regId, loanData) {
+  async addLoan(Reg_ID, loanData) {
     try {
-      const loan = await dbOperations.addLoan(regId, loanData)
+      const loan = await dbOperations.addLoan(Reg_ID, loanData)
       
       // Log operation
       await dbOperations.logOperation('ADD_LOAN', {
-        regId,
+        Reg_ID,
         loan
       })
 
@@ -124,7 +124,7 @@ export const profileService = {
       
       // Log operation
       await dbOperations.logOperation('PROCESS_PAYMENT', {
-        regId: paymentData.regId,
+        Reg_ID: paymentData.Reg_ID,
         payment: paymentData
       })
 
@@ -198,7 +198,7 @@ export const profileService = {
   validateProfileData(profileData) {
     const errors = []
     
-    if (!profileData.basicInfo?.name) {
+    if (!profileData.basicInfo?.Name) {
       errors.push('Name is required')
     }
     
@@ -236,7 +236,7 @@ export const profileService = {
   validatePaymentData(paymentData) {
     const errors = []
     
-    if (!paymentData.regId) {
+    if (!paymentData.Reg_ID) {
       errors.push('RegID is required')
     }
     

@@ -21,7 +21,10 @@
 
       <!-- RegID Lookup Section -->
       <div class="section" v-if="registrationStatus === 'existing'">
-        <h2>Search Existing Applicant</h2>
+        <div class="section-header">
+          <h2>Search Existing Applicant</h2>
+          <button @click="goBack" class="btn btn-secondary">← Back to Registration Choice</button>
+        </div>
         <div class="regid-lookup">
           <div class="form-group">
             <label for="regidSearch">Enter RegID:</label>
@@ -40,13 +43,29 @@
           <div v-if="searchResult" class="search-result">
             <div v-if="searchResult.found" class="alert alert-success">
               <strong>Found existing applicant:</strong> 
-              <div class="profile-info">
-                <p><strong>Name:</strong> {{ searchResult.profile.name || searchResult.profile.Name || 'N/A' }}</p>
-                <p><strong>RegID:</strong> {{ searchResult.profile.regId || searchResult.profile.Reg_ID || searchResult.profile.reg_id || 'N/A' }}</p>
-                <p><strong>District:</strong> {{ searchResult.profile.district || searchResult.profile.District || 'N/A' }}</p>
-                <p><strong>Phone:</strong> {{ searchResult.profile.phone || searchResult.profile.contact || 'N/A' }}</p>
+              <div class="profile-display">
+                <div class="profile-image-section">
+                  <div class="profile-image-container">
+                    <img 
+                      v-if="searchResult.profile.Image" 
+                      :src="searchResult.profile.Image" 
+                      alt="Profile Photo" 
+                      class="profile-image"
+                      @error="handleImageError"
+                    />
+                    <div v-else class="profile-placeholder">
+                      <span>No Profile Photo</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="profile-info">
+                  <p><strong>Name:</strong> {{ searchResult.profile.Name || 'N/A' }}</p>
+                  <p><strong>NIC:</strong> {{ searchResult.profile.NIC || 'N/A' }}</p>
+                  <p><strong>Phone:</strong> {{ searchResult.profile.contact || 'N/A' }}</p>
+                  <p><strong>RegID:</strong> {{ searchResult.profile.Reg_ID || 'N/A' }}</p>
+                </div>
               </div>
-              <button @click="useExistingProfile" class="btn btn-secondary">Use This Profile</button>
+              <button @click="useExistingProfile" class="btn btn-primary">Use This Profile</button>
             </div>
             <div v-else class="alert alert-warning">
               No existing profile found. Would you like to register as a new applicant?
@@ -56,78 +75,9 @@
         </div>
       </div>
 
-      <!-- Personal Information Section -->
-      <div class="section" v-if="registrationStatus === 'new' || useExisting">
-        <h2>Personal Information</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="name">Full Name *</label>
-            <input type="text" id="name" v-model="formData.name" class="form-control" required />
-          </div>
-          <div class="form-group">
-            <label for="nic">NIC Number *</label>
-            <input type="text" id="nic" v-model="formData.nic" class="form-control" required />
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="district">District *</label>
-            <select id="district" v-model="formData.district" @change="generateRegID" class="form-control" required>
-              <option value="">Select District</option>
-              <option v-for="district in districts" :key="district" :value="district">
-                {{ district }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="regId">RegID</label>
-            <input type="text" id="regId" v-model="formData.regId" class="form-control" readonly />
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="address">Address *</label>
-            <textarea id="address" v-model="formData.address" class="form-control" required></textarea>
-          </div>
-          <div class="form-group">
-            <label for="phone">Phone Number *</label>
-            <input type="tel" id="phone" v-model="formData.phone" class="form-control" required />
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" v-model="formData.email" class="form-control" />
-          </div>
-          <div class="form-group">
-            <label for="occupation">Occupation</label>
-            <input type="text" id="occupation" v-model="formData.occupation" class="form-control" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Image Upload Section -->
-      <div class="section" v-if="registrationStatus === 'new' || useExisting">
-        <h2>Document Upload</h2>
-        <div class="image-upload">
-          <div class="form-group">
-            <label for="profileImage">Profile Photo</label>
-            <input 
-              type="file" 
-              id="profileImage" 
-              @change="handleImageUpload" 
-              accept="image/*"
-              class="form-control"
-            />
-            <div v-if="imagePreview" class="image-preview">
-              <img :src="imagePreview" alt="Preview" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Loan Details Section -->
       <div class="section" v-if="registrationStatus === 'new' || useExisting">
@@ -205,7 +155,7 @@ import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
 
 export default {
-  name: 'LoanInitForm',
+  Name: 'LoanInitForm',
   setup() {
     const loading = ref(false)
     const message = ref('')
@@ -226,14 +176,14 @@ export default {
     ]
 
     const formData = reactive({
-      name: '',
-      nic: '',
+      Name: '',
+      NIC: '',
       district: '',
-      regId: '',
-      address: '',
-      phone: '',
+      Reg_ID: '',
+      Address: '',
+      contact: '',
       email: '',
-      occupation: '',
+      Occupation: '',
       loanType: '',
       initialAmount: '',
       purpose: '',
@@ -254,7 +204,7 @@ export default {
         try {
           console.log('🔧 Generating RegID for district:', formData.district)
           const newRegId = await dbOperations.generateRegID(formData.district)
-          formData.regId = newRegId
+          formData.Reg_ID = newRegId
           console.log('✅ RegID generated:', newRegId)
         } catch (error) {
           console.error('❌ Error generating RegID:', error)
@@ -300,19 +250,18 @@ export default {
         const profile = searchResult.value.profile
         console.log('📋 Using existing profile data:', profile)
         
-        // Map existing data to form fields, handling different field names
-        formData.name = profile.name || profile.Name || ''
-        formData.nic = profile.nic || profile.NIC || ''
+        // Map existing data to form fields, handling different field Names
+        formData.Name = profile.Name || profile.Name || ''
+        formData.NIC = profile.NIC || profile.NIC || ''
         formData.district = profile.district || profile.District || ''
-        formData.regId = profile.regId || profile.Reg_ID || profile.reg_id || ''
-        formData.address = profile.address || profile.Address || ''
-        formData.phone = profile.phone || profile.contact || ''
+        formData.Reg_ID = profile.Reg_ID || profile.Reg_ID || profile.reg_id || ''
+        formData.contact = profile.contact || profile.contact || ''
         formData.email = profile.email || profile.Email || ''
-        formData.occupation = profile.occupation || profile.Occupation || ''
         
         // If there's an existing profile image, use it
-        if (profile.profileImageUrl || profile.imageUrl || profile.Image) {
-          uploadedImageUrl.value = profile.profileImageUrl || profile.imageUrl || profile.Image
+        if (profile.Image || profile.profileImageUrl || profile.imageUrl) {
+          uploadedImageUrl.value = profile.Image || profile.profileImageUrl || profile.imageUrl
+          console.log('📸 Setting profile image URL:', uploadedImageUrl.value)
         }
         
         useExisting.value = true
@@ -327,6 +276,25 @@ export default {
         searchResult.value = null
         useExisting.value = false
       }
+    }
+
+    const goBack = () => {
+      registrationStatus.value = ''
+      regidSearch.value = ''
+      searchResult.value = null
+      useExisting.value = false
+      imagePreview.value = null
+      uploadedImageUrl.value = null
+      // Reset form data
+      Object.keys(formData).forEach(key => {
+        formData[key] = ''
+      })
+    }
+
+    const handleImageError = (event) => {
+      console.log('❌ Image failed to load:', event.target.src)
+      event.target.style.display = 'none'
+      event.target.nextElementSibling.style.display = 'flex'
     }
 
     const handleImageUpload = async (event) => {
@@ -352,7 +320,7 @@ export default {
 
 
     const validateForm = () => {
-      if (!formData.name || !formData.nic || !formData.district || !formData.address || !formData.phone) {
+      if (!formData.Name || !formData.NIC || !formData.district || !formData.contact) {
         showMessage('Please fill in all required fields', 'error')
         return false
       }
@@ -379,15 +347,13 @@ export default {
       try {
         // Create or update profile
         const profileData = {
-          name: formData.name,
-          nic: formData.nic,
-          district: formData.district,
-          regId: formData.regId,
-          address: formData.address,
-          phone: formData.phone,
+          Name: formData.Name,
+          NIC: formData.NIC,
+          District: formData.district, // Changed from 'district' to 'District'
+          Reg_ID: formData.Reg_ID,
+          contact: formData.contact,
           email: formData.email,
-          occupation: formData.occupation,
-          Image: uploadedImageUrl.value, // Use "Image" field name
+          Image: uploadedImageUrl.value, // Use "Image" field Name
           lastUpdated: new Date()
         }
 
@@ -453,6 +419,8 @@ export default {
       searchRegID,
       useExistingProfile,
       handleImageUpload,
+      goBack,
+      handleImageError,
 
       submitForm,
       resetForm,
@@ -579,6 +547,70 @@ h1 {
   max-width: 200px;
   max-height: 200px;
   border-radius: 5px;
+}
+
+.profile-image-section {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.profile-image-container {
+  display: inline-block;
+  width: 150px;
+  height: 150px;
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #f8f9fa;
+}
+
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  font-size: 14px;
+  text-align: center;
+  padding: 10px;
+}
+
+.back-button-container {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.profile-display {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.profile-display .profile-image-section {
+  flex-shrink: 0;
+}
+
+.profile-display .profile-info {
+  flex: 1;
 }
 
 

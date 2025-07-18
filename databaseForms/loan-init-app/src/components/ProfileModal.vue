@@ -31,28 +31,28 @@
           <h3>Basic Information</h3>
           <div class="info-grid">
             <div class="info-item">
-              <strong>RegID:</strong> {{ profile.id }}
+              <strong>RegID:</strong> {{ profile.Reg_ID || profile.id }}
             </div>
             <div class="info-item">
-              <strong>Name:</strong> {{ profile.basicInfo?.name || 'N/A' }}
+              <strong>Name:</strong> {{ profile.Name || profile.basicInfo?.Name || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}
+              <strong>Age:</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>District:</strong> {{ profile.basicInfo?.district || 'N/A' }}
+              <strong>District:</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}
+              <strong>Phone:</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Address:</strong> {{ profile.basicInfo?.address || 'N/A' }}
+              <strong>Address:</strong> {{ profile.Address || profile.basicInfo?.Address || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>NIC:</strong> {{ profile.basicInfo?.nic || 'N/A' }}
+              <strong>NIC:</strong> {{ profile.NIC || profile.basicInfo?.NIC || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Total Children:</strong> {{ profile.basicInfo?.totalChildren || 'N/A' }}
+              <strong>Total Children:</strong> {{ profile.total_children || profile.basicInfo?.total_children || 'N/A' }}
             </div>
           </div>
         </div>
