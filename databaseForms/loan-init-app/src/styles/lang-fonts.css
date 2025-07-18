@@ -1,0 +1,7 @@
+/* Language-specific font families */
+.lang-ta {
+  font-family: 'Noto Sans Tamil', 'Poppins', sans-serif;
+}
+.lang-si {
+  font-family: 'Noto Sans Sinhala', 'Poppins', sans-serif;
+} 

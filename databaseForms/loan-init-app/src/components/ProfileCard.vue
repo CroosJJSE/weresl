@@ -2,13 +2,13 @@
   <div v-if="profile" class="profile-box" @click="openModal">
     <img 
       :src="profileImageUrl" 
-      :alt="profile.basicInfo?.name || 'Profile Image'"
+      :alt="profile.basicInfo?.name || t('profileCard.unknown')"
       @error="handleImageError"
       @load="handleImageLoad"
     />
     
     <div class="profile-header">
-      <h3>{{ profile.Name || profile.basicInfo?.Name || 'Unknown' }}</h3>
+      <h3>{{ profile.Name || profile.basicInfo?.Name || t('profileCard.unknown') }}</h3>
       <div class="profile-types">
         <span 
           v-for="type in profileTypes" 
@@ -21,24 +21,25 @@
     </div>
     
     <div class="profile-info">
-      <p><strong>RegID:</strong> {{ profile.Reg_ID || profile.id }}</p>
-      <p><strong>Age:</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}</p>
-      <p><strong>District:</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}</p>
-      <p><strong>Phone:</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}</p>
+      <p><strong>{{ t('form.regid') }}</strong> {{ profile.Reg_ID || profile.id }}</p>
+      <p><strong>{{ t('profileCard.age') }}</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}</p>
+      <p><strong>{{ t('profileCard.district') }}</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}</p>
+      <p><strong>{{ t('profileCard.phone') }}</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}</p>
     </div>
     
     <div v-if="profile.computed" class="profile-stats">
-      <p><strong>Active Loans:</strong> {{ profile.computed.activeLoansCount }}</p>
-      <p><strong>Total Loan Amount:</strong> Rs. {{ formatAmount(profile.computed.totalLoanAmount) }}</p>
-      <p><strong>Remaining:</strong> Rs. {{ formatAmount(profile.computed.remainingLoanAmount) }}</p>
+      <p><strong>{{ t('profileCard.activeLoans') }}</strong> {{ profile.computed.activeLoansCount }}</p>
+      <p><strong>{{ t('profileCard.totalLoanAmount') }}</strong> Rs. {{ formatAmount(profile.computed.totalLoanAmount) }}</p>
+      <p><strong>{{ t('profileCard.remaining') }}</strong> Rs. {{ formatAmount(profile.computed.remainingLoanAmount) }}</p>
     </div>
   </div>
 </template>
 
-<script>
+<script setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
+import { t } from '../i18n';
 
 export default {
   name: 'ProfileCard',

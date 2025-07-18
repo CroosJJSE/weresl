@@ -4,7 +4,7 @@
       <div class="close-button" @click="closeModal">&times;</div>
       
       <div class="modal-header">
-        <h2>{{ profile.basicInfo?.name || 'Unknown' }}</h2>
+        <h2>{{ profile.basicInfo?.name || t('profileCard.unknown') }}</h2>
         <div class="profile-types">
           <span 
             v-for="type in profileTypes" 
@@ -20,7 +20,7 @@
         <div class="profile-image-section">
           <img 
             :src="profileImageUrl" 
-            :alt="profile.basicInfo?.name || 'Profile Image'"
+            :alt="profile.basicInfo?.name || t('profileCard.unknown')"
             @error="handleImageError"
             @load="handleImageLoad"
             class="profile-image"
@@ -28,37 +28,37 @@
         </div>
         
         <div class="basic-info">
-          <h3>Basic Information</h3>
+          <h3>{{ t('profileModal.basicInfo') }}</h3>
           <div class="info-grid">
             <div class="info-item">
-              <strong>RegID:</strong> {{ profile.Reg_ID || profile.id }}
+              <strong>{{ t('profileModal.regid') }}</strong> {{ profile.Reg_ID || profile.id }}
             </div>
             <div class="info-item">
-              <strong>Name:</strong> {{ profile.Name || profile.basicInfo?.Name || 'N/A' }}
+              <strong>{{ t('profileModal.name') }}</strong> {{ profile.Name || profile.basicInfo?.Name || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Age:</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}
+              <strong>{{ t('profileModal.age') }}</strong> {{ profile.Age || profile.basicInfo?.Age || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>District:</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}
+              <strong>{{ t('profileModal.district') }}</strong> {{ profile.District || profile.basicInfo?.District || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Phone:</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}
+              <strong>{{ t('profileModal.phone') }}</strong> {{ profile.contact || profile.basicInfo?.contact || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Address:</strong> {{ profile.Address || profile.basicInfo?.Address || 'N/A' }}
+              <strong>{{ t('profileModal.address') }}</strong> {{ profile.Address || profile.basicInfo?.Address || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>NIC:</strong> {{ profile.NIC || profile.basicInfo?.NIC || 'N/A' }}
+              <strong>{{ t('profileModal.nic') }}</strong> {{ profile.NIC || profile.basicInfo?.NIC || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Total Children:</strong> {{ profile.total_children || profile.basicInfo?.total_children || 'N/A' }}
+              <strong>{{ t('profileModal.totalChildren') }}</strong> {{ profile.total_children || profile.basicInfo?.total_children || 'N/A' }}
             </div>
           </div>
         </div>
 
         <div v-if="profile.loans && profile.loans.length > 0" class="loans-section">
-          <h3>Loans</h3>
+          <h3>{{ t('profileModal.loans') }}</h3>
           <div class="loan-list">
             <div v-for="loan in profile.loans" :key="loan.id" class="loan-item">
               <div class="loan-header">
@@ -66,34 +66,34 @@
                 <span class="loan-amount">Rs. {{ formatAmount(loan.amount) }}</span>
               </div>
               <div class="loan-details">
-                <p><strong>Purpose:</strong> {{ loan.purpose }}</p>
-                <p><strong>Date:</strong> {{ formatDate(loan.date) }}</p>
-                <p><strong>Status:</strong> 
+                <p><strong>{{ t('profileModal.purpose') }}</strong> {{ loan.purpose }}</p>
+                <p><strong>{{ t('profileModal.date') }}</strong> {{ formatDate(loan.date) }}</p>
+                <p><strong>{{ t('profileModal.status') }}</strong> 
                   <span :class="`status-${loan.status}`">{{ loan.status }}</span>
                 </p>
-                <p v-if="loan.paidAmount"><strong>Paid:</strong> Rs. {{ formatAmount(loan.paidAmount) }}</p>
+                <p v-if="loan.paidAmount"><strong>{{ t('profileModal.paid') }}</strong> Rs. {{ formatAmount(loan.paidAmount) }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div v-if="profile.grants && profile.grants.length > 0" class="grants-section">
-          <h3>Grants</h3>
+          <h3>{{ t('profileModal.grants') }}</h3>
           <div class="grant-list">
             <div v-for="grant in profile.grants" :key="grant.id" class="grant-item">
               <div class="grant-header">
                 <span class="grant-amount">Rs. {{ formatAmount(grant.amount) }}</span>
               </div>
               <div class="grant-details">
-                <p><strong>Purpose:</strong> {{ grant.purpose }}</p>
-                <p><strong>Date:</strong> {{ formatDate(grant.date) }}</p>
+                <p><strong>{{ t('profileModal.purpose') }}</strong> {{ grant.purpose }}</p>
+                <p><strong>{{ t('profileModal.date') }}</strong> {{ formatDate(grant.date) }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div v-if="profile.paymentHistory && profile.paymentHistory.length > 0" class="payments-section">
-          <h3>Payment History</h3>
+          <h3>{{ t('profileModal.paymentHistory') }}</h3>
           <div class="payment-list">
             <div v-for="payment in profile.paymentHistory" :key="payment.id" class="payment-item">
               <div class="payment-header">
@@ -101,15 +101,15 @@
                 <span class="payment-amount">Rs. {{ formatAmount(payment.amount) }}</span>
               </div>
               <div class="payment-details">
-                <p v-if="payment.details"><strong>Details:</strong> {{ payment.details }}</p>
-                <p><strong>Date:</strong> {{ formatDate(payment.date) }}</p>
+                <p v-if="payment.details"><strong>{{ t('profileModal.details') }}</strong> {{ payment.details }}</p>
+                <p><strong>{{ t('profileModal.date') }}</strong> {{ formatDate(payment.date) }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div v-if="profile.arms && profile.arms.length > 0" class="arms-section">
-          <h3>Projects (ARMS)</h3>
+          <h3>{{ t('profileModal.projects') }}</h3>
           <div class="arms-list">
             <div v-for="arm in profile.arms" :key="arm" class="arm-item">
               {{ arm }}
@@ -118,28 +118,28 @@
         </div>
 
         <div v-if="profile.computed" class="stats-section">
-          <h3>Summary Statistics</h3>
+          <h3>{{ t('profileModal.summaryStats') }}</h3>
           <div class="stats-grid">
             <div class="stat-item">
-              <strong>Active Loans:</strong> {{ profile.computed.activeLoansCount }}
+              <strong>{{ t('profileModal.activeLoans') || 'Active Loans:' }}</strong> {{ profile.computed.activeLoansCount }}
             </div>
             <div class="stat-item">
-              <strong>Completed Loans:</strong> {{ profile.computed.completedLoansCount }}
+              <strong>{{ t('profileModal.completedLoans') }}</strong> {{ profile.computed.completedLoansCount }}
             </div>
             <div class="stat-item">
-              <strong>Grants:</strong> {{ profile.computed.grantsCount }}
+              <strong>{{ t('profileModal.grantsCount') }}</strong> {{ profile.computed.grantsCount }}
             </div>
             <div class="stat-item">
-              <strong>Total Loan Amount:</strong> Rs. {{ formatAmount(profile.computed.totalLoanAmount) }}
+              <strong>{{ t('profileModal.totalLoanAmount') }}</strong> Rs. {{ formatAmount(profile.computed.totalLoanAmount) }}
             </div>
             <div class="stat-item">
-              <strong>Total Grant Amount:</strong> Rs. {{ formatAmount(profile.computed.totalGrantAmount) }}
+              <strong>{{ t('profileModal.totalGrantAmount') }}</strong> Rs. {{ formatAmount(profile.computed.totalGrantAmount) }}
             </div>
             <div class="stat-item">
-              <strong>Total Paid:</strong> Rs. {{ formatAmount(profile.computed.totalPaidAmount) }}
+              <strong>{{ t('profileModal.totalPaid') }}</strong> Rs. {{ formatAmount(profile.computed.totalPaidAmount) }}
             </div>
             <div class="stat-item">
-              <strong>Remaining Loan:</strong> Rs. {{ formatAmount(profile.computed.remainingLoanAmount) }}
+              <strong>{{ t('profileModal.remainingLoan') }}</strong> Rs. {{ formatAmount(profile.computed.remainingLoanAmount) }}
             </div>
           </div>
         </div>
@@ -148,10 +148,11 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
+import { t } from '../i18n';
 
 export default {
   name: 'ProfileModal',

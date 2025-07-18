@@ -3,15 +3,15 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-value">{{ analytics.stats?.totalProfiles || 0 }}</div>
-        <div class="stat-label">Total Profiles</div>
+        <div class="stat-label">{{ t('analytics.totalProfiles') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">{{ analytics.stats?.totalLoans || 0 }}</div>
-        <div class="stat-label">Total Loans</div>
+        <div class="stat-label">{{ t('analytics.totalLoans') }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">Rs. {{ formatAmount(analytics.stats?.totalAmount || 0) }}</div>
-        <div class="stat-label">Total Amount</div>
+        <div class="stat-label">{{ t('analytics.totalAmount') }}</div>
       </div>
     </div>
 
@@ -19,7 +19,7 @@
       <div class="chart-card">
         <div class="chart-title">
           <span class="chart-icon">📊</span>
-          District Distribution
+          {{ t('analytics.districtDistribution') }}
         </div>
         <div class="district-chart">
           <div 
@@ -44,7 +44,7 @@
       <div class="chart-card">
         <div class="chart-title">
           <span class="chart-icon">📈</span>
-          Yearly Growth
+          {{ t('analytics.yearlyGrowth') }}
         </div>
         <div class="year-chart">
           <div 
@@ -63,14 +63,14 @@
     </div>
 
     <div class="detailed-stats">
-      <h3>Detailed Statistics</h3>
+      <h3>{{ t('analytics.detailedStats') }}</h3>
       <div class="stats-table">
         <div class="stats-row header">
-          <div>District</div>
-          <div>Profiles</div>
-          <div>Loans</div>
-          <div>Grants</div>
-          <div>Total Amount</div>
+          <div>{{ t('analytics.district') }}</div>
+          <div>{{ t('analytics.profiles') }}</div>
+          <div>{{ t('analytics.loans') }}</div>
+          <div>{{ t('analytics.grants') }}</div>
+          <div>{{ t('analytics.totalAmountCol') }}</div>
         </div>
         <div 
           v-for="(stats, district) in districtDetailedStats" 
@@ -88,9 +88,10 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import { dbOperations } from '@/firebase/db.js'
+import { t } from '../../i18n';
 
 export default {
   Name: 'AnalyticsDashboard',

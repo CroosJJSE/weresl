@@ -334,6 +334,16 @@ export default {
           await profileService.addLoan(formData.Reg_ID, loanData)
           success.value = `Loan added successfully to profile ${formData.Reg_ID}`
         } else {
+          // Check if NIC already exists
+          const allProfiles = await profileService.getProfiles();
+          const nicExists = allProfiles.some(
+            p => (p.basicInfo?.NIC || p.NIC) === formData.basicInfo.NIC
+          );
+          if (nicExists) {
+            error.value = `A profile with this NIC already exists.`;
+            loading.value = false;
+            return;
+          }
           // Create new profile with loan
           const profileData = {
             basicInfo: formData.basicInfo,

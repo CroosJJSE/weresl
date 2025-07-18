@@ -12,40 +12,40 @@
         </div>
     </div>
 
-    <h1>WERESL Database</h1>
+    <h1>{{ t('home.title') }}</h1>
 
     <div class="view-toggle">
       <button 
         :class="['view-btn', { active: currentView === 'profiles' }]"
         @click="currentView = 'profiles'"
       >
-        Profiles
+        {{ t('home.profiles') }}
       </button>
       <button 
         :class="['view-btn', { active: currentView === 'analytics' }]"
         @click="currentView = 'analytics'"
       >
-        Analytics
+        {{ t('home.analytics') }}
       </button>
     </div>
 
     <div v-if="currentView === 'profiles'" class="profiles-view">
       <div class="filters">
         <select v-model="filters.district" @change="loadProfiles">
-          <option value="">All Districts</option>
+          <option value="">{{ t('home.allDistricts') }}</option>
           <option v-for="district in districts" :key="district" :value="district">
             {{ district }}
           </option>
         </select>
 
         <select v-model="filters.type" @change="loadProfiles">
-          <option value="">All Types</option>
+          <option value="">{{ t('home.allTypes') }}</option>
           <option value="RF">RF</option>
           <option value="GRANT">GRANT</option>
         </select>
 
         <select v-model="filters.year" @change="loadProfiles">
-          <option value="">All Years</option>
+          <option value="">{{ t('home.allYears') }}</option>
           <option v-for="year in years" :key="year" :value="year">
             {{ year }}
           </option>
@@ -53,11 +53,11 @@
       </div>
 
       <div v-if="loading" class="loading">
-        Loading profiles...
+        {{ t('home.loadingProfiles') }}
       </div>
 
       <div v-else-if="error" class="error">
-        {{ error }}
+        {{ t('home.failedToLoadProfiles') }} {{ error }}
       </div>
 
       <div v-else class="profile-container">
@@ -106,12 +106,12 @@
     </div>
 
     <div class="footer">
-      <p>WERESL Database Management System</p>
+      <p>{{ t('home.footer') }}</p>
     </div>
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import ProfileCard from '@/components/ProfileCard.vue'
 import ProfileModal from '@/components/ProfileModal.vue'
@@ -119,6 +119,7 @@ import AnalyticsDashboard from '@/pages/analytics/AnalyticsDashboard.vue'
 import { profileService } from '@/services/profile.js'
 import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
+import { t } from '../../i18n';
 
 export default {
   Name: 'HomePage',

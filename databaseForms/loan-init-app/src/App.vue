@@ -5,8 +5,12 @@
 </template>
 
 <script>
+import '../src/styles/lang-fonts.css';
 export default {
-  name: 'App'
+  name: 'App',
+  mounted() {
+    console.log('[App.vue] App mounted');
+  }
 }
 </script>
 

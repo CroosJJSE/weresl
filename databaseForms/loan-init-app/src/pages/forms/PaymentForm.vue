@@ -1,42 +1,42 @@
 <template>
   <div class="payment-form">
     <div class="form-header">
-      <h2>Payment Return Form</h2>
-      <p>Process RF loan payments and Grant "Give It Forward" entries</p>
+      <h2>{{ t('paymentForm.title') }}</h2>
+      <p>{{ t('paymentForm.processRF') }}</p>
     </div>
 
     <form @submit.prevent="handleSubmit" class="form">
       <div class="form-section">
-        <h3>Payment Information</h3>
+        <h3>{{ t('paymentForm.paymentInfo') }}</h3>
         
         <div class="form-row">
           <div class="form-group">
-            <label for="Reg_ID">Registration ID</label>
+            <label for="Reg_ID">{{ t('paymentForm.registrationId') }}</label>
             <input 
               type="text" 
               id="Reg_ID" 
               v-model="formData.Reg_ID" 
-              placeholder="Enter RegID"
+              :placeholder="t('form.enterRegID')"
               required
             />
           </div>
           <div class="form-group">
-            <label for="type">Payment Type</label>
+            <label for="type">{{ t('paymentForm.paymentType') }}</label>
             <select id="type" v-model="formData.type" required>
-              <option value="">Select Type</option>
-              <option value="RF">RF Loan Payment</option>
-              <option value="GRANT">Grant "Give It Forward"</option>
+              <option value="">{{ t('paymentForm.selectType') }}</option>
+              <option value="RF">{{ t('paymentForm.rfLoanPayment') }}</option>
+              <option value="GRANT">{{ t('paymentForm.grantGiveItForward') }}</option>
             </select>
           </div>
         </div>
 
         <div v-if="formData.type === 'RF'" class="form-group">
-          <label for="amount">Payment Amount (Rs.)</label>
+          <label for="amount">{{ t('paymentForm.paymentAmount') }}</label>
           <input 
             type="number" 
             id="amount" 
             v-model="formData.amount" 
-            placeholder="Enter payment amount"
+            :placeholder="t('paymentForm.enterPaymentAmount')"
             min="0"
             step="0.01"
             required
@@ -44,17 +44,17 @@
         </div>
 
         <div v-if="formData.type === 'GRANT'" class="form-group">
-          <label for="details">Give It Forward Details</label>
+          <label for="details">{{ t('paymentForm.giveItForwardDetails') }}</label>
           <textarea 
             id="details" 
             v-model="formData.details" 
-            placeholder="Enter details about the grant recipient"
+            :placeholder="t('paymentForm.enterDetails')"
             required
           ></textarea>
         </div>
 
         <div class="form-group">
-          <label for="date">Payment Date</label>
+          <label for="date">{{ t('paymentForm.paymentDate') }}</label>
           <input 
             type="date" 
             id="date" 
@@ -65,20 +65,20 @@
       </div>
 
       <div v-if="profile" class="profile-preview">
-        <h3>Profile Preview</h3>
+        <h3>{{ t('paymentForm.profilePreview') }}</h3>
         <div class="profile-info">
-          <p><strong>Name:</strong> {{ profile.basicInfo?.Name }}</p>
-          <p><strong>District:</strong> {{ profile.basicInfo?.District || profile.District || 'N/A' }}</p>
-          <p><strong>Active Loans:</strong> {{ profile.computed?.activeLoansCount || 0 }}</p>
-          <p><strong>Total Loan Amount:</strong> Rs. {{ formatAmount(profile.computed?.totalLoanAmount || 0) }}</p>
-          <p><strong>Remaining Amount:</strong> Rs. {{ formatAmount(profile.computed?.remainingLoanAmount || 0) }}</p>
+          <p><strong>{{ t('paymentForm.name') }}</strong> {{ profile.basicInfo?.Name }}</p>
+          <p><strong>{{ t('paymentForm.district') }}</strong> {{ profile.basicInfo?.District || profile.District || 'N/A' }}</p>
+          <p><strong>{{ t('paymentForm.activeLoans') }}</strong> {{ profile.computed?.activeLoansCount || 0 }}</p>
+          <p><strong>{{ t('paymentForm.totalLoanAmount') }}</strong> Rs. {{ formatAmount(profile.computed?.totalLoanAmount || 0) }}</p>
+          <p><strong>{{ t('paymentForm.remainingAmount') }}</strong> Rs. {{ formatAmount(profile.computed?.remainingLoanAmount || 0) }}</p>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="button" @click="resetForm" class="btn-secondary">Reset</button>
+        <button type="button" @click="resetForm" class="btn-secondary">{{ t('paymentForm.reset') }}</button>
         <button type="submit" :disabled="loading" class="btn-primary">
-          {{ loading ? 'Processing...' : 'Submit Payment' }}
+          {{ loading ? t('paymentForm.processing') : t('paymentForm.submit') }}
         </button>
       </div>
     </form>
@@ -93,9 +93,10 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, reactive, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
+import { t } from '../../i18n';
 
 export default {
   Name: 'PaymentForm',
@@ -131,22 +132,22 @@ export default {
       const errors = []
 
       if (!formData.Reg_ID) {
-        errors.push('Registration ID is required')
+        errors.push(t('paymentForm.regIDRequired'))
       }
 
       if (!formData.type) {
-        errors.push('Payment type is required')
+        errors.push(t('paymentForm.paymentTypeRequired'))
       }
 
       if (formData.type === 'RF') {
         if (!formData.amount || formData.amount <= 0) {
-          errors.push('Valid payment amount is required for RF payments')
+          errors.push(t('paymentForm.rfPaymentAmountRequired'))
         }
       }
 
       if (formData.type === 'GRANT') {
         if (!formData.details) {
-          errors.push('Details are required for GRANT payments')
+          errors.push(t('paymentForm.grantDetailsRequired'))
         }
       }
 
@@ -177,14 +178,14 @@ export default {
         await profileService.processPayment(paymentData)
         
         if (formData.type === 'RF') {
-          success.value = `RF payment of Rs. ${formData.amount} processed successfully for ${formData.Reg_ID}`
+          success.value = `${t('paymentForm.rfPaymentSuccess')}${formData.amount}${t('paymentForm.for')}${formData.Reg_ID}`
         } else {
-          success.value = `Grant "Give It Forward" entry processed successfully for ${formData.Reg_ID}`
+          success.value = `${t('paymentForm.grantSuccess')}${formData.Reg_ID}`
         }
 
         resetForm()
       } catch (err) {
-        error.value = 'Failed to process payment: ' + err.message
+        error.value = `${t('paymentForm.paymentFailed')}${err.message}`
       } finally {
         loading.value = false
       }
