@@ -21,10 +21,7 @@
 
       <!-- RegID Lookup Section -->
       <div class="section" v-if="registrationStatus === 'existing'">
-        <div class="section-header">
-          <h2>Search Existing Applicant</h2>
-          <button @click="goBack" class="btn btn-secondary">← Back to Registration Choice</button>
-        </div>
+        <h2>Search Existing Applicant</h2>
         <div class="regid-lookup">
           <div class="form-group">
             <label for="regidSearch">Enter RegID:</label>
@@ -43,27 +40,22 @@
           <div v-if="searchResult" class="search-result">
             <div v-if="searchResult.found" class="alert alert-success">
               <strong>Found existing applicant:</strong> 
-              <div class="profile-display">
-                <div class="profile-image-section">
-                  <div class="profile-image-container">
-                    <img 
-                      v-if="searchResult.profile.Image" 
-                      :src="searchResult.profile.Image" 
-                      alt="Profile Photo" 
-                      class="profile-image"
-                      @error="handleImageError"
-                    />
-                    <div v-else class="profile-placeholder">
-                      <span>No Profile Photo</span>
-                    </div>
+              <div class="profile-info">
+                <div class="profile-image-container">
+                  <img 
+                    v-if="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    :src="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    alt="Profile Photo" 
+                    class="profile-image"
+                  />
+                  <div v-else class="profile-placeholder">
+                    <span>No Profile Photo</span>
                   </div>
                 </div>
-                <div class="profile-info">
-                  <p><strong>Name:</strong> {{ searchResult.profile.Name || 'N/A' }}</p>
-                  <p><strong>NIC:</strong> {{ searchResult.profile.NIC || 'N/A' }}</p>
-                  <p><strong>Phone:</strong> {{ searchResult.profile.contact || 'N/A' }}</p>
-                  <p><strong>RegID:</strong> {{ searchResult.profile.Reg_ID || 'N/A' }}</p>
-                </div>
+                <p><strong>Name:</strong> {{ searchResult.profile.Name || 'N/A' }}</p>
+                <p><strong>NIC:</strong> {{ searchResult.profile.NIC || 'N/A' }}</p>
+                <p><strong>Phone:</strong> {{ searchResult.profile.contact || 'N/A' }}</p>
+                <p><strong>RegID:</strong> {{ searchResult.profile.Reg_ID || 'N/A' }}</p>
               </div>
               <button @click="useExistingProfile" class="btn btn-primary">Use This Profile</button>
             </div>
@@ -72,10 +64,80 @@
               <button @click="setRegistrationStatus('new')" class="btn btn-secondary">Register New</button>
             </div>
           </div>
+          
+          <!-- Back Button -->
+          <div class="back-button-container">
+            <button @click="goBack" class="btn btn-secondary">← Back to Registration Choice</button>
+          </div>
         </div>
       </div>
 
+      <!-- Personal Information Section -->
+      <div class="section" v-if="registrationStatus === 'new'">
+        <h2>Personal Information</h2>
+        
+        <!-- Profile Image Display and Upload for New Applicants -->
+        <div class="profile-image-section">
+          <div class="profile-image-container">
+            <img 
+              v-if="imagePreview || uploadedImageUrl" 
+              :src="imagePreview || uploadedImageUrl" 
+              alt="Profile Photo" 
+              class="profile-image"
+            />
+            <div v-else class="profile-placeholder">
+              <span>No Profile Photo</span>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top: 10px;">
+            <input 
+              type="file" 
+              id="profileImage" 
+              @change="handleImageUpload" 
+              accept="image/*"
+              class="form-control"
+            />
+          </div>
+        </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label for="Name">Full Name *</label>
+            <input type="text" id="Name" v-model="formData.Name" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="NIC">NIC Number *</label>
+            <input type="text" id="NIC" v-model="formData.NIC" class="form-control" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="contact">Phone Number *</label>
+            <input type="tel" id="contact" v-model="formData.contact" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" v-model="formData.email" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="district">District *</label>
+            <select id="district" v-model="formData.district" @change="generateRegID" class="form-control" required>
+              <option value="">Select District</option>
+              <option v-for="district in districts" :key="district" :value="district">
+                {{ district }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="Reg_ID">RegID</label>
+            <input type="text" id="Reg_ID" v-model="formData.Reg_ID" class="form-control" readonly />
+          </div>
+        </div>
+      </div>
 
 
 
@@ -151,8 +213,11 @@
 
 <script>
 import { ref, reactive, computed } from 'vue'
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
 import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
+
+const db = getFirestore();
 
 export default {
   Name: 'LoanInitForm',
@@ -291,12 +356,6 @@ export default {
       })
     }
 
-    const handleImageError = (event) => {
-      console.log('❌ Image failed to load:', event.target.src)
-      event.target.style.display = 'none'
-      event.target.nextElementSibling.style.display = 'flex'
-    }
-
     const handleImageUpload = async (event) => {
       const file = event.target.files[0]
       if (!file) return
@@ -343,9 +402,25 @@ export default {
 
       loading.value = true
       console.log('🚀 Starting form submission...')
-      
+
       try {
-        // Create or update profile
+        // 1. Check NIC uniqueness in NIC_data BEFORE RegID generation
+        const nicDataRef = doc(db, 'SearchElements', 'NIC_data')
+        const nicDataSnap = await getDoc(nicDataRef)
+        let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
+        console.log('🔍 Checking NIC_data for NIC:', formData.NIC)
+        console.log('📋 NIC_data exists:', !!nicData[formData.NIC])
+        if (nicData[formData.NIC]) {
+          showMessage('A profile with this NIC already exists (RegID: ' + nicData[formData.NIC] + ')', 'error')
+          loading.value = false
+          return
+        }
+
+        // 2. Generate RegID (only if NIC is unique)
+        await generateRegID()
+        console.log('✅ RegID generated:', formData.Reg_ID)
+
+        // 3. Create or update profile
         const profileData = {
           Name: formData.Name,
           NIC: formData.NIC,
@@ -362,6 +437,11 @@ export default {
         // Create profile document
         const profileRef = await dbOperations.createProfile(profileData)
         console.log('✅ Profile created successfully:', profileRef)
+
+        // 4. Add NIC:Reg_ID to NIC_data
+        nicData[formData.NIC] = formData.Reg_ID
+        await setDoc(nicDataRef, nicData)
+        console.log('✅ NIC_data updated:', nicData)
 
         // Create loan document using addLoan function
         const loanData = {
@@ -420,7 +500,6 @@ export default {
       useExistingProfile,
       handleImageUpload,
       goBack,
-      handleImageError,
 
       submitForm,
       resetForm,
@@ -516,9 +595,12 @@ h1 {
 }
 
 .alert-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  background-color: #4caf50;
+  color: #fff;
+  border: 1px solid #388e3c;
+  font-weight: bold;
+  font-size: 16px;
+  text-align: center;
 }
 
 .alert-error {
@@ -585,32 +667,6 @@ h1 {
 .back-button-container {
   margin-bottom: 20px;
   text-align: left;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.section-header h2 {
-  margin: 0;
-}
-
-.profile-display {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  margin-bottom: 15px;
-}
-
-.profile-display .profile-image-section {
-  flex-shrink: 0;
-}
-
-.profile-display .profile-info {
-  flex: 1;
 }
 
 
