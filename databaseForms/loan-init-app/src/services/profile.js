@@ -202,12 +202,32 @@ export const profileService = {
       errors.push('Name is required')
     }
     
+    if (!profileData.basicInfo?.NIC) {
+      errors.push('NIC is required')
+    }
+    
+    if (!profileData.basicInfo?.contact) {
+      errors.push('Contact number is required')
+    }
+    
     if (!profileData.basicInfo?.District) {
       errors.push('District is required')
     }
     
+    if (!profileData.basicInfo?.Address) {
+      errors.push('Address is required')
+    }
+    
     if (!profileData.basicInfo?.age || profileData.basicInfo.age < 0) {
       errors.push('Valid age is required')
+    }
+    
+    if (!profileData.basicInfo?.totalChildren || profileData.basicInfo.totalChildren < 0) {
+      errors.push('Total children is required')
+    }
+    
+    if (!profileData.basicInfo?.schoolKids || profileData.basicInfo.schoolKids < 0) {
+      errors.push('School-going children is required')
     }
     
     return errors

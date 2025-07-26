@@ -184,7 +184,12 @@ export const dbOperations = {
           school_kids: data.school_kids,
           others: data.others,
           createdAt: data.createdAt,
-          updatedAt: data.updatedAt
+          updatedAt: data.updatedAt,
+          // Add fields for RF/GIF return functionality
+          RF_return_history: data.RF_return_history || {},
+          GIF: data.GIF || {},
+          Grant_return: data.Grant_return || false,
+          RF_payment_history_integrity: data.RF_payment_history_integrity || false
         }
         
         return transformedProfile
@@ -193,6 +198,40 @@ export const dbOperations = {
       }
     } catch (error) {
       console.error('Error getting profile:', error)
+      throw error
+    }
+  },
+
+  // Get loans for a profile (including RF_Loans subcollection)
+  async getLoans(profileId) {
+    try {
+      const loans = []
+      
+      // Get RF_Loans from subcollection
+      try {
+        const rfQuery = query(collection(db, 'profiles', profileId, 'RF_Loans'))
+        const rfSnapshot = await getDocs(rfQuery)
+        rfSnapshot.docs.forEach(doc => {
+          loans.push({ id: doc.id, ...doc.data(), type: 'RF' })
+        })
+      } catch (error) {
+        console.log('No RF_Loans collection found')
+      }
+      
+      // Get GRANT loans from subcollection
+      try {
+        const grantQuery = query(collection(db, 'profiles', profileId, 'GRANT'))
+        const grantSnapshot = await getDocs(grantQuery)
+        grantSnapshot.docs.forEach(doc => {
+          loans.push({ id: doc.id, ...doc.data(), type: 'GRANT' })
+        })
+      } catch (error) {
+        console.log('No GRANT collection found')
+      }
+      
+      return loans.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate())
+    } catch (error) {
+      console.error('Error getting loans:', error)
       throw error
     }
   },

@@ -296,6 +296,11 @@ export default {
       if (formData.registered === 'No') {
         const validationErrors = profileService.validateProfileData({ basicInfo: formData.basicInfo })
         errors.push(...validationErrors)
+        
+        // Check if profile photo is uploaded for new users
+        if (!formData.imageFile) {
+          errors.push('Please upload a profile photo')
+        }
       }
 
       const loanValidationErrors = profileService.validateLoanData({

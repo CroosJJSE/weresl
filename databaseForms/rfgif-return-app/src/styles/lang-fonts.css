@@ -1,0 +1,91 @@
+/* Language-specific font imports and styles */
+
+/* Import Google Fonts for Tamil and Sinhala */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&display=swap');
+
+/* Language-specific font classes */
+.lang-ta {
+  font-family: 'Noto Sans Tamil', sans-serif;
+}
+
+.lang-si {
+  font-family: 'Noto Sans Sinhala', sans-serif;
+}
+
+.lang-en {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Ensure proper font rendering for all languages */
+* {
+  font-family: inherit;
+}
+
+/* Tamil-specific adjustments */
+.lang-ta .form-control,
+.lang-ta .btn,
+.lang-ta label,
+.lang-ta p,
+.lang-ta span,
+.lang-ta h1,
+.lang-ta h2,
+.lang-ta h3,
+.lang-ta h4,
+.lang-ta h5,
+.lang-ta h6 {
+  font-family: 'Noto Sans Tamil', sans-serif;
+}
+
+/* Sinhala-specific adjustments */
+.lang-si .form-control,
+.lang-si .btn,
+.lang-si label,
+.lang-si p,
+.lang-si span,
+.lang-si h1,
+.lang-si h2,
+.lang-si h3,
+.lang-si h4,
+.lang-si h5,
+.lang-si h6 {
+  font-family: 'Noto Sans Sinhala', sans-serif;
+}
+
+/* English-specific adjustments */
+.lang-en .form-control,
+.lang-en .btn,
+.lang-en label,
+.lang-en p,
+.lang-en span,
+.lang-en h1,
+.lang-en h2,
+.lang-en h3,
+.lang-en h4,
+.lang-en h5,
+.lang-en h6 {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Responsive font sizes for different languages */
+@media screen and (max-width: 768px) {
+  .lang-ta,
+  .lang-si {
+    font-size: 14px;
+  }
+  
+  .lang-ta h1,
+  .lang-si h1 {
+    font-size: 24px;
+  }
+  
+  .lang-ta h2,
+  .lang-si h2 {
+    font-size: 20px;
+  }
+  
+  .lang-ta h3,
+  .lang-si h3 {
+    font-size: 18px;
+  }
+} 

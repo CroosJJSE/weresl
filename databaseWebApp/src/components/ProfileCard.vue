@@ -62,29 +62,63 @@ export default {
       return new Intl.NumberFormat('en-IN').format(amount)
     }
 
+    const loadProfileImage = async () => {
+      try {
+        // Check multiple possible image field names
+        const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
+        
+        if (!props.profile || !imageUrl) {
+          profileImageUrl.value = '/placeholder-profile.jpg'
+          return
+        }
+        
+        // Use debug function for better troubleshooting
+        const directUrl = await imageService.debugImageUrl(imageUrl)
+        profileImageUrl.value = directUrl
+      } catch (error) {
+        console.error(`[ProfileCard] Error loading image for profile: ${props.profile?.id}:`, error)
+        profileImageUrl.value = '/placeholder-profile.jpg'
+      }
+    }
+
     const handleImageError = () => {
+      console.error(`[ProfileCard] Image failed to load for profile: ${props.profile?.id}`);
+      console.error(`[ProfileCard] Failed URL: ${profileImageUrl.value}`);
+      
+      // Try fallback URL if it's a Google Drive URL
+      const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
+      if (imageService.isGoogleDriveUrl(imageUrl)) {
+        const fileId = imageService.extractDriveFileId(imageUrl);
+        if (fileId) {
+          // Try multiple fallback formats in sequence
+          const fallbackUrls = [
+            `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`,
+            `https://drive.google.com/file/d/${fileId}/preview`,
+            `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`,
+            `https://drive.google.com/uc?export=view&id=${fileId}`
+          ];
+          
+          // Find the next URL to try (skip the one that just failed)
+          const currentUrl = profileImageUrl.value;
+          const currentIndex = fallbackUrls.findIndex(url => url === currentUrl);
+          const nextIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
+          
+          if (nextIndex < fallbackUrls.length) {
+            const nextUrl = fallbackUrls[nextIndex];
+            profileImageUrl.value = nextUrl;
+            return;
+          } else {
+            console.log(`[ProfileCard] All fallback URLs exhausted, using placeholder`);
+          }
+        }
+      }
+      
       profileImageUrl.value = '/placeholder-profile.jpg'
       imageLoading.value = false
     }
 
     const handleImageLoad = () => {
       imageLoading.value = false
-    }
-
-    const loadProfileImage = async () => {
-      try {
-        if (!props.profile || !props.profile.Image) {
-          profileImageUrl.value = '/placeholder-profile.jpg'
-          return
-        }
-        
-        // Use imageService to get the correct thumbnail URL (supports both Drive and Cloudinary)
-        const thumbnailUrl = await imageService.getProfileImageThumbnail(props.profile.Image)
-        profileImageUrl.value = thumbnailUrl
-      } catch (error) {
-        console.error('Error loading profile image:', error)
-        profileImageUrl.value = '/placeholder-profile.jpg'
-      }
     }
 
     onMounted(() => {

@@ -1,306 +1,235 @@
-# WERESL Firebase Application
+# RF & GIF Return Web App
 
-A modular Firebase web application that replicates the functionality of the existing Google Sheets/Apps Script solution with improved architecture and Firebase integration.
+A comprehensive web application for recording RF (Revolving Fund) repayments and GIF (Give It Forward) returns for the WERESL organization.
 
-## 🚀 Features
+## 🌟 Features
 
-### Core Functionalities
-- **Profile Management**: Complete CRUD operations for user profiles
-- **Loan Processing**: RF, GRANT, and GIF loan types with payment tracking
-- **Payment Processing**: RF loan payments and Grant "Give It Forward" entries
-- **Analytics Dashboard**: Real-time statistics and charts
-- **Image Upload**: HEIC conversion and compression with Google Drive integration
-- **Developer Tools**: Hidden developer mode with raw data access
+### 🔍 Profile Search
+- Search by NIC or Reg_ID to find existing profiles
+- Display profile information including name, district, contact details
+- Show profile image if available
 
-### Technical Features
-- **Modular Architecture**: Clean separation of concerns with Vue.js components
-- **Firebase Integration**: Real-time database with Firestore
-- **Responsive Design**: Mobile-friendly interface
-- **Form Validation**: Comprehensive client-side and server-side validation
-- **Error Handling**: Robust error logging and user feedback
-- **System Logging**: Complete operation tracking
+### 💰 RF (Revolving Fund) Repayment
+- **Smart Repayment Logic**: Automatically applies payments to oldest loans first
+- **Bill Upload**: Upload payment receipts (images/PDFs) to Cloudinary
+- **Balance Tracking**: Real-time updates to loan balances
+- **Payment History**: Complete audit trail of all repayments
+- **Integrity Check**: Automatic verification of payment accuracy
 
-## 📁 Project Structure
+### 🎁 GIF (Give It Forward) Returns
+- **Description Entry**: Record what beneficiaries are giving forward
+- **Return Tracking**: Mark profiles as having completed GIF returns
+- **Timestamp Logging**: Track when GIF returns were made
 
-```
-src/
-├── assets/           # Static files
-├── components/       # Reusable UI components
-│   ├── ProfileCard.vue
-│   └── ProfileModal.vue
-├── config/           # Configuration files
-├── firebase/         # Firebase services
-│   ├── auth.js       # Authentication
-│   ├── db.js         # Database operations
-│   ├── storage.js    # File storage
-│   └── index.js      # Main Firebase initialization
-├── pages/            # Application pages
-│   ├── admin/        # Admin views
-│   ├── analytics/    # Analytics dashboard
-│   ├── forms/        # Data entry forms
-│   └── main/         # Main profile views
-├── services/         # Business logic
-│   ├── profile.js    # Profile operations
-│   ├── loan.js       # Loan processing
-│   ├── grant.js      # Grant processing
-│   └── utils.js      # Utility functions
-├── styles/           # CSS files
-└── App.js            # Main application entry
-```
+### 🌐 Multi-Language Support
+- **English**: Primary language
+- **Tamil**: Full translation support
+- **Sinhala**: Full translation support
+- **Language Toggle**: Easy switching between languages
 
-## 🛠️ Installation
+## 🏗️ Technical Architecture
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd weresl-firebase-app
-   ```
+### Frontend
+- **Vue 3**: Modern reactive framework
+- **Vite**: Fast build tool
+- **Tailwind CSS**: Utility-first styling
+- **Vue Router**: Client-side routing
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+### Backend
+- **Firebase Firestore**: NoSQL database
+- **Firebase Storage**: File storage (via Cloudinary)
+- **Cloudinary**: Image/PDF upload service
 
-3. **Configure Firebase**
-   - Update `src/firebase/index.js` with your Firebase configuration
-   - Set up Firestore database with the required collections
-   - Configure Firebase Storage for image uploads
-
-4. **Migrate Data from Google Sheets** (Optional)
-   ```bash
-   # Run setup to check configuration
-   node setup-migration.js
-   
-   # Export your Google Sheets data as CSV
-   # Place main.csv and projects.csv in the data/ directory
-   
-   # Run migration
-   node migrate-from-csv.js
-   ```
-
-5. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-## 🔧 Configuration
-
-### Firebase Setup
-1. Create a Firebase project
-2. Enable Firestore Database
-3. Enable Firebase Storage
-4. Update the configuration in `src/firebase/index.js`
-
-### Database Collections
-The application uses the following Firestore collections:
-- `profiles`: User profile data
-- `loans`: Loan records
-- `grants`: Grant records
-- `payments`: Payment history
-- `system_logs`: System operation logs
-
-## 📊 Data Migration
-
-### From Google Sheets to Firebase
-
-If you have existing data in Google Sheets, you can migrate it to Firebase:
-
-1. **Export Data from Google Sheets**:
-   - Go to your Google Sheets
-   - Export the "Main" sheet as CSV: `File → Download → CSV`
-   - Save as `data/main.csv`
-   - If you have a "Projects" sheet, export it as `data/projects.csv`
-
-2. **Run Migration Setup**:
-   ```bash
-   node setup-migration.js
-   ```
-
-3. **Install Migration Dependencies**:
-   ```bash
-   npm install
-   ```
-
-4. **Run Migration**:
-   ```bash
-   node migrate-from-csv.js
-   ```
-
-### Migration Features
-- ✅ Automatic Firebase configuration detection
-- ✅ Profile data migration with all fields
-- ✅ Projects data migration (if available)
-- ✅ District mappings and codes
-- ✅ Arms data linking
-- ✅ Error handling and progress tracking
-- ✅ Data validation and cleanup
-
-### Migration Files
-- `migrate-from-csv.js`: Main migration script
-- `setup-migration.js`: Setup and configuration checker
-- `MIGRATION_GUIDE.md`: Detailed migration instructions
+### Key Components
+- `RFGIFReturnForm.vue`: Main form component
+- `LanguageToggle.vue`: Language switching component
+- `db.js`: Firebase database operations
+- `imageService.js`: File upload handling
+- `i18n.ts`: Internationalization system
 
 ## 📊 Database Schema
 
-### Profile Structure
+### Profile Document
 ```javascript
 {
-  id: "REGID", // Registration ID (e.g., "COL001")
-  basicInfo: {
-    name: "string",
-    age: "number",
-    district: "string",
-    phone: "string",
-    address: "string",
-    nic: "string",
-    totalChildren: "number",
-    schoolKids: "number"
+  Reg_ID: "string",
+  Name: "string",
+  NIC: "string",
+  District: "string",
+  contact: "string",
+  // RF Return fields
+  RF_return_history: {
+    [timestamp]: {
+      amount: number,
+      billUrl: string
+    }
   },
-  loans: [{
-    id: "string",
-    type: "RF|GRANT|GIF",
-    amount: "number",
-    purpose: "string",
-    date: "Date",
-    status: "active|completed",
-    paidAmount: "number"
-  }],
-  grants: [{
-    id: "string",
-    amount: "number",
-    purpose: "string",
-    date: "Date"
-  }],
-  paymentHistory: [{
-    id: "string",
-    type: "RF|GRANT",
-    amount: "number",
-    details: "string",
-    date: "Date"
-  }],
-  arms: ["string"], // Project names
-  imageUrl: "string",
-  meta: {
-    createdAt: "Timestamp",
-    updatedAt: "Timestamp"
-  }
+  RF_payment_history_integrity: boolean,
+  // GIF Return fields
+  GIF: {
+    [timestamp]: "description"
+  },
+  Grant_return: boolean
 }
 ```
 
-## 🎯 Usage
+### RF_Loans Subcollection
+```javascript
+{
+  purpose: "string",
+  amount: number,
+  currentBalance: number,
+  status: "active" | "completed",
+  initiationDate: timestamp,
+  lastUpdated: timestamp
+}
+```
 
-### Main Features
+## 🚀 Installation & Setup
 
-1. **Profile Viewing**
-   - Browse all profiles with filtering by district, type, and year
-   - Click on profile cards to view detailed information
-   - Use the analytics dashboard for insights
+### Prerequisites
+- Node.js 16+ 
+- npm or yarn
+- Firebase project configured
+- Cloudinary account
 
-2. **Loan Initialization**
-   - Navigate to `/loan-init`
-   - Choose between registered or new user
-   - Fill in loan details and upload profile image
-   - Submit to create new loan or add to existing profile
+### 1. Clone and Install
+```bash
+cd databaseForms/rfgif-return-app
+npm install
+```
 
-3. **Payment Processing**
-   - Navigate to `/payment`
-   - Enter RegID and payment details
-   - Process RF loan payments or Grant "Give It Forward" entries
-   - View profile preview during payment entry
+### 2. Firebase Configuration
+Create `firebase-config.js` in the root directory:
+```javascript
+export default {
+  apiKey: "your-api-key",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "your-sender-id",
+  appId: "your-app-id"
+}
+```
 
-4. **Analytics Dashboard**
-   - View real-time statistics
-   - District distribution charts
-   - Yearly growth analysis
-   - Detailed breakdown tables
+### 3. Cloudinary Setup
+The app uses Cloudinary for bill uploads. Configuration is in `src/services/imageService.js`:
+```javascript
+const CLOUDINARY_CLOUD_NAME = 'your-cloud-name';
+const CLOUDINARY_UPLOAD_PRESET = 'your-upload-preset';
+```
 
-5. **Developer Tools**
-   - Triple-click the logo to access developer mode
-   - View raw Firebase data
-   - Access system logs
-   - Data manipulation capabilities
+### 4. Run Development Server
+```bash
+npm run dev
+```
 
-### Admin Features
-- Data export/import functionality
-- System log management
-- Backup operations
-- Quick access to forms and analytics
+### 5. Build for Production
+```bash
+npm run build
+```
 
-## 🔒 Security
+## 🔧 Core Features Explained
 
-- Firebase Security Rules for data protection
-- Input validation on all forms
-- Error handling and logging
-- User authentication (to be implemented)
+### RF Repayment Algorithm
+The app implements a sophisticated repayment algorithm:
+
+1. **Sort by Date**: Loans are sorted by initiation date (oldest first)
+2. **Sequential Payment**: Payment is applied to each loan in order
+3. **Full vs Partial**: 
+   - If payment ≥ loan balance: Mark as completed
+   - If payment < loan balance: Reduce balance
+4. **Integrity Check**: 
+   ```
+   Sum(Return History) + Sum(Current Balances) = Sum(Original Loan Amounts)
+   ```
+
+### GIF Return Process
+1. **Search Profile**: Find user by NIC or Reg_ID
+2. **Enter Description**: Describe what they're giving forward
+3. **Record Return**: Add to GIF map with timestamp
+4. **Mark Complete**: Set Grant_return = true
+
+## 🎨 UI/UX Features
+
+### Responsive Design
+- Mobile-first approach
+- Adaptive layouts for all screen sizes
+- Touch-friendly interface
+
+### Visual Feedback
+- Loading states during operations
+- Success/error messages
+- Real-time form validation
+- Bill preview functionality
+
+### Accessibility
+- Keyboard navigation support
+- Screen reader compatibility
+- High contrast color scheme
+- Clear visual hierarchy
+
+## 🔒 Security Considerations
+
+### Data Validation
+- Input sanitization
+- File type validation
+- File size limits (5MB max)
+- Server-side validation
+
+### Firebase Security Rules
+Ensure your Firestore rules allow:
+- Read access to profiles
+- Write access for RF/GIF updates
+- Subcollection access for loans
+
+## 📈 Monitoring & Analytics
+
+### Error Tracking
+- Console logging for debugging
+- User-friendly error messages
+- Graceful fallbacks
+
+### Performance
+- Lazy loading of components
+- Optimized image delivery
+- Efficient database queries
 
 ## 🚀 Deployment
 
 ### Firebase Hosting
-1. Build the application:
-   ```bash
-   npm run build
-   ```
-
-2. Deploy to Firebase:
-   ```bash
-   firebase deploy
-   ```
+```bash
+npm run build
+firebase deploy
+```
 
 ### Environment Variables
-Create a `.env` file for environment-specific configuration:
-```
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_PROJECT_ID=your_project_id
-```
-
-## 📝 API Reference
-
-### Database Operations
-- `getAllProfiles(filters)`: Get profiles with optional filtering
-- `getProfileByRegId(regId)`: Get single profile
-- `createProfile(profileData)`: Create new profile
-- `updateProfile(regId, updates)`: Update existing profile
-- `addLoan(regId, loanData)`: Add loan to profile
-- `processPayment(paymentData)`: Process payment
-
-### Storage Operations
-- `uploadImage(file, regId)`: Upload and process image
-- `processImage(file)`: Convert HEIC and compress images
-- `deleteImage(imageUrl)`: Delete image from storage
+Set up environment variables for:
+- Firebase configuration
+- Cloudinary credentials
+- API endpoints
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Code Style
+- Vue 3 Composition API
+- TypeScript for type safety
+- ESLint for code quality
+- Prettier for formatting
 
-## 📄 License
+### Testing
+- Unit tests for utilities
+- Integration tests for forms
+- E2E tests for workflows
 
-This project is licensed under the MIT License.
+## 📝 License
+
+MIT License - see LICENSE file for details
 
 ## 🆘 Support
 
-For support and questions:
-- Create an issue in the repository
-- Contact the development team
-- Check the documentation
+For technical support or feature requests, please contact the WERESL development team.
 
-## 🔄 Migration from Google Sheets
+---
 
-This application is designed to replace the existing Google Sheets/Apps Script solution. Key migration points:
-
-1. **Data Structure**: Maintains the same data structure as the original system
-2. **Functionality**: Replicates all existing features
-3. **Validation**: Same validation logic as the original code.gs
-4. **Image Handling**: Maintains Google Drive integration
-5. **District Mapping**: Preserves existing district code system
-
-## 🎨 Styling
-
-The application maintains the exact same color scheme and styling as the original `index.html`:
-- Primary color: `#1565c0`
-- Secondary colors: `#e3f2fd`, `#ffebee`, `#e8f5e9`
-- Font: Poppins
-- Responsive design with mobile breakpoints 
+**Built with ❤️ for WERESL** 

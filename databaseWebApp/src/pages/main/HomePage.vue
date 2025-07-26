@@ -134,9 +134,13 @@ export default {
 
     const loadLogo = async () => {
       try {
-        logoUrl.value = await imageService.getLogoImage()
+        const originalLogoUrl = 'https://drive.google.com/thumbnail?id=1AEEWccjf_sMoXJgAaYIPZZm5rM-OCFe2';
+        
+        // Use debug function for better troubleshooting
+        const processedLogoUrl = await imageService.debugImageUrl(originalLogoUrl);
+        logoUrl.value = processedLogoUrl;
       } catch (error) {
-        console.error('Error loading logo:', error)
+        console.error('[HomePage] Error loading logo:', error)
         logoUrl.value = '/placeholder-logo.png'
       }
     }
@@ -170,19 +174,18 @@ export default {
       
       try {
         const loadedProfiles = await profileService.getProfiles(filters)
-        console.log('Loaded profiles:', loadedProfiles)
         
         // Filter out any null or invalid profiles
         profiles.value = loadedProfiles.filter(profile => {
           if (!profile || !profile.id) {
-            console.warn('Found invalid profile:', profile)
+            console.warn('[HomePage] Found invalid profile:', profile)
             return false
           }
           return true
         })
         
-        console.log('Filtered profiles:', profiles.value)
       } catch (err) {
+        console.error('[HomePage] Error loading profiles:', err);
         error.value = 'Failed to load profiles: ' + err.message
       } finally {
         loading.value = false
@@ -231,6 +234,10 @@ export default {
     onMounted(() => {
       loadProfiles()
       loadLogo()
+      // Test image processing
+      imageService.testImageProcessing()
+      // Test specific problematic thumbnail URL
+      imageService.testThumbnailUrl()
     })
 
           return {

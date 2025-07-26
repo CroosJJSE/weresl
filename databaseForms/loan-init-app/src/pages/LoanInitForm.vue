@@ -100,13 +100,16 @@
             </div>
           </div>
           <div class="form-group" style="margin-top: 10px;">
+            <label for="profileImage">{{ t('form.profileImage') }} *</label>
             <input 
               type="file" 
               id="profileImage" 
               @change="handleImageUpload" 
               accept="image/*"
               class="form-control"
+              required
             />
+            <span v-if="imageError" class="error-message">{{ imageError }}</span>
           </div>
         </div>
 
@@ -116,31 +119,63 @@
             <input type="text" id="Name" v-model="formData.Name" class="form-control" required />
           </div>
           <div class="form-group">
-            <label for="NIC">{{ t('form.nicNumber') }}</label>
-            <input type="text" id="NIC" v-model="formData.NIC" class="form-control" required />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="dateOfBirth">{{ t('form.dateOfBirth') }}</label>
-            <input type="date" id="dateOfBirth" v-model="formData.dateOfBirth" class="form-control" required />
-          </div>
-          <div class="form-group">
-            <label for="contact">{{ t('form.phoneNumber') }}</label>
-            <input type="tel" id="contact" v-model="formData.contact" class="form-control" required />
+            <label for="yearOfBirth">{{ t('form.yearOfBirth') }}</label>
+            <input 
+              type="number" 
+              id="yearOfBirth" 
+              v-model="formData.yearOfBirth" 
+              class="form-control" 
+              min="1900" 
+              max="2020" 
+              @input="validateYearOfBirth"
+              required 
+            />
+            <span v-if="yearOfBirthError" class="error-message">{{ yearOfBirthError }}</span>
           </div>
         </div>
 
         <div class="form-group">
           <label for="address">{{ t('form.address') }}</label>
-          <textarea id="address" v-model="formData.address" class="form-control" rows="3" required></textarea>
+          <textarea 
+            id="address" 
+            v-model="formData.address" 
+            class="form-control" 
+            rows="3"
+            required
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="NIC">{{ t('form.nicNumber') }}</label>
+            <input type="text" id="NIC" v-model="formData.NIC" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="contact">{{ t('form.phoneNumber') }}</label>
+            <input 
+              type="tel" 
+              id="contact" 
+              v-model="formData.contact" 
+              class="form-control" 
+              @input="validatePhoneNumber"
+              @keypress="onlyNumbers"
+              required 
+            />
+            <span v-if="phoneError" class="error-message">{{ phoneError }}</span>
+          </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label for="totalChildren">{{ t('form.totalChildren') }}</label>
-            <input type="number" id="totalChildren" v-model="formData.totalChildren" class="form-control" min="0" required />
+            <input 
+              type="number" 
+              id="totalChildren" 
+              v-model="formData.totalChildren" 
+              class="form-control" 
+              min="0" 
+              required 
+            />
           </div>
           <div class="form-group">
             <label for="occupation">{{ t('form.occupation') }}</label>
@@ -155,7 +190,6 @@
             v-model="formData.familyBackground" 
             class="form-control" 
             rows="3"
-            :placeholder="t('form.familyBackgroundPlaceholder')"
             required
           ></textarea>
         </div>
@@ -268,6 +302,9 @@ const useExisting = ref(false)
 const imagePreview = ref(null)
 const uploadedImageUrl = ref(null)
 const registrationStatus = ref('') // 'existing', 'new', ''
+const yearOfBirthError = ref('')
+const phoneError = ref('')
+const imageError = ref('')
 
 const districts = [
   'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
@@ -279,15 +316,15 @@ const districts = [
 
 const formData = reactive({
   Name: '',
-  NIC: '',
-  dateOfBirth: '',
+  yearOfBirth: '',
   address: '',
-  district: '',
-  Reg_ID: '',
+  NIC: '',
   contact: '',
   totalChildren: '',
   familyBackground: '',
   occupation: '',
+  district: '',
+  Reg_ID: '',
   loanType: '',
   initialAmount: '',
   purpose: '',
@@ -353,27 +390,29 @@ const useExistingProfile = () => {
   if (searchResult.value?.profile) {
     const profile = searchResult.value.profile
     console.log('📋 Using existing profile data:', profile)
-    
-    // Map existing data to form fields, handling different field Names
-    formData.Name = profile.Name || profile.Name || ''
-    formData.NIC = profile.NIC || profile.NIC || ''
-    formData.dateOfBirth = profile.dateOfBirth || profile.DateOfBirth || ''
+    // Map existing data to form fields, handling different field Names and providing defaults
+    formData.Name = profile.Name || ''
+    formData.yearOfBirth = profile.yearOfBirth || profile.YearOfBirth || ''
     formData.address = profile.address || profile.Address || ''
-    formData.totalChildren = profile.totalChildren || profile.TotalChildren || ''
+    formData.NIC = profile.NIC || ''
+    formData.contact = profile.contact || ''
+    formData.totalChildren = profile.totalChildren || profile.TotalChildren || 0
     formData.familyBackground = profile.familyBackground || profile.FamilyBackground || ''
     formData.occupation = profile.occupation || profile.Occupation || ''
     formData.district = profile.district || profile.District || ''
-    formData.Reg_ID = profile.Reg_ID || profile.Reg_ID || profile.reg_id || ''
-    formData.contact = profile.contact || profile.contact || ''
-    
+    formData.Reg_ID = profile.Reg_ID || profile.reg_id || profile.id || ''
     // If there's an existing profile image, use it
     if (profile.Image || profile.profileImageUrl || profile.imageUrl) {
       uploadedImageUrl.value = profile.Image || profile.profileImageUrl || profile.imageUrl
       console.log('📸 Setting profile image URL:', uploadedImageUrl.value)
+    } else {
+      uploadedImageUrl.value = null
+      console.log('📸 No existing profile image found')
     }
-    
     useExisting.value = true
     showMessage('Using existing profile data', 'success')
+    // Debug log for all fields
+    console.log('📝 Mapped formData:', JSON.parse(JSON.stringify(formData)))
   }
 }
 
@@ -401,7 +440,10 @@ const goBack = () => {
 
 const handleImageUpload = async (event) => {
   const file = event.target.files[0]
-  if (!file) return
+  if (!file) {
+    imageError.value = 'Profile photo is required.';
+    return;
+  }
 
   try {
     // Show preview
@@ -413,15 +455,117 @@ const handleImageUpload = async (event) => {
 
     // Upload to Google Drive
     uploadedImageUrl.value = await imageService.uploadImage(file, 'profile-photos')
+    imageError.value = ''; // Clear error if upload is successful
     showMessage('Image uploaded successfully', 'success')
   } catch (error) {
+    imageError.value = 'Error uploading image: ' + error.message;
     showMessage('Error uploading image: ' + error.message, 'error')
   }
 }
 
+const validateYearOfBirth = () => {
+  const year = parseInt(formData.yearOfBirth);
+  if (year < 1900 || year > 2020) {
+    yearOfBirthError.value = 'Year of birth must be between 1900 and 2020';
+    return false;
+  }
+  yearOfBirthError.value = '';
+  return true;
+};
+
+const validatePhoneNumber = () => {
+  const phone = formData.contact;
+  if (phone.length > 0 && !/^\d+$/.test(phone)) {
+    phoneError.value = 'Phone number must contain only numbers.';
+    return false;
+  }
+  phoneError.value = '';
+  return true;
+};
+
+const onlyNumbers = (event) => {
+  const key = event.key;
+  if (!/^\d$/.test(key)) {
+    event.preventDefault();
+  }
+};
+
+// Update validation to show which field is missing
 const validateForm = () => {
-  if (!formData.Name || !formData.NIC || !formData.dateOfBirth || !formData.address || !formData.district || !formData.contact || !formData.totalChildren || !formData.familyBackground || !formData.occupation) {
-    showMessage('Please fill in all required fields', 'error')
+  console.log('🔍 Validating form...')
+  console.log('📋 Form data:', formData)
+  console.log('📸 Uploaded image URL:', uploadedImageUrl.value)
+  console.log('🔍 Registration status:', registrationStatus.value)
+  console.log('🔍 Use existing:', useExisting.value)
+  console.log('🔍 Search result profile:', searchResult.value?.profile)
+
+  if (useExisting.value) {
+    // Only validate loan fields for existing profiles
+    if (!formData.loanType || !formData.initialAmount || !formData.purpose) {
+      showMessage('Please fill in all loan details', 'error')
+      return false
+    }
+    if (formData.initialAmount <= 0) {
+      showMessage('Initial amount must be greater than 0', 'error')
+      return false
+    }
+    return true
+  }
+
+  // Full validation for new profiles
+  const requiredFields = [
+    { key: 'Name', label: 'Full Name' },
+    { key: 'yearOfBirth', label: 'Year of Birth' },
+    { key: 'address', label: 'Address' },
+    { key: 'NIC', label: 'NIC' },
+    { key: 'contact', label: 'Contact' },
+    { key: 'totalChildren', label: 'Total Children' },
+    { key: 'familyBackground', label: 'Family Background' },
+    { key: 'occupation', label: 'Occupation' },
+    { key: 'district', label: 'District' }
+  ]
+  for (const field of requiredFields) {
+    if (
+      formData[field.key] === '' ||
+      formData[field.key] === null ||
+      formData[field.key] === undefined
+    ) {
+      console.log(`❌ Form validation failed: missing field ${field.key}`)
+      showMessage(`Please fill in the required field: ${field.label}`, 'error')
+      return false
+    }
+  }
+
+  // Check for profile photo - either uploaded for new users or existing for existing users
+  if (registrationStatus.value === 'new' && !uploadedImageUrl.value) {
+    console.log('❌ Form validation failed: no image uploaded for new user')
+    showMessage('Please upload a profile photo', 'error')
+    return false
+  }
+
+  // For existing users, check if they have an existing image or uploaded a new one
+  if (useExisting.value && !uploadedImageUrl.value && !searchResult.value?.profile?.Image && !searchResult.value?.profile?.profileImageUrl && !searchResult.value?.profile?.imageUrl) {
+    console.log('❌ Form validation failed: no image for existing user')
+    showMessage('Please upload a profile photo or use existing profile with photo', 'error')
+    return false
+  }
+
+  console.log('✅ Form validation passed')
+
+  // Validate year of birth
+  if (!validateYearOfBirth()) {
+    return false
+  }
+
+  // Validate phone number
+  if (!validatePhoneNumber()) {
+    return false
+  }
+
+  // Validate total children
+  const childrenCount = parseInt(formData.totalChildren)
+  if (childrenCount < 0) {
+    showMessage('Total number of children cannot be negative', 'error')
     return false
   }
 
@@ -435,11 +579,6 @@ const validateForm = () => {
     return false
   }
 
-  if (formData.totalChildren < 0) {
-    showMessage('Total number of children must be 0 or greater', 'error')
-    return false
-  }
-
   return true
 }
 
@@ -450,58 +589,56 @@ const submitForm = async () => {
   console.log('🚀 Starting form submission...')
 
   try {
-    // Only check NIC uniqueness for new registrations
-    if (registrationStatus.value === 'new') {
+    let profileRef;
+
+    if (useExisting.value) {
+      // Use the existing RegID from the form/profile
+      profileRef = formData.Reg_ID;
+      console.log('📝 Using existing profile with Reg_ID:', profileRef);
+    } else {
+      // New profile flow
       // 1. Check NIC uniqueness in NIC_data BEFORE RegID generation
       const nicDataRef = doc(db, 'SearchElements', 'NIC_data')
       const nicDataSnap = await getDoc(nicDataRef)
       let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
       console.log('🔍 Checking NIC_data for NIC:', formData.NIC)
-      console.log('📋 NIC_data exists:', !!nicData[formData.NIC])
       if (nicData[formData.NIC]) {
         showMessage('A profile with this NIC already exists (RegID: ' + nicData[formData.NIC] + ')', 'error')
         loading.value = false
         return
       }
+      // 2. Generate RegID (only if NIC is unique)
+      await generateRegID()
+      console.log('✅ RegID generated:', formData.Reg_ID)
+      // 3. Create new profile
+      const profileData = {
+        Name: formData.Name,
+        yearOfBirth: parseInt(formData.yearOfBirth),
+        address: formData.address,
+        NIC: formData.NIC,
+        contact: formData.contact,
+        totalChildren: parseInt(formData.totalChildren),
+        familyBackground: formData.familyBackground,
+        occupation: formData.occupation,
+        District: formData.district, // Changed from 'district' to 'District'
+        Reg_ID: formData.Reg_ID,
+        Image: uploadedImageUrl.value, // Use "Image" field Name
+        lastUpdated: new Date()
+      }
+      console.log('📝 Creating profile with data:', profileData)
+      // Create profile document
+      profileRef = await dbOperations.createProfile(profileData)
+      console.log('✅ Profile created successfully:', profileRef)
+      // 4. Add NIC:Reg_ID to NIC_data (only for new registrations)
+      const nicDataRef2 = doc(db, 'SearchElements', 'NIC_data')
+      const nicDataSnap2 = await getDoc(nicDataRef2)
+      let nicData2 = nicDataSnap2.exists() ? nicDataSnap2.data() : {}
+      nicData2[formData.NIC] = formData.Reg_ID
+      await setDoc(nicDataRef2, nicData2)
+      console.log('✅ NIC_data updated:', nicData2)
     }
 
-    // 2. Generate RegID (only if NIC is unique)
-    await generateRegID()
-    console.log('✅ RegID generated:', formData.Reg_ID)
-
-    // 3. Create or update profile
-    const profileData = {
-      Name: formData.Name,
-      NIC: formData.NIC,
-      DateOfBirth: formData.dateOfBirth,
-      Address: formData.address,
-      TotalChildren: formData.totalChildren,
-      FamilyBackground: formData.familyBackground,
-      Occupation: formData.occupation,
-      District: formData.district, // Changed from 'district' to 'District'
-      Reg_ID: formData.Reg_ID,
-      contact: formData.contact,
-      Image: uploadedImageUrl.value, // Use "Image" field Name
-      lastUpdated: new Date()
-    }
-
-    console.log('📝 Creating profile with data:', profileData)
-
-    // Create profile document
-    const profileRef = await dbOperations.createProfile(profileData)
-    console.log('✅ Profile created successfully:', profileRef)
-
-    // 4. Add NIC:Reg_ID to NIC_data (only for new registrations)
-    if (registrationStatus.value === 'new') {
-      const nicDataRef = doc(db, 'SearchElements', 'NIC_data')
-      const nicDataSnap = await getDoc(nicDataRef)
-      let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
-      nicData[formData.NIC] = formData.Reg_ID
-      await setDoc(nicDataRef, nicData)
-      console.log('✅ NIC_data updated:', nicData)
-    }
-
-    // Create loan document using addLoan function
+    // Add loan document using addLoan function
     const loanData = {
       type: formData.loanType,
       amount: parseFloat(formData.initialAmount),
@@ -540,8 +677,11 @@ const resetForm = () => {
   useExisting.value = false
   imagePreview.value = null
   uploadedImageUrl.value = null
+  imageError.value = ''; // Reset image error
   message.value = ''
   registrationStatus.value = '' // Reset registration status
+  yearOfBirthError.value = ''
+  phoneError.value = ''
 }
 
 </script>
@@ -637,6 +777,17 @@ h1 {
   outline: none;
   border-color: #1565c0;
   box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+.form-control.error {
+  border-color: #dc3545;
 }
 
 .search-container {
