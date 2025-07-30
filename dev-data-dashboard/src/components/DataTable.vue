@@ -25,19 +25,27 @@
     <!-- Mobile-Friendly Document List -->
     <div v-else class="space-y-3">
       <div v-for="document in documents" :key="document.id" class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-        <!-- Name and Edit Button Row -->
+        <!-- Name and Action Buttons Row -->
         <div class="flex items-start justify-between mb-2">
           <div class="flex-1 min-w-0">
             <h3 class="text-lg font-semibold text-gray-900 truncate">
               {{ document.Name || 'No Name' }}
             </h3>
           </div>
-          <button
-            @click="$emit('edit-document', document)"
-            class="ml-3 flex-shrink-0 bg-primary-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
-          >
-            Edit
-          </button>
+          <div class="ml-3 flex-shrink-0 flex gap-2">
+            <button
+              @click="$emit('view-loans', document)"
+              class="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+            >
+              Loans
+            </button>
+            <button
+              @click="$emit('edit-document', document)"
+              class="bg-primary-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+            >
+              Edit
+            </button>
+          </div>
         </div>
 
         <!-- NIC and Reg ID Row -->
@@ -93,6 +101,6 @@ export default {
       default: ''
     }
   },
-  emits: ['edit-document']
+  emits: ['edit-document', 'view-loans']
 }
 </script> 

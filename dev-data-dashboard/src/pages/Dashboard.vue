@@ -17,6 +17,7 @@
       :loading="loading"
       :search-term="searchTerm"
       @edit-document="openEditModal"
+      @view-loans="openLoanModal"
     />
 
     <!-- Load More Button and Page Info -->
@@ -63,6 +64,13 @@
       @close="closeEditModal"
       @document-updated="handleDocumentUpdated"
     />
+
+    <!-- Loan Modal -->
+    <LoanModal
+      :show="showLoanModal"
+      :document="selectedDocument"
+      @close="closeLoanModal"
+    />
   </div>
 </template>
 
@@ -70,6 +78,7 @@
 import SearchBar from '../components/SearchBar.vue';
 import DataTable from '../components/DataTable.vue';
 import EditModal from '../components/EditModal.vue';
+import LoanModal from '../components/LoanModal.vue';
 import firestoreService from '../services/firestoreService.js';
 
 export default {
@@ -77,7 +86,8 @@ export default {
   components: {
     SearchBar,
     DataTable,
-    EditModal
+    EditModal,
+    LoanModal
   },
   data() {
     return {
@@ -88,6 +98,7 @@ export default {
       selectedDistrict: '',
       currentCollection: 'profiles',
       showEditModal: false,
+      showLoanModal: false,
       selectedDocument: null,
       lastDocument: null,
       hasMore: false,
@@ -216,6 +227,18 @@ export default {
     closeEditModal() {
       console.log('Closing edit modal');
       this.showEditModal = false;
+      this.selectedDocument = null;
+    },
+
+    openLoanModal(document) {
+      console.log('Opening loan modal for document:', document);
+      this.selectedDocument = document;
+      this.showLoanModal = true;
+    },
+
+    closeLoanModal() {
+      console.log('Closing loan modal');
+      this.showLoanModal = false;
       this.selectedDocument = null;
     },
 

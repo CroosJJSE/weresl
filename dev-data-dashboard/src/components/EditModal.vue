@@ -123,6 +123,48 @@
                 placeholder="Enter occupation"
               />
             </div>
+
+            <!-- Profile Photo URL Field -->
+            <div>
+              <label for="Image" class="block text-sm font-medium text-gray-700 mb-2">
+                Profile Photo URL
+              </label>
+              <div class="space-y-2">
+                <input
+                  id="Image"
+                  v-model="formData.Image"
+                  type="url"
+                  class="input w-full text-base"
+                  placeholder="Enter Google Drive photo URL"
+                />
+                
+                <!-- Current Photo Preview -->
+                <div v-if="formData.Image" class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                  <div class="flex-shrink-0">
+                    <img 
+                      :src="formData.Image" 
+                      alt="Profile Photo"
+                      class="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                      @error="handleImageError"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm text-gray-600">Current photo</p>
+                    <p class="text-xs text-gray-500 truncate">{{ formData.Image }}</p>
+                  </div>
+                </div>
+                
+                <!-- No Photo Message -->
+                <div v-else class="p-3 bg-gray-50 rounded-lg">
+                  <p class="text-sm text-gray-600">No profile photo set</p>
+                  <p class="text-xs text-gray-500 mt-1">Add a Google Drive photo URL to display a profile image</p>
+                </div>
+                
+                <p class="text-xs text-blue-600">
+                  Enter a Google Drive sharing URL for the profile photo
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- Success/Error Messages -->
@@ -283,6 +325,11 @@ export default {
       } else {
         this.regIdPreview = null;
       }
+    },
+    handleImageError(event) {
+      // Replace broken image with placeholder
+      event.target.src = '/placeholder-profile.jpg';
+      event.target.alt = 'Profile photo not available';
     }
   }
 }
