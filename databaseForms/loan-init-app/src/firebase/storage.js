@@ -1,7 +1,7 @@
 import { imageService } from '@/services/imageService.js';
 
 export const storageOperations = {
-  // Upload image using imageService (Cloudinary)
+  // Upload image using imageService (Google Drive)
   async uploadImage(file, Reg_ID) {
     return imageService.uploadImage(file, Reg_ID);
   },

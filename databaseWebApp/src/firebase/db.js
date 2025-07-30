@@ -420,6 +420,165 @@ export const dbOperations = {
     } catch (error) {
       console.error('Error logging operation:', error)
     }
+  },
+
+  // Get loans for a profile (including RF_Loans subcollection)
+  async getProfileLoans(profileId) {
+    try {
+      console.log('[dbOperations] Loading loans for profile:', profileId);
+      const loans = [];
+      
+      // Get RF_Loans from subcollection
+      try {
+        const rfQuery = query(collection(db, 'profiles', profileId, 'RF_Loans'));
+        const rfSnapshot = await getDocs(rfQuery);
+        
+        rfSnapshot.forEach(doc => {
+          const loanData = doc.data();
+          loans.push({
+            id: doc.id,
+            ...loanData,
+            type: 'RF'
+          });
+        });
+        
+        console.log('[dbOperations] Loaded RF loans:', loans.length);
+      } catch (error) {
+        console.log('[dbOperations] No RF_Loans collection found for profile:', profileId);
+      }
+      
+      // Get GRANT loans from subcollection
+      try {
+        const grantQuery = query(collection(db, 'profiles', profileId, 'GRANT'));
+        const grantSnapshot = await getDocs(grantQuery);
+        
+        grantSnapshot.forEach(doc => {
+          const loanData = doc.data();
+          loans.push({
+            id: doc.id,
+            ...loanData,
+            type: 'GRANT'
+          });
+        });
+        
+        console.log('[dbOperations] Loaded GRANT loans:', loans.length);
+      } catch (error) {
+        console.log('[dbOperations] No GRANT collection found for profile:', profileId);
+      }
+      
+      console.log('[dbOperations] Total loans loaded:', loans.length);
+      return loans;
+    } catch (error) {
+      console.error('[dbOperations] Error loading loans:', error);
+      return [];
+    }
+  },
+
+  // Get RF return history for a profile
+  async getRFReturnHistory(profileId) {
+    try {
+      console.log('[dbOperations] Loading RF return history for profile:', profileId);
+      
+      const docRef = doc(db, 'profiles', profileId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const returnHistory = data.RF_return_history || {};
+        
+        console.log('[dbOperations] RF return history found:', Object.keys(returnHistory).length, 'entries');
+        
+        // Parse the return history structure
+        const parsedHistory = [];
+        Object.keys(returnHistory).forEach(dateKey => {
+          const payments = returnHistory[dateKey];
+          Object.keys(payments).forEach(amount => {
+            parsedHistory.push({
+              dateKey: dateKey,
+              amount: parseInt(amount),
+              proofUrl: payments[amount],
+              // Parse date from key format: 441918072025 -> 18-07-2025
+              parsedDate: this.parseDateFromKey(dateKey)
+            });
+          });
+        });
+        
+        console.log('[dbOperations] Parsed return history:', parsedHistory);
+        return parsedHistory;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('[dbOperations] Error loading RF return history:', error);
+      return [];
+    }
+  },
+
+  // Parse date from key format (441918072025 -> 18-07-2025)
+  parseDateFromKey(dateKey) {
+    try {
+      // Format: 441918072025 -> 44-19-18-07-2025
+      // We need: 18-07-2025
+      const parts = dateKey.match(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{4})/);
+      if (parts) {
+        const day = parts[3];
+        const month = parts[4];
+        const year = parts[5];
+        return `${day}-${month}-${year}`;
+      }
+      return dateKey;
+    } catch (error) {
+      console.error('[dbOperations] Error parsing date key:', error);
+      return dateKey;
+    }
+  },
+
+  // Get comprehensive profile details including projects and history
+  async getProfileDetails(profileId) {
+    try {
+      console.log('[dbOperations] Loading comprehensive details for profile:', profileId);
+      
+      const [loans, returnHistory] = await Promise.all([
+        this.getProfileLoans(profileId),
+        this.getRFReturnHistory(profileId)
+      ]);
+      
+      // Get profile document for additional info
+      const docRef = doc(db, 'profiles', profileId);
+      const docSnap = await getDoc(docRef);
+      const profileData = docSnap.exists() ? docSnap.data() : {};
+      
+      const details = {
+        loans: loans,
+        returnHistory: returnHistory,
+        grantReturn: profileData.Grant_return || false,
+        gifData: profileData.GIF || {},
+        // Calculate totals
+        totalRFLoans: loans.filter(l => l.type === 'RF').length,
+        totalGrants: loans.filter(l => l.type === 'GRANT').length,
+        totalReturnAmount: returnHistory.reduce((sum, payment) => sum + payment.amount, 0),
+        activeRFLoans: loans.filter(l => l.type === 'RF' && l.status === 'active'),
+        completedRFLoans: loans.filter(l => l.type === 'RF' && l.status === 'completed'),
+        activeGrants: loans.filter(l => l.type === 'GRANT')
+      };
+      
+      console.log('[dbOperations] Comprehensive details loaded:', details);
+      return details;
+    } catch (error) {
+      console.error('[dbOperations] Error loading comprehensive details:', error);
+      return {
+        loans: [],
+        returnHistory: [],
+        grantReturn: false,
+        gifData: {},
+        totalRFLoans: 0,
+        totalGrants: 0,
+        totalReturnAmount: 0,
+        activeRFLoans: [],
+        completedRFLoans: [],
+        activeGrants: []
+      };
+    }
   }
 }
 

@@ -154,7 +154,7 @@ export default {
   border: 1px solid #ddd;
   border-radius: 10px;
   padding: 15px;
-  width: 300px;
+  width: 100%;
   text-align: left;
   background-color: #f9f9f9;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -170,17 +170,19 @@ export default {
 .profile-box img {
   width: 100%;
   height: 200px;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: 10px;
   margin-bottom: 10px;
   background-color: #f5f5f5;
+  aspect-ratio: 1;
 }
 
 .profile-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 10px;
+  gap: 10px;
 }
 
 .profile-header h3 {
@@ -188,33 +190,40 @@ export default {
   font-size: 16px;
   font-weight: 600;
   color: #333;
+  flex: 1;
 }
 
 .profile-types {
   display: flex;
   gap: 5px;
+  flex-wrap: wrap;
 }
 
 .profile-type {
-  padding: 5px 10px;
-  border-radius: 5px;
-  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .rf-type {
   background-color: #e3f2fd;
   color: #1565c0;
+  border: 1px solid #1565c0;
 }
 
 .grant-type {
   background-color: #ffebee;
   color: #c62828;
+  border: 1px solid #c62828;
 }
 
 .gif-type {
   background-color: #e8f5e9;
   color: #2e7d32;
+  border: 1px solid #2e7d32;
 }
 
 .profile-info {
@@ -243,5 +252,70 @@ export default {
 
 .profile-stats strong {
   color: #333;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .profile-box {
+    padding: 12px;
+  }
+  
+  .profile-box img {
+    height: 150px;
+  }
+  
+  .profile-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .profile-header h3 {
+    font-size: 14px;
+  }
+  
+  .profile-types {
+    gap: 4px;
+  }
+  
+  .profile-type {
+    padding: 3px 6px;
+    font-size: 9px;
+  }
+  
+  .profile-info {
+    font-size: 13px;
+  }
+  
+  .profile-stats {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-box {
+    padding: 10px;
+  }
+  
+  .profile-box img {
+    height: 120px;
+  }
+  
+  .profile-header h3 {
+    font-size: 13px;
+  }
+  
+  .profile-type {
+    padding: 2px 5px;
+    font-size: 8px;
+  }
+  
+  .profile-info {
+    font-size: 12px;
+  }
+  
+  .profile-stats {
+    font-size: 11px;
+  }
 }
 </style> 

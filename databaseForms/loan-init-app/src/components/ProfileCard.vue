@@ -40,6 +40,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
 import { t } from '../i18n';
+import { generateImageUrls } from '@/utils/driveUrlUtils.js'
 
 export default {
   name: 'ProfileCard',
@@ -99,31 +100,22 @@ export default {
         }
         
         // Check if profile has an Image field with Google Drive URL
-        let fileId = null;
-        
         if (props.profile.Image) {
-          // Extract file ID from the Image URL (like the original system)
-          const match = props.profile.Image.match(/[-\w]{25,}/);
-          if (match) {
-            fileId = match[0];
-            console.log('Extracted file ID from Image URL:', fileId);
+          // Generate URL formats using utility function
+          urlFormats.value = generateImageUrls(props.profile.Image)
+          console.log('Generated URL formats for profile:', props.profile.id, urlFormats.value)
+          
+          if (urlFormats.value.length > 0) {
+            // Start with the first URL format
+            currentUrlIndex.value = 0
+            profileImageUrl.value = urlFormats.value[0]
+            return
           }
         }
         
-        // If no file ID from Image field, use placeholder
-        if (!fileId) {
-          console.log('No Image URL found for profile:', props.profile.id);
-          profileImageUrl.value = '/placeholder-profile.jpg';
-          return;
-        }
-        
-        // Generate all possible URL formats for this profile
-        urlFormats.value = [
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w300`,
-          `https://drive.google.com/uc?export=view&id=${fileId}`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`,
-          `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
-        ]
+        // If no valid URL formats, use placeholder
+        console.log('No Image URL found for profile:', props.profile.id);
+        profileImageUrl.value = '/placeholder-profile.jpg';
         
         console.log('Generated URL formats for profile:', props.profile.id, urlFormats.value)
         

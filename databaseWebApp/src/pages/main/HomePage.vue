@@ -14,17 +14,7 @@
 
     <h1>WERESL Database</h1>
 
-    <div class="view-toggle">
-      <button 
-        :class="['view-btn', { active: currentView === 'profiles' }]"
-        @click="currentView = 'profiles'"
-      >
-        Profiles
-      </button>
-
-    </div>
-
-    <div v-if="currentView === 'profiles'" class="profiles-view">
+    <div class="profiles-view">
       <div class="filters">
         <select v-model="filters.District" @change="loadProfiles">
           <option value="">All Districts</option>
@@ -121,7 +111,6 @@ export default {
     ProfileModal
   },
   setup() {
-    const currentView = ref('profiles')
     const profiles = ref([])
     const loading = ref(false)
     const error = ref(null)
@@ -241,7 +230,6 @@ export default {
     })
 
           return {
-        currentView,
         profiles,
         loading,
         error,
@@ -274,11 +262,12 @@ export default {
   background-color: #ffffff;
   text-align: center;
   padding: 20px;
+  min-height: 100vh;
 }
 
 .header-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 20px;
   margin-bottom: 30px;
@@ -286,194 +275,156 @@ export default {
 }
 
 .logo-container {
-  flex: 1;
   text-align: center;
 }
 
 .logo {
-  max-width: 400px;
+  max-width: 300px;
   height: auto;
   cursor: pointer;
 }
 
-
-
 h1 {
   font-weight: 600;
-  font-size: 32px;
+  font-size: 28px;
   margin-bottom: 20px;
   text-transform: uppercase;
-}
-
-.view-toggle {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.view-btn {
-  padding: 8px 20px;
-  border: 1px solid #1565c0;
-  background-color: white;
   color: #1565c0;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-family: 'Poppins', sans-serif;
 }
 
-.view-btn.active {
-  background-color: #1565c0;
-  color: white;
+.profiles-view {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .filters {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-select {
-  padding: 10px;
-  font-size: 16px;
-  width: 250px;
-  font-family: 'Poppins', sans-serif;
-}
-
-.profile-container {
-  display: flex;
   flex-wrap: wrap;
-  gap: 20px;
-  margin-top: 20px;
+  gap: 15px;
   justify-content: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 10px;
+}
+
+.filters select {
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 14px;
+  min-width: 150px;
+  cursor: pointer;
+}
+
+.filters select:focus {
+  outline: none;
+  border-color: #1565c0;
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
 }
 
 .loading, .error {
-  padding: 20px;
+  text-align: center;
+  padding: 40px;
   font-size: 18px;
   color: #666;
 }
 
 .error {
-  color: #c62828;
+  color: #d32f2f;
+  background-color: #ffebee;
+  border-radius: 8px;
+  margin: 20px;
 }
 
-.dev-tools-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-}
-
-.dev-tools-content {
-  background-color: white;
-  padding: 20px;
-  border-radius: 10px;
-  width: 90%;
-  max-width: 1200px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.dev-tools-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-}
-
-.dev-tools-body {
+.profile-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-}
-
-.raw-data, .system-logs {
-  background-color: #f5f5f5;
-  padding: 15px;
-  border-radius: 5px;
-}
-
-.raw-data pre {
-  font-size: 12px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-}
-
-.log-entry {
-  display: flex;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px solid #ddd;
-}
-
-.log-level {
-  font-weight: 600;
-  min-width: 60px;
-}
-
-.log-level.info {
-  color: #1565c0;
-}
-
-.log-level.error {
-  color: #c62828;
-}
-
-.log-level.warning {
-  color: #f57c00;
-}
-
-.log-time {
-  color: #666;
-  font-size: 12px;
+  padding: 20px 0;
 }
 
 .footer {
   margin-top: 40px;
   padding: 20px;
-  text-align: center;
-  font-style: italic;
-  color: #1565c0;
-  border-top: 1px solid #eee;
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  color: #666;
 }
 
-@media screen and (max-width: 768px) {
+.footer p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .home-page {
+    padding: 10px;
+  }
+  
+  .header-container {
+    padding: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .logo {
+    max-width: 250px;
+  }
+  
+  h1 {
+    font-size: 24px;
+    margin-bottom: 15px;
+  }
+  
   .filters {
     flex-direction: column;
-    align-items: center;
+    gap: 10px;
+    padding: 15px;
   }
-
+  
+  .filters select {
+    width: 100%;
+    min-width: auto;
+  }
+  
   .profile-container {
-    width: 90%;
-  }
-
-  .logo {
-    max-width: 300px;
-  }
-
-
-
-  .dev-tools-body {
     grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 10px 0;
+  }
+  
+  .loading, .error {
+    padding: 20px;
+    font-size: 16px;
+  }
+  
+  .footer {
+    margin-top: 30px;
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-page {
+    padding: 5px;
+  }
+  
+  .logo {
+    max-width: 200px;
+  }
+  
+  h1 {
+    font-size: 20px;
+  }
+  
+  .filters {
+    padding: 10px;
+  }
+  
+  .profile-container {
+    gap: 10px;
   }
 }
 </style> 

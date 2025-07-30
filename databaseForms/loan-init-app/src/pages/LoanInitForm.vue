@@ -53,10 +53,11 @@
               <div class="profile-info">
                 <div class="profile-image-container">
                   <img 
-                    v-if="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
-                    :src="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    v-if="profileImageUrl || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    :src="profileImageUrl || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
                     alt="Profile Photo" 
                     class="profile-image"
+                    @error="handleImageError"
                   />
                   <div v-else class="profile-placeholder">
                     <span>{{ t('form.noProfilePhoto') }}</span>
@@ -290,6 +291,7 @@ import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
 import { t } from '../i18n';
 import LanguageToggle from '../components/LanguageToggle.vue';
+import { convertToImageUrl } from '@/utils/driveUrlUtils.js'
 
 const db = getFirestore();
 
@@ -331,6 +333,14 @@ const formData = reactive({
   projectDescription: ''
 })
 
+// Computed property to convert Google Drive URL to displayable image URL
+const profileImageUrl = computed(() => {
+  if (searchResult.value?.profile?.Image) {
+    return convertToImageUrl(searchResult.value.profile.Image) || searchResult.value.profile.Image
+  }
+  return null
+})
+
 const showMessage = (text, type = 'info') => {
   message.value = text
   messageType.value = `alert-${type}`
@@ -338,6 +348,11 @@ const showMessage = (text, type = 'info') => {
     message.value = ''
     messageType.value = ''
   }, 5000)
+}
+
+const handleImageError = (event) => {
+  console.log('Image failed to load, using placeholder')
+  event.target.src = '/placeholder-profile.jpg'
 }
 
 const generateRegID = async () => {
