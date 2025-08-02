@@ -1,4 +1,4 @@
-import { dbOperations, utils } from '@/firebase/db.js'
+import { dbOperations } from '@/firebase/db.js'
 import { storageOperations } from '@/firebase/storage.js'
 
 export const profileService = {
@@ -42,9 +42,7 @@ export const profileService = {
       // Generate RegID if not provided
       if (!profileData.Reg_ID) {
         console.log('🔧 Generating RegID...')
-        const existingProfiles = await dbOperations.getAllProfiles()
-        const existingIds = existingProfiles.map(p => p.id)
-        profileData.Reg_ID = utils.generateRegId(profileData.basicInfo.District, existingIds)
+        profileData.Reg_ID = await dbOperations.generateRegID(profileData.District || profileData.basicInfo?.District)
         console.log('✅ Generated RegID:', profileData.Reg_ID)
       }
 
@@ -100,14 +98,15 @@ export const profileService = {
   },
 
   // Add loan to profile
-  async addLoan(Reg_ID, loanData) {
+  async addLoan(Reg_ID, loanData, loanType = 'RF') {
     try {
-      const loan = await dbOperations.addLoan(Reg_ID, loanData)
+      const loan = await dbOperations.addLoan(Reg_ID, loanData, loanType)
       
       // Log operation
       await dbOperations.logOperation('ADD_LOAN', {
         Reg_ID,
-        loan
+        loan,
+        loanType
       })
 
       return loan

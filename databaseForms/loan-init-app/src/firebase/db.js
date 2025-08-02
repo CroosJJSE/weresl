@@ -15,6 +15,7 @@ import {
   setDoc
 } from 'firebase/firestore'
 import firebaseConfig from '../../firebase-config.js'
+import { RootCollection, ProfileField } from '../enums/db.js'
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
@@ -28,7 +29,7 @@ export const dbOperations = {
         
       // Use Reg_ID as the document ID
       const regId = profileData.Reg_ID
-      const docRef = doc(db, 'profiles', regId)
+      const docRef = doc(db, RootCollection.PROFILES, regId)
       
       // Add RF_return_history and GIF as empty maps
       const profileWithDefaults = {
@@ -51,7 +52,7 @@ export const dbOperations = {
 
   async getAllProfiles(filters = {}) {
     try {
-      let q = query(collection(db, 'profiles'))
+      let q = query(collection(db, RootCollection.PROFILES))
       
       // Apply filters if provided
       if (filters.district) {
@@ -80,7 +81,7 @@ export const dbOperations = {
       console.log('🔍 Searching for RegID:', regId)
       
       // Search by Reg_ID field only
-      const q = query(collection(db, 'profiles'), where('Reg_ID', '==', regId))
+      const q = query(collection(db, RootCollection.PROFILES), where(ProfileField.REG_ID, '==', regId))
       const querySnapshot = await getDocs(q)
       
       if (!querySnapshot.empty) {
@@ -100,7 +101,7 @@ export const dbOperations = {
 
   async updateProfile(profileId, updateData) {
     try {
-      const profileRef = doc(db, 'profiles', profileId)
+      const profileRef = doc(db, RootCollection.PROFILES, profileId)
       await updateDoc(profileRef, {
         ...updateData,
         lastUpdated: serverTimestamp()
@@ -112,27 +113,32 @@ export const dbOperations = {
   },
 
   // Loan Operations - Updated to handle separate collections
-  async addLoan(regId, loanData) {
+  async addLoan(regId, loanData, loanType = 'RF') {
     try {
       console.log('📝 Adding loan for RegID:', regId)
       console.log('📋 Loan data:', loanData)
+      console.log('📋 Loan type:', loanType)
+      
+      if (!loanData.loanId) {
+        throw new Error('Loan ID is required')
+      }
       
       let collectionName
-      if (loanData.type === 'RF') {
-        collectionName = 'RF_Loans'
-      } else if (loanData.type === 'GRANT') {
-        collectionName = 'GRANT'
+      if (loanType === 'RF' || loanData.type === 'RF') {
+        collectionName = ProfileField.RF_LOANS
+      } else if (loanType === 'GRANT' || loanData.type === 'GRANT') {
+        collectionName = ProfileField.GRANT
       } else {
         throw new Error('Invalid loan type. Only RF and GRANT are supported.')
       }
       
       console.log('📁 Using collection:', collectionName)
       
-      // Create document with purpose as document ID
-      const docId = loanData.purpose.replace(/[^a-zA-Z0-9]/g, '_') // Sanitize purpose for document ID
+      // Use loanId as document ID
+      const docId = loanData.loanId
       console.log('📄 Creating document with ID:', docId)
       
-      const loanRef = doc(db, 'profiles', regId, collectionName, docId)
+      const loanRef = doc(db, RootCollection.PROFILES, regId, collectionName, docId)
       
       const loanDocument = {
         ...loanData,
@@ -154,8 +160,8 @@ export const dbOperations = {
       console.error('❌ Error adding loan:', error)
       console.error('❌ Error details:', {
         regId,
-        loanType: loanData.type,
-        purpose: loanData.purpose,
+        loanType: loanType || loanData.type,
+        loanId: loanData.loanId,
         error: error.message
       })
       throw error
@@ -168,7 +174,7 @@ export const dbOperations = {
       
       // Get RF_Loans
       try {
-        const rfQuery = query(collection(db, 'profiles', profileId, 'RF_Loans'))
+        const rfQuery = query(collection(db, RootCollection.PROFILES, profileId, 'RF_Loans'))
         const rfSnapshot = await getDocs(rfQuery)
         rfSnapshot.docs.forEach(doc => {
           loans.push({ id: doc.id, ...doc.data(), type: 'RF' })
@@ -179,7 +185,7 @@ export const dbOperations = {
       
       // Get GRANT loans
       try {
-        const grantQuery = query(collection(db, 'profiles', profileId, 'GRANT'))
+        const grantQuery = query(collection(db, RootCollection.PROFILES, profileId, 'GRANT'))
         const grantSnapshot = await getDocs(grantQuery)
         grantSnapshot.docs.forEach(doc => {
           loans.push({ id: doc.id, ...doc.data(), type: 'GRANT' })
@@ -244,7 +250,7 @@ export const dbOperations = {
   // Completed Projects Operations
   async addCompletedProjects(profileId, completedProjects) {
     try {
-      const profileRef = doc(db, 'profiles', profileId)
+      const profileRef = doc(db, RootCollection.PROFILES, profileId)
       await updateDoc(profileRef, {
         completedProjects: arrayUnion(...completedProjects),
         lastUpdated: serverTimestamp()
@@ -273,7 +279,7 @@ export const dbOperations = {
   // Process Payment
   async processPayment(paymentData) {
     try {
-      const profileRef = doc(db, 'profiles', paymentData.regId)
+      const profileRef = doc(db, RootCollection.PROFILES, paymentData.regId)
       
       // Update payment history
       await updateDoc(profileRef, {
@@ -296,7 +302,7 @@ export const dbOperations = {
   // Utility Operations
   async getProfileById(profileId) {
     try {
-      const profileRef = doc(db, 'profiles', profileId)
+      const profileRef = doc(db, RootCollection.PROFILES, profileId)
       const profileSnap = await getDoc(profileRef)
       
       if (profileSnap.exists()) {
@@ -321,7 +327,7 @@ export const dbOperations = {
       // Try lowercase 'district' first
     try {
         const q1 = query(
-          collection(db, 'profiles'),
+          collection(db, RootCollection.PROFILES),
           where('district', '==', district)
         )
         querySnapshot = await getDocs(q1)
@@ -335,7 +341,7 @@ export const dbOperations = {
       if (querySnapshot.size === 0) {
         try {
           const q2 = query(
-            collection(db, 'profiles'),
+            collection(db, RootCollection.PROFILES),
             where('District', '==', district)
           )
           querySnapshot = await getDocs(q2)
@@ -349,7 +355,7 @@ export const dbOperations = {
       // If still no results, get all profiles and filter manually
       if (querySnapshot.size === 0) {
         console.log('🔍 Getting all profiles to filter manually...')
-        const allProfilesQuery = query(collection(db, 'profiles'))
+        const allProfilesQuery = query(collection(db, RootCollection.PROFILES))
         const allProfilesSnapshot = await getDocs(allProfilesQuery)
         
         const matchingProfiles = allProfilesSnapshot.docs.filter(doc => {

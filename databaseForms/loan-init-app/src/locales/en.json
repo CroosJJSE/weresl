@@ -161,5 +161,7 @@
   "paymentForm.errorRegIdRequired": "Registration ID is required",
   "paymentForm.errorTypeRequired": "Payment type is required",
   "paymentForm.errorAmountRequired": "Valid payment amount is required for RF payments",
-  "paymentForm.errorDetailsRequired": "Details are required for GRANT payments"
+  "paymentForm.errorDetailsRequired": "Details are required for GRANT payments",
+  "form.source": "Source *",
+  "form.selectSource": "Select Source"
 } 

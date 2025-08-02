@@ -53,8 +53,8 @@
               <div class="profile-info">
                 <div class="profile-image-container">
                   <img 
-                    v-if="profileImageUrl || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
-                    :src="profileImageUrl || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    v-if="profileImageUrl || searchResult.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    :src="profileImageUrl || (searchResult.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] ? convertToImageUrl(searchResult.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID]) : null) || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
                     alt="Profile Photo" 
                     class="profile-image"
                     @error="handleImageError"
@@ -63,10 +63,13 @@
                     <span>{{ t('form.noProfilePhoto') }}</span>
                   </div>
                 </div>
-                <p><strong>{{ t('form.name') }}</strong> {{ searchResult.profile.Name || 'N/A' }}</p>
-                <p><strong>{{ t('form.nic') }}</strong> {{ searchResult.profile.NIC || 'N/A' }}</p>
-                <p><strong>{{ t('form.phone') }}</strong> {{ searchResult.profile.contact || 'N/A' }}</p>
-                <p><strong>{{ t('form.regid') }}</strong> {{ searchResult.profile.Reg_ID || 'N/A' }}</p>
+                <p><strong>{{ t('form.name') }}</strong> {{ searchResult.profile[ProfileField.FULL_NAME] || searchResult.profile.Name || 'N/A' }}</p>
+                <p><strong>{{ t('form.nic') }}</strong> {{ searchResult.profile[ProfileField.NIC] || searchResult.profile.NIC || 'N/A' }}</p>
+                <p><strong>{{ t('form.phone') }}</strong> {{ searchResult.profile[ProfileField.PHONE_NUMBER] || searchResult.profile.contact || 'N/A' }}</p>
+                <p><strong>{{ t('form.regid') }}</strong> {{ searchResult.profile[ProfileField.REG_ID] || searchResult.profile.Reg_ID || 'N/A' }}</p>
+                <p v-if="searchResult.profile.hasPendingLoan" class="pending-loan-warning">
+                  <strong>⚠️ Pending Loan:</strong> This user has a pending loan request
+                </p>
               </div>
               <button @click="useExistingProfile" class="btn btn-primary">{{ t('form.useThisProfile') }}</button>
             </div>
@@ -238,6 +241,15 @@
               required 
             />
           </div>
+          <div class="form-group">
+            <label for="source">{{ t('form.source') }}</label>
+            <select id="source" v-model="formData.source" class="form-control">
+              <option value="">{{ t('form.selectSource') }}</option>
+              <option v-for="account in bankAccounts" :key="account" :value="account">
+                {{ account }}
+              </option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
@@ -285,13 +297,25 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
-import { dbOperations } from '@/firebase/db.js'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { getFirestore, doc, getDoc, setDoc, collection, query, getDocs, where } from 'firebase/firestore'
 import { imageService } from '@/services/imageService.js'
+import { profileService } from '@/services/profile.js'
+import { dbOperations } from '@/firebase/db.js'
 import { t } from '../i18n';
 import LanguageToggle from '../components/LanguageToggle.vue';
-import { convertToImageUrl } from '@/utils/driveUrlUtils.js'
+import { convertToImageUrl, extractFileId } from '@/utils/driveUtils.js'
+import { 
+  getProfileByRegId, 
+  saveProfile, 
+  addLoan, 
+  getPendingLoans,
+  generateRFLoanId,
+  generateGrantLoanId
+} from '@/utils/dbUtils.js'
+import { generateRegIdFromDistrict } from '@/utils/regIdUtils.js'
+import { DISTRICT_MAPPING } from '@/enums/districts.js'
+import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '@/enums/db.js'
 
 const db = getFirestore();
 
@@ -307,14 +331,10 @@ const registrationStatus = ref('') // 'existing', 'new', ''
 const yearOfBirthError = ref('')
 const phoneError = ref('')
 const imageError = ref('')
+const receivers = ref([])
+const bankAccounts = ref([])
 
-const districts = [
-  'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
-  'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara',
-  'Kandy', 'Kegalle', 'Kilinochchi', 'Kurunegala', 'Mannar',
-  'Matale', 'Matara', 'Monaragala', 'Mullaitivu', 'Nuwara Eliya',
-  'Polonnaruwa', 'Puttalam', 'Ratnapura', 'Trincomalee', 'Vavuniya'
-]
+const districts = Object.values(DISTRICT_MAPPING)
 
 const formData = reactive({
   Name: '',
@@ -330,7 +350,38 @@ const formData = reactive({
   loanType: '',
   initialAmount: '',
   purpose: '',
-  projectDescription: ''
+  projectDescription: '',
+  source: ''
+})
+
+// Load receivers from RF_receiver collection
+const loadReceivers = async () => {
+  try {
+    const receiversQuery = query(collection(db, 'RF_receiver'))
+    const receiversSnapshot = await getDocs(receiversQuery)
+    receivers.value = receiversSnapshot.docs.map(doc => doc.id)
+    console.log('Loaded receivers:', receivers.value)
+  } catch (error) {
+    console.error('Error loading receivers:', error)
+  }
+}
+
+// Load bank accounts from bank_accounts collection
+const loadBankAccounts = async () => {
+  try {
+    const bankAccountsQuery = query(collection(db, RootCollection.BANK_ACCOUNTS))
+    const bankAccountsSnapshot = await getDocs(bankAccountsQuery)
+    bankAccounts.value = bankAccountsSnapshot.docs.map(doc => doc.id)
+    console.log('Loaded bank accounts:', bankAccounts.value)
+  } catch (error) {
+    console.error('Error loading bank accounts:', error)
+  }
+}
+
+// Load data on component mount
+onMounted(() => {
+  loadReceivers()
+  loadBankAccounts()
 })
 
 // Computed property to convert Google Drive URL to displayable image URL
@@ -359,7 +410,7 @@ const generateRegID = async () => {
   if (formData.district) {
     try {
       console.log('🔧 Generating RegID for district:', formData.district)
-      const newRegId = await dbOperations.generateRegID(formData.district)
+      const newRegId = await generateRegIdFromDistrict(formData.district)
       formData.Reg_ID = newRegId
       console.log('✅ RegID generated:', newRegId)
     } catch (error) {
@@ -370,31 +421,42 @@ const generateRegID = async () => {
 }
 
 const searchRegID = async () => {
-  if (!regidSearch.value) {
+  if (!regidSearch.value.trim()) {
     showMessage('Please enter a RegID to search', 'error')
     return
   }
 
-  console.log('🔍 Starting RegID search for:', regidSearch.value)
   loading.value = true
   try {
-    const profile = await dbOperations.getProfileByRegId(regidSearch.value)
-    console.log('📋 Search result:', profile)
+    console.log('🔍 Searching for RegID:', regidSearch.value)
     
-    searchResult.value = {
-      found: !!profile,
-      profile: profile || null
-    }
+    // Use centralized utility to get profile
+    const profileResult = await getProfileByRegId(regidSearch.value)
     
-    console.log('📊 Search result object:', searchResult.value)
-    
-    if (profile) {
-      showMessage('Profile found!', 'success')
+    if (profileResult.success && profileResult.data) {
+      const profileData = profileResult.data
+      
+      // Check pending loan status
+      const pendingLoansResult = await getPendingLoans()
+      const hasPendingLoan = pendingLoansResult.success && 
+        pendingLoansResult.data.includes(regidSearch.value)
+      
+      searchResult.value = {
+        found: true,
+        profile: {
+          ...profileData,
+          hasPendingLoan: hasPendingLoan
+        }
+      }
+      
+      console.log('✅ Profile found:', profileData)
+      console.log('📝 Pending loan status:', hasPendingLoan)
     } else {
-      showMessage('No profile found with this RegID', 'warning')
+      searchResult.value = { found: false }
+      console.log('❌ No profile found with RegID:', regidSearch.value)
     }
   } catch (error) {
-    console.error('❌ Search error:', error)
+    console.error('❌ Error searching for RegID:', error)
     showMessage('Error searching for profile: ' + error.message, 'error')
   } finally {
     loading.value = false
@@ -406,19 +468,19 @@ const useExistingProfile = () => {
     const profile = searchResult.value.profile
     console.log('📋 Using existing profile data:', profile)
     // Map existing data to form fields, handling different field Names and providing defaults
-    formData.Name = profile.Name || ''
-    formData.yearOfBirth = profile.yearOfBirth || profile.YearOfBirth || ''
-    formData.address = profile.address || profile.Address || ''
-    formData.NIC = profile.NIC || ''
-    formData.contact = profile.contact || ''
-    formData.totalChildren = profile.totalChildren || profile.TotalChildren || 0
-    formData.familyBackground = profile.familyBackground || profile.FamilyBackground || ''
-    formData.occupation = profile.occupation || profile.Occupation || ''
-    formData.district = profile.district || profile.District || ''
-    formData.Reg_ID = profile.Reg_ID || profile.reg_id || profile.id || ''
+    formData.Name = profile[ProfileField.FULL_NAME] || profile.Name || ''
+    formData.yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth || profile.YearOfBirth || ''
+    formData.address = profile[ProfileField.ADDRESS] || profile.address || profile.Address || ''
+    formData.NIC = profile[ProfileField.NIC] || profile.NIC || ''
+    formData.contact = profile[ProfileField.PHONE_NUMBER] || profile.contact || ''
+    formData.totalChildren = profile[ProfileField.TOTAL_CHILDREN] || profile.totalChildren || profile.TotalChildren || 0
+    formData.familyBackground = profile[ProfileField.DESCRIPTION] || profile.familyBackground || profile.FamilyBackground || ''
+    formData.occupation = profile[ProfileField.OCCUPATION] || profile.occupation || profile.Occupation || ''
+    formData.district = profile[ProfileField.DISTRICT] || profile.district || profile.District || ''
+    formData.Reg_ID = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.reg_id || profile.id || ''
     // If there's an existing profile image, use it
-    if (profile.Image || profile.profileImageUrl || profile.imageUrl) {
-      uploadedImageUrl.value = profile.Image || profile.profileImageUrl || profile.imageUrl
+    if (profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl) {
+      uploadedImageUrl.value = profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl
       console.log('📸 Setting profile image URL:', uploadedImageUrl.value)
     } else {
       uploadedImageUrl.value = null
@@ -613,7 +675,7 @@ const submitForm = async () => {
     } else {
       // New profile flow
       // 1. Check NIC uniqueness in NIC_data BEFORE RegID generation
-      const nicDataRef = doc(db, 'SearchElements', 'NIC_data')
+      const nicDataRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap = await getDoc(nicDataRef)
       let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
       console.log('🔍 Checking NIC_data for NIC:', formData.NIC)
@@ -627,25 +689,25 @@ const submitForm = async () => {
       console.log('✅ RegID generated:', formData.Reg_ID)
       // 3. Create new profile
       const profileData = {
-        Name: formData.Name,
-        yearOfBirth: parseInt(formData.yearOfBirth),
-        address: formData.address,
-        NIC: formData.NIC,
-        contact: formData.contact,
-        totalChildren: parseInt(formData.totalChildren),
-        familyBackground: formData.familyBackground,
-        occupation: formData.occupation,
-        District: formData.district, // Changed from 'district' to 'District'
-        Reg_ID: formData.Reg_ID,
-        Image: uploadedImageUrl.value, // Use "Image" field Name
-        lastUpdated: new Date()
+        [ProfileField.FULL_NAME]: formData.Name,
+        [ProfileField.YEAR_OF_BIRTH]: parseInt(formData.yearOfBirth),
+        [ProfileField.ADDRESS]: formData.address,
+        [ProfileField.NIC]: formData.NIC,
+        [ProfileField.PHONE_NUMBER]: formData.contact,
+        [ProfileField.TOTAL_CHILDREN]: parseInt(formData.totalChildren),
+        [ProfileField.DESCRIPTION]: formData.familyBackground,
+        [ProfileField.OCCUPATION]: formData.occupation,
+        [ProfileField.DISTRICT]: formData.district,
+        [ProfileField.REG_ID]: formData.Reg_ID,
+        [ProfileField.PROFILE_IMAGE_DRIVE_ID]: uploadedImageUrl.value ? extractFileId(uploadedImageUrl.value) : null,
+        [ProfileField.LAST_UPDATED]: new Date()
       }
       console.log('📝 Creating profile with data:', profileData)
       // Create profile document
       profileRef = await dbOperations.createProfile(profileData)
       console.log('✅ Profile created successfully:', profileRef)
       // 4. Add NIC:Reg_ID to NIC_data (only for new registrations)
-      const nicDataRef2 = doc(db, 'SearchElements', 'NIC_data')
+      const nicDataRef2 = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap2 = await getDoc(nicDataRef2)
       let nicData2 = nicDataSnap2.exists() ? nicDataSnap2.data() : {}
       nicData2[formData.NIC] = formData.Reg_ID
@@ -653,23 +715,56 @@ const submitForm = async () => {
       console.log('✅ NIC_data updated:', nicData2)
     }
 
-    // Add loan document using addLoan function
+    // Generate loan ID based on loan type
+    let loanId
+    if (formData.loanType === 'RF') {
+      loanId = await generateRFLoanId(profileRef)
+    } else if (formData.loanType === 'GRANT') {
+      loanId = await generateGrantLoanId(profileRef)
+    } else {
+      throw new Error('Invalid loan type')
+    }
+
+    // Add loan document using addLoan function with proper enum field names
     const loanData = {
-      type: formData.loanType,
-      amount: parseFloat(formData.initialAmount),
-      purpose: formData.purpose,
-      projectDescription: formData.projectDescription,
-      initiationDate: new Date(),
-      status: 'active',
-      currentBalance: parseFloat(formData.initialAmount)
+      loanId: loanId,
+      [RF_LOAN_FIELD.TYPE]: formData.loanType,
+      [RF_LOAN_FIELD.AMOUNT]: parseFloat(formData.initialAmount),
+      [RF_LOAN_FIELD.PURPOSE]: formData.purpose,
+      [RF_LOAN_FIELD.PROJECT_DESCRIPTION]: formData.projectDescription,
+      [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
+      [RF_LOAN_FIELD.STATUS]: 'pending',
+      [RF_LOAN_FIELD.CURRENT_BALANCE]: parseFloat(formData.initialAmount),
+      [RF_LOAN_FIELD.SOURCE]: formData.source,
+      [RF_LOAN_FIELD.REG_ID]: profileRef
     }
 
     console.log('📝 Adding loan with data:', loanData)
     console.log('📝 Profile ID for loan:', profileRef)
+    console.log('📝 Generated loan ID:', loanId)
 
-    // Use addLoan function instead of createLoan
-    const loanResult = await dbOperations.addLoan(profileRef, loanData)
+    // Use profile service to add loan with loan type
+    const loanResult = await profileService.addLoan(profileRef, loanData, formData.loanType)
     console.log('✅ Loan added successfully:', loanResult)
+
+    // Add pending loan information to SearchElements using LOAN_ID as field name
+    const pendingLoanRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN)
+    const pendingLoanSnap = await getDoc(pendingLoanRef)
+    let pendingLoans = pendingLoanSnap.exists() ? pendingLoanSnap.data() : {}
+    
+    // Add the new pending loan using LOAN_ID as the field name with proper enum field names
+    pendingLoans[loanId] = {
+      regId: profileRef,
+      loanId: loanId,
+      loanType: formData.loanType,
+      [RF_LOAN_FIELD.AMOUNT]: parseFloat(formData.initialAmount),
+      [RF_LOAN_FIELD.PURPOSE]: formData.purpose,
+      [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
+      [RF_LOAN_FIELD.STATUS]: 'pending'
+    }
+    
+    await setDoc(pendingLoanRef, pendingLoans)
+    console.log('✅ Pending loan added to SearchElements with LOAN_ID as field name:', pendingLoans)
 
     showMessage('Loan was initiated successfully!', 'success')
     setTimeout(() => {
@@ -764,7 +859,7 @@ h1 {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr; /* Changed to 3 columns */
   gap: 20px;
   margin-bottom: 20px;
 }
@@ -1001,6 +1096,18 @@ h1 {
 }
 .language-toggle .lang-toggle button:hover:not(.active) {
   background: #e3f2fd;
+}
+
+.pending-loan-warning {
+  color: #f57c00; /* Orange color for warning */
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #fffbe6; /* Light yellow background */
+  border: 1px solid #ffe58f; /* Light orange border */
+  border-radius: 5px;
+  text-align: center;
 }
 
 @media (max-width: 768px) {

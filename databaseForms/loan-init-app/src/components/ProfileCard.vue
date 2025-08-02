@@ -40,7 +40,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
 import { t } from '../i18n';
-import { generateImageUrls } from '@/utils/driveUrlUtils.js'
+import { generateImageUrls } from '@/utils/driveUtils.js'
 
 export default {
   name: 'ProfileCard',
