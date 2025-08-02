@@ -111,9 +111,9 @@
       <div v-if="returnType === 'RF' && searchResult && searchResult.found" class="section">
         <h2>{{ t('form.rfRepaymentForm') }}</h2>
         
-        <!-- Active RF Loans Display -->
+        <!-- Active and Completed RF Loans Display -->
         <div v-if="activeRFLoans.length > 0" class="rf-loans-section">
-          <h3>{{ t('form.activeRFLoans') }}</h3>
+          <h3>{{ t('form.activeAndCompletedRFLoans') }}</h3>
           <div class="loans-list">
             <div v-for="loan in activeRFLoans" :key="loan.id" class="loan-item">
               <div class="loan-header">
@@ -139,7 +139,7 @@
         </div>
 
         <div v-else class="alert alert-info">
-          {{ t('form.noActiveRFLoans') }}
+          {{ t('form.noActiveOrCompletedRFLoans') }}
         </div>
 
         <!-- Payment Entry -->
@@ -147,6 +147,25 @@
           <h3>{{ t('form.paymentEntry') }}</h3>
           
           <div class="form-row">
+            <div class="form-group">
+              <label for="receiverSelect">{{ t('form.receiver') }} *</label>
+              <select 
+                id="receiverSelect" 
+                v-model="rfData.receiver" 
+                class="form-control"
+                :class="{ 'error': showRFReceiverError && !rfData.receiver }"
+                required
+                @blur="validateRFReceiver"
+              >
+                <option value="">{{ t('form.selectReceiver') }}</option>
+                <option v-for="receiver in receivers" :key="receiver" :value="receiver">
+                  {{ receiver }}
+                </option>
+              </select>
+              <span v-if="showRFReceiverError && !rfData.receiver" class="error-message">
+                {{ t('form.pleaseSelectReceiver') }}
+              </span>
+            </div>
             <div class="form-group">
               <label for="repaymentAmount">{{ t('form.repaymentAmount') }} *</label>
               <input 
@@ -164,6 +183,9 @@
                 {{ t('form.pleaseEnterValidAmount') }}
               </span>
             </div>
+          </div>
+          
+          <div class="form-row">
             <div class="form-group">
               <label for="billUpload">{{ t('form.billUpload') }} *</label>
               <input 
@@ -212,7 +234,7 @@
 
           <div class="form-actions">
             <button @click="submitRFRepayment" :disabled="loading || !canSubmitRF" class="btn btn-primary">
-              {{ loading ? t('form.processing') : t('form.submitRepayment') }}
+              {{ loading ? t('form.processing') : t('form.requestRepayment') }}
             </button>
           </div>
         </div>
@@ -237,7 +259,7 @@ import { dbOperations } from '../firebase/db.js'
 import { imageService } from '../services/imageService.js'
 import { t } from '../i18n.ts'
 import LanguageToggle from '../components/LanguageToggle.vue'
-import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, setDoc } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
 import '../styles/lang-fonts.css'
 
@@ -260,6 +282,10 @@ export default {
     const showGIFError = ref(false)
     const showRFAmountError = ref(false)
     const showRFBillError = ref(false)
+    const showRFReceiverError = ref(false)
+
+    // Receivers Data
+    const receivers = ref([])
 
     // GIF Return Data
     const gifData = reactive({
@@ -269,6 +295,7 @@ export default {
     // RF Repayment Data
     const rfData = reactive({
       amount: '',
+      receiver: '',
       billFile: null,
       billUrl: ''
     })
@@ -283,7 +310,7 @@ export default {
     })
 
     const canSubmitRF = computed(() => {
-      return rfData.amount > 0 && rfData.billFile && !loading.value
+      return rfData.amount > 0 && rfData.receiver && rfData.billFile && !loading.value
     })
 
     // Methods
@@ -332,9 +359,9 @@ export default {
     const loadActiveRFLoans = async (regId) => {
       try {
         const loans = await dbOperations.getLoans(regId)
-        // Filter for active RF loans and sort by initiation date (oldest first)
+        // Filter for active and completed RF loans (ignore pending status) and sort by initiation date (oldest first)
         activeRFLoans.value = loans
-          .filter(loan => loan.type === 'RF' && loan.status === 'active')
+          .filter(loan => loan.type === 'RF' && (loan.status === 'active' || loan.status === 'completed'))
           .sort((a, b) => {
             const dateA = a.initiationDate?.toDate?.() || new Date(a.initiationDate)
             const dateB = b.initiationDate?.toDate?.() || new Date(b.initiationDate)
@@ -444,6 +471,10 @@ export default {
         errorMessage.value = t('form.pleaseEnterValidAmount')
         return
       }
+      if (!rfData.receiver) {
+        errorMessage.value = t('form.pleaseSelectReceiver')
+        return
+      }
       if (!rfData.billFile) {
         errorMessage.value = t('form.pleaseUploadBill')
         return
@@ -460,61 +491,48 @@ export default {
       try {
         const regId = currentProfile.value.Reg_ID
         const repaymentAmount = parseFloat(rfData.amount)
-        let remainingRepayment = repaymentAmount
-
+        
         // Upload bill to Cloudinary
         const billUrl = await imageService.uploadImage(rfData.billFile, regId)
 
-        // Apply repayment to loans (oldest first)
-        for (const loan of activeRFLoans.value) {
-          if (remainingRepayment <= 0) break
+        // Create timestamp for document ID (MMHH-DD-MM-YYYY format)
+        const now = new Date()
+        const timestamp = `${String(now.getMinutes()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`
 
-          const currentBalance = loan.currentBalance || 0
-          const loanRef = doc(db, `profiles/${regId}/RF_Loans/${loan.id}`)
-
-          if (remainingRepayment >= currentBalance) {
-            // Full payment, mark as completed
-            await updateDoc(loanRef, {
-              currentBalance: 0,
-              status: 'completed',
-              lastUpdated: serverTimestamp(),
-            })
-            remainingRepayment -= currentBalance
-          } else {
-            // Partial payment
-            await updateDoc(loanRef, {
-              currentBalance: currentBalance - remainingRepayment,
-              lastUpdated: serverTimestamp(),
-            })
-            remainingRepayment = 0
-          }
+        // Prepare repayment request data
+        const repaymentRequest = {
+          regId: regId,
+          timestamp: now,
+          status: 'pending',
+          amount: repaymentAmount,
+          receiver: rfData.receiver,
+          driveLink: billUrl,
+          loans: activeRFLoans.value.map(loan => ({
+            id: loan.id,
+            purpose: loan.purpose,
+            amount: loan.amount,
+            currentBalance: loan.currentBalance,
+            initiationDate: loan.initiationDate,
+            status: loan.status
+          })),
+          totalBalance: totalBalance.value,
+          createdAt: serverTimestamp()
         }
 
-        // Record in RF_return_history with proper key format
-        const now = new Date();
-        const key = `${String(now.getMinutes()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${now.getFullYear()}`;
-        
-        await dbOperations.updateProfile(regId, {
-          [`RF_return_history.${key}`]: {
-            [repaymentAmount]: billUrl
-          }
-        })
+        // Save to RF_return_record collection
+        const repaymentRef = doc(db, 'RF_return_record', timestamp)
+        await setDoc(repaymentRef, repaymentRequest)
 
-        // Update payment integrity
-        await updatePaymentIntegrity(regId)
-
-        successMessage.value = t('form.repaymentRecorded')
+        successMessage.value = t('form.repaymentRequestSubmitted')
         rfData.amount = ''
+        rfData.receiver = ''
         rfData.billFile = null
         rfData.billUrl = ''
         billPreview.value = null
         returnType.value = ''
-
-        // Reload loans to show updated status
-        await loadActiveRFLoans(regId)
       } catch (error) {
-        console.error('Error submitting RF repayment:', error)
-        errorMessage.value = t('form.errorSubmittingRepayment')
+        console.error('Error submitting RF repayment request:', error)
+        errorMessage.value = t('form.errorSubmittingRepaymentRequest')
       } finally {
         loading.value = false
       }
@@ -584,6 +602,27 @@ export default {
       showRFBillError.value = true
     }
 
+    const validateRFReceiver = () => {
+      showRFReceiverError.value = true
+    }
+
+    const loadReceivers = async () => {
+      try {
+        const receiversQuery = query(collection(db, 'RF_receiver'))
+        const receiversSnapshot = await getDocs(receiversQuery)
+        receivers.value = receiversSnapshot.docs.map(doc => doc.id)
+        console.log('Loaded receivers:', receivers.value)
+      } catch (error) {
+        console.error('Error loading receivers:', error)
+        errorMessage.value = t('form.errorLoadingReceivers')
+      }
+    }
+
+    // Load receivers on component mount
+    onMounted(() => {
+      loadReceivers()
+    })
+
     return {
       loading,
       searchInput,
@@ -592,6 +631,7 @@ export default {
       gifData,
       rfData,
       activeRFLoans,
+      receivers,
       billPreview,
       billError,
       successMessage,
@@ -605,13 +645,15 @@ export default {
       submitRFRepayment,
       formatCurrency,
       formatDate,
-        validateGIFDescription,
-        validateRFAmount,
-        validateRFBill,
-        showGIFError,
-        showRFAmountError,
-        showRFBillError,
-        t
+      validateGIFDescription,
+      validateRFAmount,
+      validateRFBill,
+      validateRFReceiver,
+      showGIFError,
+      showRFAmountError,
+      showRFBillError,
+      showRFReceiverError,
+      t
     }
   }
 }
@@ -764,6 +806,11 @@ export default {
 .status.completed {
   background: #e3f2fd;
   color: #1565c0;
+}
+
+.status.pending {
+  background: #fff3e0;
+  color: #f57c00;
 }
 
 .loan-details {

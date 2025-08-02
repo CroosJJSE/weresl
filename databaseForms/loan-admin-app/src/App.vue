@@ -30,31 +30,6 @@ body {
   min-height: 100vh;
 }
 
-/* Global utility classes */
-.text-center {
-  text-align: center;
-}
-
-.text-left {
-  text-align: left;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.mt-20 {
-  margin-top: 20px;
-}
-
-.mb-20 {
-  margin-bottom: 20px;
-}
-
-.p-20 {
-  padding: 20px;
-}
-
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -88,6 +63,15 @@ body {
 
 .btn-secondary:hover {
   background-color: #545b62;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #1e7e34;
 }
 
 .btn-danger {
@@ -151,7 +135,6 @@ body {
   border: 1px solid #bbdefb;
 }
 
-/* Responsive utilities */
 @media screen and (max-width: 768px) {
   .container {
     padding: 0 10px;

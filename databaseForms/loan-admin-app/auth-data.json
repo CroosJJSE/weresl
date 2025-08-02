@@ -1,0 +1,11 @@
+{"users": [
+{
+  "localId": "5LeupPxUwmSozzPAkmiUlJZKfgx2",
+  "email": "projectsweresl@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "9ahy21xrv/kZlTPb5WjrvzNw0UYEhLlAZAlodHepMKlE9rqYPuD8G4xX5POMFmAK67lG0fNyDnrX7Bm1aFVo7Q==",
+  "salt": "mNV+/WKnTywczQ==",
+  "createdAt": "1752425978404",
+  "disabled": false,
+  "providerUserInfo": []
+}]}
