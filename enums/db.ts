@@ -10,7 +10,8 @@ export enum RootCollection {
   RF_RETURN_RECORD = 'RF_return_record', //{will have the documents of RF return record in timestamp format}
   TOPVIEW_LINKS = 'topview-links', //{will have the documents of topview links}
   CONFIG = 'config',
-  UPLOADED_IMAGES = 'uploadedImages'
+  UPLOADED_IMAGES = 'uploadedImages',
+  COORDINATORS = 'coordinators' //{will have the documents as the NIC number}
 }
 
 export enum SearchElementDoc {
@@ -77,7 +78,8 @@ export const ROOT_COLLECTIONS: Record<RootCollection, string> = {
   [RootCollection.RF_RETURN_RECORD]: 'RF_return_record',
   [RootCollection.TOPVIEW_LINKS]: 'topview-links',
   [RootCollection.CONFIG]: 'config',
-  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages'
+  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages',
+  [RootCollection.COORDINATORS]: 'coordinators'
 }
 export const PROFILE_FIELDS: Record<ProfileField, string> = {
   [ProfileField.REG_ID]: 'Reg_ID',
@@ -106,6 +108,8 @@ export const SEARCH_ELEMENT_DOCS: Record<SearchElementDoc, string> = {
   [SearchElementDoc.PENDING_LOAN]: 'pending-loan',
   [SearchElementDoc.NIC_DATA]: 'NIC_data'
 }
+
+
 
 
 
@@ -189,6 +193,47 @@ export enum RF_RETURN_RECORD_FIELD_TYPES {
   STATUS = 'string',
   TIMESTAMP = 'date',
   TOTAL_BALANCE = 'number'
+}
+
+// Coordinator field enums
+export enum COORDINATOR_FIELD {
+  FIRST_NAME = 'firstName',
+  LAST_NAME = 'lastName',
+  PHONE_NUMBER = 'phoneNumber',
+  NIC = 'nic',
+  SIGNATURE_DRIVE_ID = 'signatureDriveId',
+  POSITION = 'position',
+  CREATED_AT = 'createdAt',
+  LAST_UPDATED = 'lastUpdated'
+}
+
+export enum COORDINATOR_FIELD_TYPES {
+  FIRST_NAME = 'string',
+  LAST_NAME = 'string',
+  PHONE_NUMBER = 'string',
+  NIC = 'string',
+  SIGNATURE_DRIVE_ID = 'string',
+  POSITION = 'string',
+  CREATED_AT = 'date',
+  LAST_UPDATED = 'date'
+}
+
+// Coordinator position options
+export enum COORDINATOR_POSITION {
+  COORDINATOR = 'Coordinator',
+  TREASURER = 'Treasurer'
+}
+
+// Coordinator field constants for backward compatibility
+export const COORDINATOR_FIELDS: Record<COORDINATOR_FIELD, string> = {
+  [COORDINATOR_FIELD.FIRST_NAME]: 'firstName',
+  [COORDINATOR_FIELD.LAST_NAME]: 'lastName',
+  [COORDINATOR_FIELD.PHONE_NUMBER]: 'phoneNumber',
+  [COORDINATOR_FIELD.NIC]: 'nic',
+  [COORDINATOR_FIELD.SIGNATURE_DRIVE_ID]: 'signatureDriveId',
+  [COORDINATOR_FIELD.POSITION]: 'position',
+  [COORDINATOR_FIELD.CREATED_AT]: 'createdAt',
+  [COORDINATOR_FIELD.LAST_UPDATED]: 'lastUpdated'
 }
 
 // Helper functions

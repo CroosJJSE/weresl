@@ -113,6 +113,7 @@
               class="form-control"
               required
             />
+            <small class="file-size-limit">{{ t('form.maxFileSize') }}: 10MB</small>
             <span v-if="imageError" class="error-message">{{ imageError }}</span>
           </div>
         </div>
@@ -281,10 +282,14 @@
       <!-- Submit Section -->
       <div class="section" v-if="registrationStatus === 'new' || useExisting">
         <div class="form-actions">
-          <button @click="submitForm" :disabled="loading" class="btn btn-primary">
-            {{ loading ? t('form.submitting') : t('form.submit') }}
+          <button @click="submitForm" :disabled="loading || imageUploading" class="btn btn-primary">
+            <span v-if="loading || imageUploading" class="loading-spinner"></span>
+            <span v-if="imageUploading">{{ t('form.uploadingImage') }}</span>
+            <span v-else-if="loading">{{ t('form.submitting') }}</span>
+            <span v-else>{{ t('form.submit') }}</span>
           </button>
-          <button @click="resetForm" class="btn btn-secondary">{{ t('form.reset') }}</button>
+          <button @click="resetForm" class="btn btn-secondary" :disabled="loading || imageUploading">{{ t('form.reset') }}</button>
+          <button @click="goToHome" class="btn btn-outline">{{ t('form.backToHome') }}</button>
         </div>
       </div>
 
@@ -320,6 +325,7 @@ import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FI
 const db = getFirestore();
 
 const loading = ref(false)
+const imageUploading = ref(false)
 const message = ref('')
 const messageType = ref('')
 const regidSearch = ref('')
@@ -360,7 +366,6 @@ const loadReceivers = async () => {
     const receiversQuery = query(collection(db, 'RF_receiver'))
     const receiversSnapshot = await getDocs(receiversQuery)
     receivers.value = receiversSnapshot.docs.map(doc => doc.id)
-    console.log('Loaded receivers:', receivers.value)
   } catch (error) {
     console.error('Error loading receivers:', error)
   }
@@ -372,7 +377,6 @@ const loadBankAccounts = async () => {
     const bankAccountsQuery = query(collection(db, RootCollection.BANK_ACCOUNTS))
     const bankAccountsSnapshot = await getDocs(bankAccountsQuery)
     bankAccounts.value = bankAccountsSnapshot.docs.map(doc => doc.id)
-    console.log('Loaded bank accounts:', bankAccounts.value)
   } catch (error) {
     console.error('Error loading bank accounts:', error)
   }
@@ -402,19 +406,15 @@ const showMessage = (text, type = 'info') => {
 }
 
 const handleImageError = (event) => {
-  console.log('Image failed to load, using placeholder')
   event.target.src = '/placeholder-profile.jpg'
 }
 
 const generateRegID = async () => {
   if (formData.district) {
     try {
-      console.log('🔧 Generating RegID for district:', formData.district)
       const newRegId = await generateRegIdFromDistrict(formData.district)
       formData.Reg_ID = newRegId
-      console.log('✅ RegID generated:', newRegId)
     } catch (error) {
-      console.error('❌ Error generating RegID:', error)
       showMessage('Error generating RegID: ' + error.message, 'error')
     }
   }
@@ -428,7 +428,6 @@ const searchRegID = async () => {
 
   loading.value = true
   try {
-    console.log('🔍 Searching for RegID:', regidSearch.value)
     
     // Use centralized utility to get profile
     const profileResult = await getProfileByRegId(regidSearch.value)
@@ -449,14 +448,10 @@ const searchRegID = async () => {
         }
       }
       
-      console.log('✅ Profile found:', profileData)
-      console.log('📝 Pending loan status:', hasPendingLoan)
     } else {
       searchResult.value = { found: false }
-      console.log('❌ No profile found with RegID:', regidSearch.value)
     }
   } catch (error) {
-    console.error('❌ Error searching for RegID:', error)
     showMessage('Error searching for profile: ' + error.message, 'error')
   } finally {
     loading.value = false
@@ -466,7 +461,6 @@ const searchRegID = async () => {
 const useExistingProfile = () => {
   if (searchResult.value?.profile) {
     const profile = searchResult.value.profile
-    console.log('📋 Using existing profile data:', profile)
     // Map existing data to form fields, handling different field Names and providing defaults
     formData.Name = profile[ProfileField.FULL_NAME] || profile.Name || ''
     formData.yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth || profile.YearOfBirth || ''
@@ -481,15 +475,11 @@ const useExistingProfile = () => {
     // If there's an existing profile image, use it
     if (profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl) {
       uploadedImageUrl.value = profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl
-      console.log('📸 Setting profile image URL:', uploadedImageUrl.value)
     } else {
       uploadedImageUrl.value = null
-      console.log('📸 No existing profile image found')
     }
     useExisting.value = true
     showMessage('Using existing profile data', 'success')
-    // Debug log for all fields
-    console.log('📝 Mapped formData:', JSON.parse(JSON.stringify(formData)))
   }
 }
 
@@ -531,12 +521,15 @@ const handleImageUpload = async (event) => {
     reader.readAsDataURL(file)
 
     // Upload to Google Drive
+    imageUploading.value = true; // Start upload
     uploadedImageUrl.value = await imageService.uploadImage(file, 'profile-photos')
     imageError.value = ''; // Clear error if upload is successful
     showMessage('Image uploaded successfully', 'success')
   } catch (error) {
     imageError.value = 'Error uploading image: ' + error.message;
     showMessage('Error uploading image: ' + error.message, 'error')
+  } finally {
+    imageUploading.value = false; // End upload
   }
 }
 
@@ -569,13 +562,6 @@ const onlyNumbers = (event) => {
 
 // Update validation to show which field is missing
 const validateForm = () => {
-  console.log('🔍 Validating form...')
-  console.log('📋 Form data:', formData)
-  console.log('📸 Uploaded image URL:', uploadedImageUrl.value)
-  console.log('🔍 Registration status:', registrationStatus.value)
-  console.log('🔍 Use existing:', useExisting.value)
-  console.log('🔍 Search result profile:', searchResult.value?.profile)
-
   if (useExisting.value) {
     // Only validate loan fields for existing profiles
     if (!formData.loanType || !formData.initialAmount || !formData.purpose) {
@@ -607,7 +593,6 @@ const validateForm = () => {
       formData[field.key] === null ||
       formData[field.key] === undefined
     ) {
-      console.log(`❌ Form validation failed: missing field ${field.key}`)
       showMessage(`Please fill in the required field: ${field.label}`, 'error')
       return false
     }
@@ -615,19 +600,15 @@ const validateForm = () => {
 
   // Check for profile photo - either uploaded for new users or existing for existing users
   if (registrationStatus.value === 'new' && !uploadedImageUrl.value) {
-    console.log('❌ Form validation failed: no image uploaded for new user')
     showMessage('Please upload a profile photo', 'error')
     return false
   }
 
   // For existing users, check if they have an existing image or uploaded a new one
   if (useExisting.value && !uploadedImageUrl.value && !searchResult.value?.profile?.Image && !searchResult.value?.profile?.profileImageUrl && !searchResult.value?.profile?.imageUrl) {
-    console.log('❌ Form validation failed: no image for existing user')
     showMessage('Please upload a profile photo or use existing profile with photo', 'error')
     return false
   }
-
-  console.log('✅ Form validation passed')
 
   // Validate year of birth
   if (!validateYearOfBirth()) {
@@ -663,7 +644,6 @@ const submitForm = async () => {
   if (!validateForm()) return
 
   loading.value = true
-  console.log('🚀 Starting form submission...')
 
   try {
     let profileRef;
@@ -671,14 +651,12 @@ const submitForm = async () => {
     if (useExisting.value) {
       // Use the existing RegID from the form/profile
       profileRef = formData.Reg_ID;
-      console.log('📝 Using existing profile with Reg_ID:', profileRef);
     } else {
       // New profile flow
       // 1. Check NIC uniqueness in NIC_data BEFORE RegID generation
       const nicDataRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap = await getDoc(nicDataRef)
       let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
-      console.log('🔍 Checking NIC_data for NIC:', formData.NIC)
       if (nicData[formData.NIC]) {
         showMessage('A profile with this NIC already exists (RegID: ' + nicData[formData.NIC] + ')', 'error')
         loading.value = false
@@ -686,7 +664,6 @@ const submitForm = async () => {
       }
       // 2. Generate RegID (only if NIC is unique)
       await generateRegID()
-      console.log('✅ RegID generated:', formData.Reg_ID)
       // 3. Create new profile
       const profileData = {
         [ProfileField.FULL_NAME]: formData.Name,
@@ -702,17 +679,14 @@ const submitForm = async () => {
         [ProfileField.PROFILE_IMAGE_DRIVE_ID]: uploadedImageUrl.value ? extractFileId(uploadedImageUrl.value) : null,
         [ProfileField.LAST_UPDATED]: new Date()
       }
-      console.log('📝 Creating profile with data:', profileData)
       // Create profile document
       profileRef = await dbOperations.createProfile(profileData)
-      console.log('✅ Profile created successfully:', profileRef)
       // 4. Add NIC:Reg_ID to NIC_data (only for new registrations)
       const nicDataRef2 = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap2 = await getDoc(nicDataRef2)
       let nicData2 = nicDataSnap2.exists() ? nicDataSnap2.data() : {}
       nicData2[formData.NIC] = formData.Reg_ID
       await setDoc(nicDataRef2, nicData2)
-      console.log('✅ NIC_data updated:', nicData2)
     }
 
     // Generate loan ID based on loan type
@@ -739,13 +713,8 @@ const submitForm = async () => {
       [RF_LOAN_FIELD.REG_ID]: profileRef
     }
 
-    console.log('📝 Adding loan with data:', loanData)
-    console.log('📝 Profile ID for loan:', profileRef)
-    console.log('📝 Generated loan ID:', loanId)
-
     // Use profile service to add loan with loan type
     const loanResult = await profileService.addLoan(profileRef, loanData, formData.loanType)
-    console.log('✅ Loan added successfully:', loanResult)
 
     // Add pending loan information to SearchElements using LOAN_ID as field name
     const pendingLoanRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN)
@@ -764,14 +733,12 @@ const submitForm = async () => {
     }
     
     await setDoc(pendingLoanRef, pendingLoans)
-    console.log('✅ Pending loan added to SearchElements with LOAN_ID as field name:', pendingLoans)
 
     showMessage('Loan was initiated successfully!', 'success')
     setTimeout(() => {
       resetForm()
     }, 3000)
   } catch (error) {
-    console.error('❌ Error submitting application:', error)
     showMessage('Error submitting application: ' + error.message, 'error')
   } finally {
     loading.value = false
@@ -792,6 +759,10 @@ const resetForm = () => {
   registrationStatus.value = '' // Reset registration status
   yearOfBirthError.value = ''
   phoneError.value = ''
+}
+
+const goToHome = () => {
+  window.location.href = '/'; // Redirect to home page
 }
 
 </script>
@@ -891,6 +862,13 @@ h1 {
 
 .error-message {
   color: #dc3545;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+.file-size-limit {
+  color: #6c757d;
   font-size: 12px;
   margin-top: 5px;
   display: block;
@@ -1110,6 +1088,33 @@ h1 {
   text-align: center;
 }
 
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid #1565c0;
+  color: #1565c0;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #e3f2fd;
+}
+
 @media (max-width: 768px) {
   .form-row {
     grid-template-columns: 1fr;
@@ -1121,6 +1126,21 @@ h1 {
   
   .form-actions {
     flex-direction: column;
+    gap: 10px;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+  
+  .choice-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .choice-buttons .btn {
+    width: 100%;
   }
 }
 </style> 

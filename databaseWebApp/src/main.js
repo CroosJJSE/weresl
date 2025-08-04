@@ -5,8 +5,6 @@ import App from './App.vue'
 
 // Import pages
 import HomePage from './pages/main/HomePage.vue'
-import LoanInitForm from './pages/forms/LoanInitForm.vue'
-import PaymentForm from './pages/forms/PaymentForm.vue'
 
 // Create router
 const routes = [
@@ -14,16 +12,6 @@ const routes = [
     path: '/',
     name: 'Home',
     component: HomePage
-  },
-  {
-    path: '/loan-init',
-    name: 'LoanInit',
-    component: LoanInitForm
-  },
-  {
-    path: '/payment',
-    name: 'Payment',
-    component: PaymentForm
   }
 ]
 

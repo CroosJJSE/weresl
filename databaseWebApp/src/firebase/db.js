@@ -14,54 +14,34 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from './index.js'
-
-// Collection names
-const COLLECTIONS = {
-  PROFILES: 'profiles',
-  LOANS: 'loans',
-  GRANTS: 'grants',
-  PAYMENTS: 'payments',
-  PROJECTS: 'projects',
-  LOGS: 'system_logs'
-}
-
-// District mapping (replicated from code.gs)
-const DISTRICT_MAPPING = {
-  "MAN": "Mannar", "COL": "Colombo", "BAT": "Batticaloa", "GAM": "Gampaha", "KAL": "Kalutara",
-  "KAN": "Kandy", "KUR": "Kurunegala", "JAF": "Jaffna", "VAV": "Vavuniya", "TRI": "Trincomalee",
-  "MTR": "Matara", "HAM": "Hambantota", "MON": "Monaragala", "ANU": "Anuradhapura", "POL": "Polonnaruwa",
-  "PUT": "Puttalam", "RAT": "Ratnapura", "NUW": "Nuwara Eliya", "BAD": "Badulla", "KEG": "Kegalle",
-  "MUL": "Mullaitivu", "MTL": "Matale", "AMP": "Ampara", "KIL": "Kilinochchi", "GAE": "Galle"
-}
-
-const DISTRICT_CODES = {
-  "Mannar": "MAN", "Colombo": "COL", "Batticaloa": "BAT", "Gampaha": "GAM", 
-  "Kalutara": "KAL", "Kandy": "KAN", "Kurunegala": "KUR", "Jaffna": "JAF", 
-  "Vavuniya": "VAV", "Trincomalee": "TRI", "Matara": "MTR", "Hambantota": "HAM", 
-  "Monaragala": "MON", "Anuradhapura": "ANU", "Polonnaruwa": "POL", "Puttalam": "PUT", 
-  "Ratnapura": "RAT", "Nuwara Eliya": "NUW", "Badulla": "BAD", "Kegalle": "KEG", 
-  "Mullaitivu": "MUL", "Matale": "MTL", "Ampara": "AMP", "Kilinochchi": "KIL", 
-  "Galle": "GAE"
-}
+import { 
+  RootCollection, 
+  ProfileField, 
+  SearchElementDoc,
+  RF_LOAN_FIELD,
+  GRANT_FIELD
+} from '../enums/db.js'
+import { DISTRICT_MAPPING, DISTRICT_CODES } from '../enums/districts.js'
+import { generateNextRegId, generateRegIdFromDistrict, validateRegId } from '../utils/regIdUtils.js'
 
 // Database operations
 export const dbOperations = {
   // Get all profiles with filtering
   async getAllProfiles(filters = {}) {
     try {
-      let q = collection(db, COLLECTIONS.PROFILES)
+      let q = collection(db, RootCollection.PROFILES)
       
       // Apply filters - handle both old flat structure and new nested structure
       if (filters.District) {
         // Try both field structures
-        q = query(q, where('District', '==', filters.District))
+        q = query(q, where(ProfileField.DISTRICT, '==', filters.District))
       }
       if (filters.type) {
         // For now, we'll filter after fetching since the structure varies
         q = query(q)
       }
       if (filters.year) {
-        q = query(q, where('createdAt', '>=', new Date(filters.year, 0, 1)))
+        q = query(q, where(ProfileField.CREATED_AT, '>=', new Date(filters.year, 0, 1)))
       }
       
       const snapshot = await getDocs(q)
@@ -73,26 +53,26 @@ export const dbOperations = {
         // Transform the data structure to match what the components expect
         const transformedProfile = {
           id: doc.id,
-          // Map flat fields to nested structure
+          // Map fields using enums
           basicInfo: {
-            name: data.Name || data.basicInfo?.name || 'N/A',
-            age: data.Age || data.basicInfo?.age || 'N/A',
-            District: data.District || data.basicInfo?.District || 'N/A',
-            phone: data.contact || data.basicInfo?.phone || 'N/A',
-            address: data.Address || data.basicInfo?.address || 'N/A',
-            nic: data.NIC || data.basicInfo?.nic || 'N/A',
-            totalChildren: data.total_children || data.basicInfo?.totalChildren || 0,
-            schoolKids: data.school_kids || data.basicInfo?.schoolKids || 0,
-            others: data.others || data.basicInfo?.others || 0,
-            occupation: data.Occupation || data.basicInfo?.occupation || 'N/A'
+            name: data[ProfileField.FULL_NAME] || data.Name || data.basicInfo?.name || 'N/A',
+            age: data[ProfileField.YEAR_OF_BIRTH] || data.Age || data.basicInfo?.age || 'N/A',
+            District: data[ProfileField.DISTRICT] || data.District || data.basicInfo?.District || 'N/A',
+            phone: data[ProfileField.PHONE_NUMBER] || data.contact || data.basicInfo?.phone || 'N/A',
+            address: data[ProfileField.ADDRESS] || data.Address || data.basicInfo?.address || 'N/A',
+            nic: data[ProfileField.NIC] || data.NIC || data.basicInfo?.nic || 'N/A',
+            totalChildren: data[ProfileField.TOTAL_CHILDREN] || data.total_children || data.basicInfo?.totalChildren || 0,
+            schoolKids: data[ProfileField.SCHOOL_GOING_CHILDREN] || data.school_kids || data.basicInfo?.schoolKids || 0,
+            others: data[ProfileField.OTHER_DEPENDENTS] || data.others || data.basicInfo?.others || 0,
+            occupation: data[ProfileField.OCCUPATION] || data.Occupation || data.basicInfo?.occupation || 'N/A'
           },
-          // Map loans and grants
-          loans: data.loans || [],
-          grants: data.grants || [],
+          // Map loans and grants using enums
+          loans: data[ProfileField.RF_LOANS] || data.loans || [],
+          grants: data[ProfileField.GRANT] || data.grants || [],
           paymentHistory: data.paymentHistory || [],
           arms: data.ArmsArray || data.arms || [],
           // Keep original fields for backward compatibility
-          Image: data.Image,
+          Image: data[ProfileField.PROFILE_IMAGE_DRIVE_ID] || data.Image,
           imageUrl: data.imageUrl,
           // Additional fields from migration
           RF_Loan: data.RF_Loan,
@@ -102,14 +82,16 @@ export const dbOperations = {
           GRANT: data.GRANT,
           GIFor: data.GIFor,
           GRANT_Cur_Prj: data.GRANT_Cur_Prj,
-          Description: data.Description,
-          Reg_ID: data.Reg_ID,
+          Description: data[ProfileField.DESCRIPTION] || data.Description,
+          Reg_ID: data[ProfileField.REG_ID] || data.Reg_ID,
           contact: data.contact,
           total_children: data.total_children,
           school_kids: data.school_kids,
           others: data.others,
           createdAt: data.createdAt,
-          updatedAt: data.updatedAt
+          updatedAt: data.updatedAt,
+          // Add enum field mapping for description
+          [ProfileField.DESCRIPTION]: data[ProfileField.DESCRIPTION] || data.Description || data.description
         }
         
         profiles.push(transformedProfile)
@@ -139,7 +121,7 @@ export const dbOperations = {
   // Get single profile by RegID
   async getProfileByRegId(regId) {
     try {
-      const docRef = doc(db, COLLECTIONS.PROFILES, regId)
+      const docRef = doc(db, RootCollection.PROFILES, regId)
       const docSnap = await getDoc(docRef)
       
       if (docSnap.exists()) {
@@ -148,26 +130,26 @@ export const dbOperations = {
         // Transform the data structure to match what the components expect
         const transformedProfile = {
           id: docSnap.id,
-          // Map flat fields to nested structure
+          // Map fields using enums
           basicInfo: {
-            name: data.Name || data.basicInfo?.name || 'N/A',
-            age: data.Age || data.basicInfo?.age || 'N/A',
-            District: data.District || data.basicInfo?.District || 'N/A',
-            phone: data.contact || data.basicInfo?.phone || 'N/A',
-            address: data.Address || data.basicInfo?.address || 'N/A',
-            nic: data.NIC || data.basicInfo?.nic || 'N/A',
-            totalChildren: data.total_children || data.basicInfo?.totalChildren || 0,
-            schoolKids: data.school_kids || data.basicInfo?.schoolKids || 0,
-            others: data.others || data.basicInfo?.others || 0,
-            occupation: data.Occupation || data.basicInfo?.occupation || 'N/A'
+            name: data[ProfileField.FULL_NAME] || data.Name || data.basicInfo?.name || 'N/A',
+            age: data[ProfileField.YEAR_OF_BIRTH] || data.Age || data.basicInfo?.age || 'N/A',
+            District: data[ProfileField.DISTRICT] || data.District || data.basicInfo?.District || 'N/A',
+            phone: data[ProfileField.PHONE_NUMBER] || data.contact || data.basicInfo?.phone || 'N/A',
+            address: data[ProfileField.ADDRESS] || data.Address || data.basicInfo?.address || 'N/A',
+            nic: data[ProfileField.NIC] || data.NIC || data.basicInfo?.nic || 'N/A',
+            totalChildren: data[ProfileField.TOTAL_CHILDREN] || data.total_children || data.basicInfo?.totalChildren || 0,
+            schoolKids: data[ProfileField.SCHOOL_GOING_CHILDREN] || data.school_kids || data.basicInfo?.schoolKids || 0,
+            others: data[ProfileField.OTHER_DEPENDENTS] || data.others || data.basicInfo?.others || 0,
+            occupation: data[ProfileField.OCCUPATION] || data.Occupation || data.basicInfo?.occupation || 'N/A'
           },
-          // Map loans and grants
-          loans: data.loans || [],
-          grants: data.grants || [],
+          // Map loans and grants using enums
+          loans: data[ProfileField.RF_LOANS] || data.loans || [],
+          grants: data[ProfileField.GRANT] || data.grants || [],
           paymentHistory: data.paymentHistory || [],
           arms: data.ArmsArray || data.arms || [],
           // Keep original fields for backward compatibility
-          Image: data.Image,
+          Image: data[ProfileField.PROFILE_IMAGE_DRIVE_ID] || data.Image,
           imageUrl: data.imageUrl,
           // Additional fields from migration
           RF_Loan: data.RF_Loan,
@@ -177,14 +159,16 @@ export const dbOperations = {
           GRANT: data.GRANT,
           GIFor: data.GIFor,
           GRANT_Cur_Prj: data.GRANT_Cur_Prj,
-          Description: data.Description,
-          Reg_ID: data.Reg_ID,
+          Description: data[ProfileField.DESCRIPTION] || data.Description,
+          Reg_ID: data[ProfileField.REG_ID] || data.Reg_ID,
           contact: data.contact,
           total_children: data.total_children,
           school_kids: data.school_kids,
           others: data.others,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt
+          createdAt: data[ProfileField.CREATED_AT] || data.createdAt,
+          updatedAt: data[ProfileField.LAST_UPDATED] || data.updatedAt,
+          // Add enum field mapping for description
+          [ProfileField.DESCRIPTION]: data[ProfileField.DESCRIPTION] || data.Description || data.description
         }
         
         return transformedProfile
@@ -197,240 +181,14 @@ export const dbOperations = {
     }
   },
 
-  // Create new profile
-  async createProfile(profileData) {
-    try {
-      const regId = profileData.regId
-      const docRef = doc(db, COLLECTIONS.PROFILES, regId)
-      
-      const profile = {
-        basicInfo: profileData.basicInfo,
-        loans: profileData.loans || [],
-        grants: profileData.grants || [],
-        paymentHistory: profileData.paymentHistory || [],
-        arms: profileData.arms || [],
-        imageUrl: profileData.imageUrl || '',
-        meta: {
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }
-      }
-      
-      await setDoc(docRef, profile)
-      return regId
-    } catch (error) {
-      console.error('Error creating profile:', error)
-      throw error
-    }
-  },
-
-  // Update profile
-  async updateProfile(regId, updates) {
-    try {
-      const docRef = doc(db, COLLECTIONS.PROFILES, regId)
-      const updateData = {
-        ...updates,
-        meta: {
-          updatedAt: serverTimestamp()
-        }
-      }
-      
-      await updateDoc(docRef, updateData)
-      return regId
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      throw error
-    }
-  },
-
-  // Add loan to profile
-  async addLoan(regId, loanData) {
-    try {
-      const profile = await this.getProfileByRegId(regId)
-      if (!profile) throw new Error('Profile not found')
-      
-      const newLoan = {
-        id: Date.now().toString(),
-        type: loanData.type,
-        amount: loanData.amount,
-        purpose: loanData.purpose,
-        date: loanData.date,
-        status: 'active',
-        ...loanData
-      }
-      
-      const updatedLoans = [...profile.loans, newLoan]
-      await this.updateProfile(regId, { loans: updatedLoans })
-      
-      return newLoan
-    } catch (error) {
-      console.error('Error adding loan:', error)
-      throw error
-    }
-  },
-
-  // Process payment (replicates onRFGIFReturnSubmit logic)
-  async processPayment(paymentData) {
-    try {
-      const { regId, type, amount, details, date } = paymentData
-      const profile = await this.getProfileByRegId(regId)
-      
-      if (!profile) throw new Error('Profile not found')
-      
-      const payment = {
-        id: Date.now().toString(),
-        type,
-        amount: parseFloat(amount) || 0,
-        details,
-        date: date || new Date(),
-        timestamp: serverTimestamp()
-      }
-      
-      // Update payment history
-      const updatedPaymentHistory = [...profile.paymentHistory, payment]
-      
-      if (type === 'RF') {
-        // Process RF loan payment logic (replicated from code.gs)
-        const updatedProfile = await this.processRFPayment(profile, payment)
-        return updatedProfile
-      } else if (type === 'GRANT') {
-        // Process grant payment
-        const updatedProfile = await this.processGrantPayment(profile, payment)
-        return updatedProfile
-      }
-      
-    } catch (error) {
-      console.error('Error processing payment:', error)
-      throw error
-    }
-  },
-
-  // Process RF payment (replicates RF payment logic from code.gs)
-  async processRFPayment(profile, payment) {
-    const { amount } = payment
-    let remainingPayment = amount
-    
-    // Update current projects based on payment
-    const updatedProjects = []
-    const completedProjects = []
-    
-    for (const project of profile.loans.filter(loan => loan.status === 'active')) {
-      if (remainingPayment > 0) {
-        const projectRemaining = project.amount - (project.paidAmount || 0)
-        
-        if (projectRemaining <= remainingPayment) {
-          // Project completed
-          completedProjects.push({
-            ...project,
-            paidAmount: project.amount,
-            status: 'completed',
-            completedDate: new Date()
-          })
-          remainingPayment -= projectRemaining
-        } else {
-          // Partial payment
-          const newPaidAmount = (project.paidAmount || 0) + remainingPayment
-          updatedProjects.push({
-            ...project,
-            paidAmount: newPaidAmount
-          })
-          remainingPayment = 0
-        }
-      } else {
-        updatedProjects.push(project)
-      }
-    }
-    
-    // Update profile with new data
-    const updatedLoans = [...updatedProjects, ...completedProjects]
-    const updatedPaymentHistory = [...profile.paymentHistory, payment]
-    
-    await this.updateProfile(profile.id, {
-      loans: updatedLoans,
-      paymentHistory: updatedPaymentHistory
-    })
-    
-    return { ...profile, loans: updatedLoans, paymentHistory: updatedPaymentHistory }
-  },
-
-  // Process grant payment
-  async processGrantPayment(profile, payment) {
-    const updatedPaymentHistory = [...profile.paymentHistory, payment]
-    
-    await this.updateProfile(profile.id, {
-      paymentHistory: updatedPaymentHistory
-    })
-    
-    return { ...profile, paymentHistory: updatedPaymentHistory }
-  },
-
-  // Get analytics data
-  async getAnalyticsData() {
-    try {
-      const profiles = await this.getAllProfiles()
-      
-      const stats = {
-        totalProfiles: profiles.length,
-        totalLoans: profiles.reduce((sum, p) => sum + p.loans.length, 0),
-        totalGrants: profiles.reduce((sum, p) => sum + p.grants.length, 0),
-        totalAmount: profiles.reduce((sum, p) => {
-          const loanAmount = p.loans.reduce((lSum, l) => lSum + (l.amount || 0), 0)
-          const grantAmount = p.grants.reduce((gSum, g) => gSum + (g.amount || 0), 0)
-          return sum + loanAmount + grantAmount
-        }, 0)
-      }
-      
-      // District breakdown
-      const districtStats = {}
-      profiles.forEach(profile => {
-        const district = profile.basicInfo?.District || 'Unknown'
-        districtStats[district] = (districtStats[district] || 0) + 1
-      })
-      
-      // Year breakdown
-      const yearStats = {}
-      profiles.forEach(profile => {
-        const year = new Date(profile.meta?.createdAt?.toDate()).getFullYear()
-        yearStats[year] = (yearStats[year] || 0) + 1
-      })
-      
-      return {
-        stats,
-        districtStats,
-        yearStats
-      }
-    } catch (error) {
-      console.error('Error getting analytics:', error)
-      throw error
-    }
-  },
-
-  // Log system operations
-  async logOperation(operation, details, level = 'info') {
-    try {
-      const logEntry = {
-        operation,
-        details,
-        level,
-        timestamp: serverTimestamp(),
-        userId: 'system' // TODO: Add user authentication
-      }
-      
-      await addDoc(collection(db, COLLECTIONS.LOGS), logEntry)
-    } catch (error) {
-      console.error('Error logging operation:', error)
-    }
-  },
-
   // Get loans for a profile (including RF_Loans subcollection)
   async getProfileLoans(profileId) {
     try {
-      console.log('[dbOperations] Loading loans for profile:', profileId);
       const loans = [];
       
       // Get RF_Loans from subcollection
       try {
-        const rfQuery = query(collection(db, 'profiles', profileId, 'RF_Loans'));
+        const rfQuery = query(collection(db, RootCollection.PROFILES, profileId, ProfileField.RF_LOANS));
         const rfSnapshot = await getDocs(rfQuery);
         
         rfSnapshot.forEach(doc => {
@@ -441,15 +199,13 @@ export const dbOperations = {
             type: 'RF'
           });
         });
-        
-        console.log('[dbOperations] Loaded RF loans:', loans.length);
       } catch (error) {
-        console.log('[dbOperations] No RF_Loans collection found for profile:', profileId);
+        // No RF_Loans collection found for profile
       }
       
       // Get GRANT loans from subcollection
       try {
-        const grantQuery = query(collection(db, 'profiles', profileId, 'GRANT'));
+        const grantQuery = query(collection(db, RootCollection.PROFILES, profileId, ProfileField.GRANT));
         const grantSnapshot = await getDocs(grantQuery);
         
         grantSnapshot.forEach(doc => {
@@ -460,13 +216,10 @@ export const dbOperations = {
             type: 'GRANT'
           });
         });
-        
-        console.log('[dbOperations] Loaded GRANT loans:', loans.length);
       } catch (error) {
-        console.log('[dbOperations] No GRANT collection found for profile:', profileId);
+        // No GRANT collection found for profile
       }
       
-      console.log('[dbOperations] Total loans loaded:', loans.length);
       return loans;
     } catch (error) {
       console.error('[dbOperations] Error loading loans:', error);
@@ -477,33 +230,41 @@ export const dbOperations = {
   // Get RF return history for a profile
   async getRFReturnHistory(profileId) {
     try {
-      console.log('[dbOperations] Loading RF return history for profile:', profileId);
-      
-      const docRef = doc(db, 'profiles', profileId);
+      const docRef = doc(db, RootCollection.PROFILES, profileId);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const returnHistory = data.RF_return_history || {};
+        const returnHistory = data[ProfileField.RF_RETURN_HISTORY] || {};
         
-        console.log('[dbOperations] RF return history found:', Object.keys(returnHistory).length, 'entries');
-        
-        // Parse the return history structure
+        // Parse the return history structure - handle both map and array formats
         const parsedHistory = [];
-        Object.keys(returnHistory).forEach(dateKey => {
-          const payments = returnHistory[dateKey];
-          Object.keys(payments).forEach(amount => {
-            parsedHistory.push({
-              dateKey: dateKey,
-              amount: parseInt(amount),
-              proofUrl: payments[amount],
-              // Parse date from key format: 441918072025 -> 18-07-2025
-              parsedDate: this.parseDateFromKey(dateKey)
-            });
-          });
-        });
         
-        console.log('[dbOperations] Parsed return history:', parsedHistory);
+        if (Array.isArray(returnHistory)) {
+          // If it's already an array, use it directly
+          parsedHistory.push(...returnHistory);
+        } else if (typeof returnHistory === 'object' && returnHistory !== null) {
+          // If it's a map/object, convert to array
+          Object.entries(returnHistory).forEach(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              // If value is an object with amount and date
+              parsedHistory.push({
+                dateKey: key,
+                amount: value.amount || value,
+                parsedDate: this.parseDateFromKey(key),
+                proofUrl: value.proofUrl || null
+              });
+            } else {
+              // If value is just a number
+              parsedHistory.push({
+                dateKey: key,
+                amount: value,
+                parsedDate: this.parseDateFromKey(key)
+              });
+            }
+          });
+        }
+        
         return parsedHistory;
       }
       
@@ -514,21 +275,81 @@ export const dbOperations = {
     }
   },
 
-  // Parse date from key format (441918072025 -> 18-07-2025)
+  // Parse date from key format (1421_3_7_2025 -> 03-07-2025)
   parseDateFromKey(dateKey) {
     try {
-      // Format: 441918072025 -> 44-19-18-07-2025
-      // We need: 18-07-2025
-      const parts = dateKey.match(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{4})/);
-      if (parts) {
-        const day = parts[3];
-        const month = parts[4];
-        const year = parts[5];
-        return `${day}-${month}-${year}`;
+      // Handle format: 1421_3_7_2025 or 514_3_7_2025
+      // Format is: minutes_hours_day_month_year (from createTimestamp function)
+      const parts = dateKey.split('_');
+      
+      if (parts.length >= 4) {
+        // Format: minutes_hours_day_month_year
+        // But the first part might be combined minutes+hours
+        const firstPart = parts[0];
+        const day = parts[1];
+        const month = parts[2];
+        const year = parts[3];
+        
+        // Validate the parts
+        if (day && month && year) {
+          // Format as DD-MM-YYYY
+          const formattedDate = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
+          return formattedDate;
+        }
+      } else if (parts.length >= 3) {
+        // Alternative format: day_month_year
+        const day = parts[0];
+        const month = parts[1];
+        const year = parts[2];
+        
+        if (day && month && year) {
+          const formattedDate = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
+          return formattedDate;
+        }
       }
+      
+      // Fallback: try the old format (441918072025 -> 18-07-2025)
+      const oldFormat = dateKey.match(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{4})/);
+      if (oldFormat) {
+        const day = oldFormat[3];
+        const month = oldFormat[4];
+        const year = oldFormat[5];
+        const formattedDate = `${day}-${month}-${year}`;
+        return formattedDate;
+      }
+      
       return dateKey;
     } catch (error) {
-      console.error('[dbOperations] Error parsing date key:', error);
+      console.error('[dbOperations] Error parsing date key:', error, dateKey);
+      return dateKey;
+    }
+  },
+
+  // Parse full timestamp (date and time) from key format
+  parseFullTimestamp(dateKey) {
+    try {
+      const parts = dateKey.split('_');
+      
+      if (parts.length >= 4) {
+        // Format: minutes_hours_day_month_year
+        const minutes = parts[0];
+        const hours = parts[1];
+        const day = parts[2];
+        const month = parts[3];
+        const year = parts[4];
+        
+        if (day && month && year && hours && minutes) {
+          // Format as DD-MM-YYYY HH:MM
+          const formattedDate = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
+          const formattedTime = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+          return `${formattedDate} ${formattedTime}`;
+        }
+      }
+      
+      // Fallback to just date
+      return this.parseDateFromKey(dateKey);
+    } catch (error) {
+      console.error('[dbOperations] Error parsing full timestamp:', error, dateKey);
       return dateKey;
     }
   },
@@ -536,15 +357,13 @@ export const dbOperations = {
   // Get comprehensive profile details including projects and history
   async getProfileDetails(profileId) {
     try {
-      console.log('[dbOperations] Loading comprehensive details for profile:', profileId);
-      
       const [loans, returnHistory] = await Promise.all([
         this.getProfileLoans(profileId),
         this.getRFReturnHistory(profileId)
       ]);
       
       // Get profile document for additional info
-      const docRef = doc(db, 'profiles', profileId);
+      const docRef = doc(db, RootCollection.PROFILES, profileId);
       const docSnap = await getDoc(docRef);
       const profileData = docSnap.exists() ? docSnap.data() : {};
       
@@ -552,17 +371,16 @@ export const dbOperations = {
         loans: loans,
         returnHistory: returnHistory,
         grantReturn: profileData.Grant_return || false,
-        gifData: profileData.GIF || {},
+        gifData: profileData[ProfileField.GIF] || {},
         // Calculate totals
         totalRFLoans: loans.filter(l => l.type === 'RF').length,
         totalGrants: loans.filter(l => l.type === 'GRANT').length,
-        totalReturnAmount: returnHistory.reduce((sum, payment) => sum + payment.amount, 0),
+        totalReturnAmount: returnHistory.reduce((sum, payment) => sum + (payment.amount || 0), 0),
         activeRFLoans: loans.filter(l => l.type === 'RF' && l.status === 'active'),
         completedRFLoans: loans.filter(l => l.type === 'RF' && l.status === 'completed'),
         activeGrants: loans.filter(l => l.type === 'GRANT')
       };
       
-      console.log('[dbOperations] Comprehensive details loaded:', details);
       return details;
     } catch (error) {
       console.error('[dbOperations] Error loading comprehensive details:', error);
@@ -582,7 +400,7 @@ export const dbOperations = {
   }
 }
 
-// Utility functions
+// Utility functions - now using centralized utils
 export const utils = {
   getDistrictFromRegID(regID) {
     const districtPrefix = regID.substring(0, 3).toUpperCase()
@@ -594,16 +412,7 @@ export const utils = {
   },
 
   generateRegId(district, existingIds = []) {
-    const districtCode = this.getDistrictCodeFromName(district)
-    let counter = 1
-    
-    while (true) {
-      const regId = `${districtCode}${counter.toString().padStart(3, '0')}`
-      if (!existingIds.includes(regId)) {
-        return regId
-      }
-      counter++
-    }
+    return generateRegIdFromDistrict(district)
   }
 }
 

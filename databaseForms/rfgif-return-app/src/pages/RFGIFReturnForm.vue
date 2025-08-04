@@ -40,8 +40,8 @@
               <div class="profile-info">
                 <div class="profile-image-container">
                   <img 
-                    v-if="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
-                    :src="searchResult.profile.Image || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
+                    v-if="profileImageUrl" 
+                    :src="profileImageUrl" 
                     alt="Profile Photo" 
                     class="profile-image"
                   />
@@ -49,11 +49,11 @@
                     <span>{{ t('form.noProfilePhoto') }}</span>
                   </div>
                 </div>
-                <p><strong>{{ t('form.name') }}</strong> {{ searchResult.profile.Name || searchResult.profile.basicInfo?.name || 'N/A' }}</p>
-                <p><strong>{{ t('form.nic') }}</strong> {{ searchResult.profile.NIC || searchResult.profile.basicInfo?.nic || 'N/A' }}</p>
-                <p><strong>{{ t('form.phone') }}</strong> {{ searchResult.profile.contact || searchResult.profile.basicInfo?.phone || 'N/A' }}</p>
+                <p><strong>{{ t('form.name') }}</strong> {{ searchResult.profile.fullName || searchResult.profile.basicInfo?.name || 'N/A' }}</p>
+                <p><strong>{{ t('form.nic') }}</strong> {{ searchResult.profile.nic || searchResult.profile.basicInfo?.nic || 'N/A' }}</p>
+                <p><strong>{{ t('form.phone') }}</strong> {{ searchResult.profile.phoneNumber || searchResult.profile.basicInfo?.phone || 'N/A' }}</p>
                 <p><strong>{{ t('form.regid') }}</strong> {{ searchResult.profile.Reg_ID || searchResult.profile.regId || 'N/A' }}</p>
-                <p><strong>{{ t('form.district') }}</strong> {{ searchResult.profile.District || searchResult.profile.basicInfo?.district || 'N/A' }}</p>
+                <p><strong>{{ t('form.district') }}</strong> {{ searchResult.profile.district || searchResult.profile.basicInfo?.district || 'N/A' }}</p>
               </div>
             </div>
             <div v-else class="alert alert-warning">
@@ -71,15 +71,21 @@
             <button @click="setReturnType('RF')" class="btn btn-primary" :class="{ active: returnType === 'RF' }">
               {{ t('form.rfRepayment') }}
             </button>
-            <button @click="setReturnType('GIF')" class="btn btn-secondary" :class="{ active: returnType === 'GIF' }">
+            <button 
+              @click="setReturnType('GIF')" 
+              class="btn btn-secondary" 
+              :class="{ active: returnType === 'GIF', disabled: !hasGrantLoans }"
+              :disabled="!hasGrantLoans"
+            >
               {{ t('form.gifReturn') }}
+              <span v-if="!hasGrantLoans" class="disabled-hint">({{ t('form.noGrantLoans') }})</span>
             </button>
-            </div>
-            </div>
-            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- GIF Return Form -->
-      <div v-if="returnType === 'GIF' && searchResult && searchResult.found" class="section">
+      <div v-if="returnType === 'GIF' && searchResult && searchResult.found && hasGrantLoans" class="section">
         <h2>{{ t('form.gifReturnForm') }}</h2>
         <div class="gif-form">
           <div class="form-group">
@@ -100,7 +106,7 @@
           </div>
           
           <div class="form-actions">
-            <button @click="submitGIFReturn" :disabled="loading || !gifData.description" class="btn btn-primary">
+            <button @click="submitGIFReturn" :disabled="loading || !gifData.description.trim()" class="btn btn-primary">
               {{ loading ? t('form.processing') : t('form.submitGIFReturn') }}
             </button>
           </div>
@@ -118,7 +124,7 @@
             <div v-for="loan in activeRFLoans" :key="loan.id" class="loan-item">
               <div class="loan-header">
                 <h4>{{ loan.purpose }}</h4>
-                <span :class="['status', loan.status]">{{ loan.status }}</span>
+                <span :class="['status', loan.status]">{{ getStatusText(loan.status) }}</span>
               </div>
               <div class="loan-details">
                 <div class="detail-row">
@@ -188,15 +194,21 @@
           <div class="form-row">
             <div class="form-group">
               <label for="billUpload">{{ t('form.billUpload') }} *</label>
-              <input 
-                type="file" 
-                id="billUpload" 
-                @change="handleBillUpload" 
-                accept="image/*,.pdf"
-                class="form-control"
-                :class="{ 'error': showRFBillError && !rfData.billFile }"
-                required
-              />
+              <div class="file-upload-container">
+                <input 
+                  type="file" 
+                  id="billUpload" 
+                  @change="handleBillUpload" 
+                  accept="image/*,.pdf"
+                  class="file-input"
+                  :class="{ 'error': showRFBillError && !rfData.billFile }"
+                  required
+                />
+                <label for="billUpload" class="file-label">
+                  <span class="file-text">{{ rfData.billFile ? rfData.billFile.name : t('form.chooseFile') }}</span>
+                  <span class="file-hint">{{ t('form.noFileChosen') }}</span>
+                </label>
+              </div>
               <span v-if="billError" class="error-message">{{ billError }}</span>
               <span v-if="showRFBillError && !rfData.billFile" class="error-message">
                 {{ t('form.pleaseUploadBill') }}
@@ -210,9 +222,9 @@
               <img v-if="billPreview.type === 'image'" :src="billPreview.url" alt="Bill Preview" class="bill-image" />
               <div v-else class="bill-pdf">
                 <span>{{ t('form.pdfFile') }}: {{ billPreview.name }}</span>
-                </div>
               </div>
             </div>
+          </div>
             
           <div class="payment-summary">
             <h4>{{ t('form.paymentSummary') }}</h4>
@@ -228,9 +240,9 @@
               <div class="summary-item">
                 <span class="label">{{ t('form.totalBalance') }}:</span>
                 <span class="value">LKR {{ formatCurrency(totalBalance) }}</span>
+              </div>
             </div>
           </div>
-        </div>
 
           <div class="form-actions">
             <button @click="submitRFRepayment" :disabled="loading || !canSubmitRF" class="btn btn-primary">
@@ -263,6 +275,20 @@ import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, set
 import { db } from '../firebase/index.js'
 import '../styles/lang-fonts.css'
 
+// Import enums and utils
+import { 
+  RootCollection, 
+  ProfileField, 
+  RF_LOAN_FIELD, 
+  RF_RETURN_RECORD_FIELD,
+  GIF_RETURN_RECORD_FIELD,
+  LoanStatus,
+  ReturnRecordStatus
+} from '../enums/db.js'
+import { getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
+import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
+import { createTimestamp } from '../utils/regIdUtils.js'
+
 export default {
   name: 'RFGIFReturnForm',
   components: {
@@ -277,6 +303,7 @@ export default {
     const errorMessage = ref('')
     const billError = ref('')
     const billPreview = ref(null)
+    const profileImageUrl = ref('')
 
     // Validation state
     const showGIFError = ref(false)
@@ -303,14 +330,19 @@ export default {
     // Profile and Loans Data
     const currentProfile = ref(null)
     const activeRFLoans = ref([])
+    const grantLoans = ref([])
 
     // Computed properties
     const totalBalance = computed(() => {
-      return activeRFLoans.value.reduce((sum, loan) => sum + (loan.currentBalance || 0), 0)
+      return activeRFLoans.value.reduce((sum, loan) => sum + (loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0), 0)
     })
 
     const canSubmitRF = computed(() => {
       return rfData.amount > 0 && rfData.receiver && rfData.billFile && !loading.value
+    })
+
+    const hasGrantLoans = computed(() => {
+      return grantLoans.value.length > 0
     })
 
     // Methods
@@ -325,28 +357,33 @@ export default {
       successMessage.value = ''
 
       try {
-        // Search by Reg_ID first
+        // Search by Reg_ID first using dbOperations function
         let profile = await dbOperations.getProfileByRegId(searchInput.value.trim())
         
-        // If not found, search by NIC
         if (!profile) {
-          const q = query(collection(db, 'profiles'), where('NIC', '==', searchInput.value.trim()))
+          // If not found, search by NIC
+          const q = query(collection(db, RootCollection.PROFILES), where(ProfileField.NIC, '==', searchInput.value.trim()))
           const querySnapshot = await getDocs(q)
           if (!querySnapshot.empty) {
             const doc = querySnapshot.docs[0]
-            profile = { id: doc.id, ...doc.data() }
+            profile = await dbOperations.getProfileByRegId(doc.id)
           }
         }
 
         if (profile) {
-          console.log('[DEBUG] Profile loaded:', profile)
           searchResult.value = { found: true, profile }
           currentProfile.value = profile
-          await loadActiveRFLoans(profile.Reg_ID)
+          
+          // Load profile image using drive utils
+          await loadProfileImage(profile)
+          
+          // Load RF loans using utils function
+          await loadLoans(profile[ProfileField.REG_ID])
         } else {
           searchResult.value = { found: false }
           currentProfile.value = null
           activeRFLoans.value = []
+          profileImageUrl.value = ''
         }
       } catch (error) {
         console.error('Error searching profile:', error)
@@ -356,20 +393,64 @@ export default {
       }
     }
 
-    const loadActiveRFLoans = async (regId) => {
+    const loadProfileImage = async (profile) => {
       try {
-        const loans = await dbOperations.getLoans(regId)
-        // Filter for active and completed RF loans (ignore pending status) and sort by initiation date (oldest first)
-        activeRFLoans.value = loans
-          .filter(loan => loan.type === 'RF' && (loan.status === 'active' || loan.status === 'completed'))
-          .sort((a, b) => {
-            const dateA = a.initiationDate?.toDate?.() || new Date(a.initiationDate)
-            const dateB = b.initiationDate?.toDate?.() || new Date(b.initiationDate)
-            return dateA - dateB
-          })
+        // Check for profile image drive ID
+        const imageDriveId = profile[ProfileField.PROFILE_IMAGE_DRIVE_ID]
+        
+        if (imageDriveId) {
+          // Convert drive ID to URL using utils
+          profileImageUrl.value = convertGoogleDriveUrl(imageDriveId, 'w300')
+        } else {
+          // Fallback to old Image field
+          const oldImageUrl = profile.Image || profile.profileImageUrl || profile.imageUrl
+          if (oldImageUrl) {
+            const fileId = extractFileId(oldImageUrl)
+            if (fileId) {
+              profileImageUrl.value = convertGoogleDriveUrl(fileId, 'w300')
+            } else {
+              profileImageUrl.value = ''
+            }
+          } else {
+            profileImageUrl.value = ''
+          }
+        }
       } catch (error) {
-        console.error('Error loading RF loans:', error)
+        console.error('Error loading profile image:', error)
+        profileImageUrl.value = ''
+      }
+    }
+
+    const loadLoans = async (regId) => {
+      try {
+        // Use utils function to get RF loans
+        const loansResult = await getRFLoans(regId)
+        
+        if (loansResult.success) {
+          // Filter for active and completed RF loans and sort by initiation date (oldest first)
+          activeRFLoans.value = loansResult.data
+            .filter(loan => loan[RF_LOAN_FIELD.STATUS] === LoanStatus.ACTIVE || loan[RF_LOAN_FIELD.STATUS] === LoanStatus.COMPLETED)
+            .sort((a, b) => {
+              const dateA = a[RF_LOAN_FIELD.INITIATION_DATE]?.toDate?.() || new Date(a[RF_LOAN_FIELD.INITIATION_DATE])
+              const dateB = b[RF_LOAN_FIELD.INITIATION_DATE]?.toDate?.() || new Date(b[RF_LOAN_FIELD.INITIATION_DATE])
+              return dateA - dateB
+            })
+        } else {
+          activeRFLoans.value = []
+        }
+
+        // Load Grant loans
+        const grantLoansResult = await getGrantLoans(regId)
+        if (grantLoansResult.success) {
+          grantLoans.value = grantLoansResult.data
+        } else {
+          grantLoans.value = []
+        }
+      } catch (error) {
+        console.error('Error loading loans:', error)
         errorMessage.value = t('form.errorLoadingLoans')
+        activeRFLoans.value = []
+        grantLoans.value = []
       }
     }
 
@@ -439,17 +520,23 @@ export default {
       successMessage.value = ''
 
       try {
-        const regId = currentProfile.value.Reg_ID
-        const now = new Date();
-        const key = `${String(now.getMinutes()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${now.getFullYear()}`;
+        const regId = currentProfile.value[ProfileField.REG_ID]
+        const timestamp = createTimestamp()
         
-        // Update profile with GIF return
-        await dbOperations.updateProfile(regId, {
-          [`GIF.${key}`]: gifData.description,
-          Grant_return: true
-        })
+        // Create GIF return record using enum fields
+        const gifReturnRecord = {
+          [GIF_RETURN_RECORD_FIELD.REG_ID]: regId,
+          [GIF_RETURN_RECORD_FIELD.TIMESTAMP]: new Date(),
+          [GIF_RETURN_RECORD_FIELD.STATUS]: ReturnRecordStatus.PENDING,
+          [GIF_RETURN_RECORD_FIELD.DESCRIPTION]: gifData.description.trim(),
+          [GIF_RETURN_RECORD_FIELD.CREATED_AT]: serverTimestamp()
+        }
 
-        successMessage.value = t('form.gifReturnRecorded')
+        // Save to GIF_return_record collection using enum
+        const gifReturnRef = doc(db, RootCollection.GIF_RETURN_RECORD, timestamp)
+        await setDoc(gifReturnRef, gifReturnRecord)
+
+        successMessage.value = t('form.gifReturnRecordedSuccessfully')
         gifData.description = ''
         returnType.value = ''
       } catch (error) {
@@ -465,20 +552,34 @@ export default {
       errorMessage.value = ''
       successMessage.value = ''
       
+      // Reset validation states
+      showRFAmountError.value = false
+      showRFReceiverError.value = false
+      showRFBillError.value = false
+      
       // Validate mandatory fields
-      console.log('[DEBUG] Repayment amount:', rfData.amount, 'Total balance:', totalBalance.value)
+      let hasErrors = false
+      
       if (!rfData.amount || rfData.amount <= 0) {
-        errorMessage.value = t('form.pleaseEnterValidAmount')
-        return
+        showRFAmountError.value = true
+        hasErrors = true
       }
+      
       if (!rfData.receiver) {
-        errorMessage.value = t('form.pleaseSelectReceiver')
-        return
+        showRFReceiverError.value = true
+        hasErrors = true
       }
+      
       if (!rfData.billFile) {
-        errorMessage.value = t('form.pleaseUploadBill')
+        showRFBillError.value = true
+        hasErrors = true
+      }
+      
+      if (hasErrors) {
+        errorMessage.value = t('form.pleaseCompleteAllRequiredFields')
         return
       }
+      
       if (parseFloat(rfData.amount) > totalBalance.value) {
         errorMessage.value = t('form.overpaymentNotAllowed')
         return
@@ -489,38 +590,37 @@ export default {
       successMessage.value = ''
 
       try {
-        const regId = currentProfile.value.Reg_ID
+        const regId = currentProfile.value[ProfileField.REG_ID]
         const repaymentAmount = parseFloat(rfData.amount)
         
-        // Upload bill to Cloudinary
+        // Upload bill to Google Drive
         const billUrl = await imageService.uploadImage(rfData.billFile, regId)
 
-        // Create timestamp for document ID (MMHH-DD-MM-YYYY format)
-        const now = new Date()
-        const timestamp = `${String(now.getMinutes()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`
+        // Create timestamp for document ID using utils function
+        const timestamp = createTimestamp()
 
-        // Prepare repayment request data
+        // Prepare repayment request data using enum fields
         const repaymentRequest = {
-          regId: regId,
-          timestamp: now,
-          status: 'pending',
-          amount: repaymentAmount,
-          receiver: rfData.receiver,
-          driveLink: billUrl,
+          [RF_RETURN_RECORD_FIELD.REG_ID]: regId,
+          [RF_RETURN_RECORD_FIELD.TIMESTAMP]: new Date(),
+          [RF_RETURN_RECORD_FIELD.STATUS]: ReturnRecordStatus.PENDING,
+          [RF_RETURN_RECORD_FIELD.PAID_AMOUNT]: repaymentAmount, // Amount that was paid
+          [RF_RETURN_RECORD_FIELD.TOTAL_BALANCE]: totalBalance.value, // Total balance before payment
+          [RF_RETURN_RECORD_FIELD.RECEIVER]: rfData.receiver,
+          [RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID]: billUrl,
           loans: activeRFLoans.value.map(loan => ({
             id: loan.id,
-            purpose: loan.purpose,
-            amount: loan.amount,
-            currentBalance: loan.currentBalance,
-            initiationDate: loan.initiationDate,
-            status: loan.status
+            purpose: loan[RF_LOAN_FIELD.PURPOSE],
+            amount: loan[RF_LOAN_FIELD.AMOUNT],
+            currentBalance: loan[RF_LOAN_FIELD.CURRENT_BALANCE],
+            initiationDate: loan[RF_LOAN_FIELD.INITIATION_DATE],
+            status: loan[RF_LOAN_FIELD.STATUS]
           })),
-          totalBalance: totalBalance.value,
           createdAt: serverTimestamp()
         }
 
-        // Save to RF_return_record collection
-        const repaymentRef = doc(db, 'RF_return_record', timestamp)
+        // Save to RF_return_record collection using enum
+        const repaymentRef = doc(db, RootCollection.RF_RETURN_RECORD, timestamp)
         await setDoc(repaymentRef, repaymentRequest)
 
         successMessage.value = t('form.repaymentRequestSubmitted')
@@ -540,17 +640,18 @@ export default {
 
     const updatePaymentIntegrity = async (regId) => {
       try {
-        // Get all RF loans
-        const loans = await dbOperations.getLoans(regId)
-        const rfLoans = loans.filter(loan => loan.type === 'RF')
+        // Get all RF loans using utils function
+        const loansResult = await getRFLoans(regId)
+        const rfLoans = loansResult.success ? loansResult.data : []
         
         // Get return history
-        const profile = await dbOperations.getProfileByRegId(regId)
-        const returnHistory = profile.RF_return_history || {}
+        const profileResult = await dbOperations.getProfileByRegId(regId)
+        const profile = profileResult.success ? profileResult.data : null
+        const returnHistory = profile ? profile[ProfileField.RF_RETURN_HISTORY] || {} : {}
 
         // Calculate sums
-        const sumOfRFLoans = rfLoans.reduce((sum, loan) => sum + (loan.amount || 0), 0)
-        const sumOfCurrentBalances = rfLoans.reduce((sum, loan) => sum + (loan.currentBalance || 0), 0)
+        const sumOfRFLoans = rfLoans.reduce((sum, loan) => sum + (loan[RF_LOAN_FIELD.AMOUNT] || 0), 0)
+        const sumOfCurrentBalances = rfLoans.reduce((sum, loan) => sum + (loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0), 0)
         
         // Calculate sum of return history with new format
         const sumOfReturnHistory = Object.values(returnHistory).reduce((sum, entry) => {
@@ -589,6 +690,21 @@ export default {
       return dateObj.toLocaleDateString()
     }
 
+    const getStatusText = (status) => {
+      switch (status) {
+        case LoanStatus.ACTIVE:
+          return t('form.active');
+        case LoanStatus.COMPLETED:
+          return t('form.completed');
+        case LoanStatus.GRANTED:
+          return t('form.granted');
+        case LoanStatus.PENDING:
+          return t('form.pending');
+        default:
+          return status;
+      }
+    };
+
     // Validation functions
     const validateGIFDescription = () => {
       showGIFError.value = true
@@ -608,10 +724,10 @@ export default {
 
     const loadReceivers = async () => {
       try {
-        const receiversQuery = query(collection(db, 'RF_receiver'))
+        const receiversQuery = query(collection(db, RootCollection.BANK_ACCOUNTS))
         const receiversSnapshot = await getDocs(receiversQuery)
         receivers.value = receiversSnapshot.docs.map(doc => doc.id)
-        console.log('Loaded receivers:', receivers.value)
+        console.log('[RECEIVERS] Loaded bank accounts:', receivers.value.length, 'accounts')
       } catch (error) {
         console.error('Error loading receivers:', error)
         errorMessage.value = t('form.errorLoadingReceivers')
@@ -638,6 +754,12 @@ export default {
       errorMessage,
       totalBalance,
       canSubmitRF,
+      profileImageUrl,
+      ProfileField,
+      RF_LOAN_FIELD,
+      RF_RETURN_RECORD_FIELD,
+      LoanStatus,
+      ReturnRecordStatus,
       searchProfile,
       setReturnType,
       handleBillUpload,
@@ -653,7 +775,9 @@ export default {
       showRFAmountError,
       showRFBillError,
       showRFReceiverError,
-      t
+      t,
+      hasGrantLoans,
+      getStatusText
     }
   }
 }
@@ -661,7 +785,7 @@ export default {
 
 <style scoped>
 .rfgif-return-form {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -672,44 +796,88 @@ export default {
 }
 
 .logo {
-  height: 60px;
+  height: 120px;
   width: auto;
 }
 
 .form-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .form-header h2 {
   color: #1565c0;
   margin-bottom: 10px;
+  font-size: 2rem;
 }
 
 .language-toggle {
-  position: absolute;
-  top: 20px;
-  right: 20px;
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 30px 0;
+}
+
+.language-toggle .lang-toggle {
+  display: flex;
+  gap: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px 20px;
+  border-radius: 30px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border: 2px solid #e3f2fd;
+}
+
+.language-toggle .lang-toggle button {
+  font-size: 1.3rem;
+  padding: 15px 30px;
+  border-radius: 25px;
+  border: 2px solid #1565c0;
+  background: #f5faff;
+  color: #1565c0;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.language-toggle .lang-toggle button.active, 
+.language-toggle .lang-toggle button:focus {
+  background: #1565c0;
+  color: #fff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
+}
+
+.language-toggle .lang-toggle button:hover:not(.active) {
+  background: #e3f2fd;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.2);
 }
 
 .section {
   background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 25px;
+  margin-bottom: 25px;
+  border: 1px solid #e8f4fd;
 }
 
 .section h2 {
   color: #1565c0;
-  margin-bottom: 15px;
-  border-bottom: 2px solid #e3f2fd;
-  padding-bottom: 10px;
+  margin-bottom: 20px;
+  border-bottom: 3px solid #e3f2fd;
+  padding-bottom: 15px;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .search-container {
   display: flex;
-  gap: 10px;
+  gap: 15px;
 }
 
 .search-container input {
@@ -717,35 +885,37 @@ export default {
 }
 
 .profile-info {
-  margin-top: 15px;
+  margin-top: 20px;
 }
 
 .profile-image-container {
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .profile-image {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #1565c0;
+  border: 4px solid #1565c0;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.2);
 }
 
 .profile-placeholder {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   background: #f5f5f5;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  border: 3px solid #ddd;
+  border: 4px solid #ddd;
   color: #666;
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .return-type-selection {
@@ -754,159 +924,316 @@ export default {
 
 .choice-buttons {
   display: flex;
-  gap: 15px;
+  gap: 20px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .choice-buttons .btn {
-  min-width: 150px;
+  min-width: 180px;
+  padding: 15px 25px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
 .btn.active {
   background-color: #0d47a1;
   transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(13, 71, 161, 0.3);
+}
+
+.btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #ccc;
+  color: #666;
+}
+
+.disabled-hint {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  display: block;
+  margin-top: 5px;
 }
 
 .loans-list {
-  margin-top: 15px;
+  margin-top: 20px;
 }
 
 .loan-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
   background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.loan-item:hover {
+  border-color: #1565c0;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.1);
 }
 
 .loan-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
 }
 
 .loan-header h4 {
   margin: 0;
   color: #1565c0;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status.active {
   background: #e8f5e9;
   color: #2e7d32;
+  border: 1px solid #4caf50;
 }
 
 .status.completed {
   background: #e3f2fd;
   color: #1565c0;
+  border: 1px solid #2196f3;
 }
 
 .status.pending {
   background: #fff3e0;
   color: #f57c00;
+  border: 1px solid #ff9800;
+}
+
+.status.granted {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #9c27b0;
 }
 
 .loan-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
+  gap: 15px;
 }
 
 .detail-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
 }
 
 .label {
-  font-weight: 500;
-  color: #666;
+  font-weight: 600;
+  color: #555;
+  font-size: 0.95rem;
 }
 
 .value {
-  font-weight: 600;
+  font-weight: 700;
   color: #333;
+  font-size: 1rem;
 }
 
 .payment-entry {
-  margin-top: 20px;
+  margin-top: 25px;
 }
 
 .payment-entry h3 {
   color: #1565c0;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .bill-preview {
-  margin-top: 15px;
-  padding: 15px;
+  margin-top: 20px;
+  padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 2px solid #e3f2fd;
 }
 
 .bill-image {
-  max-width: 200px;
-  max-height: 200px;
-  border-radius: 4px;
-  border: 1px solid #ddd;
+  max-width: 250px;
+  max-height: 250px;
+  border-radius: 8px;
+  border: 2px solid #ddd;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .bill-pdf {
-  padding: 10px;
+  padding: 15px;
   background: #e3f2fd;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #1565c0;
+  font-weight: 600;
+  border: 2px solid #bbdefb;
 }
 
 .payment-summary {
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 25px;
+  padding: 20px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 2px solid #e3f2fd;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
 }
 
 .summary-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 15px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
 }
 
 .form-actions {
-  margin-top: 20px;
+  margin-top: 25px;
   text-align: center;
 }
 
 .form-actions .btn {
   margin: 0 10px;
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
 .error-message {
   color: #dc3545;
-  font-size: 12px;
-  margin-top: 5px;
+  font-size: 0.9rem;
+  margin-top: 8px;
+  font-weight: 500;
 }
 
 .form-control.error {
   border-color: #dc3545;
-  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.file-upload-container {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+.file-input {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 100%;
+  min-height: 100%;
+  font-size: 999px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.file-label {
+  display: inline-block;
+  padding: 12px 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #333;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  border: 2px solid #e0e0e0;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  padding-right: 40px;
+  position: relative;
+}
+
+.file-label:hover {
+  background-color: #e3f2fd;
+  border-color: #1565c0;
+}
+
+.file-label::after {
+  content: '📁';
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+.file-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 10px;
+  font-weight: 500;
+}
+
+.file-hint {
+  font-size: 12px;
+  color: #666;
+  margin-left: 5px;
+  opacity: 0.8;
 }
 
 @media screen and (max-width: 768px) {
   .rfgif-return-form {
-    padding: 10px;
+    padding: 15px;
+  }
+  
+  .logo {
+    height: 100px;
+  }
+  
+  .form-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .language-toggle {
+    margin: 15px 0 25px 0;
+  }
+  
+  .language-toggle .lang-toggle {
+    justify-content: center;
+    padding: 10px 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .language-toggle .lang-toggle button {
+    font-size: 1.1rem;
+    padding: 12px 20px;
+    min-width: 80px;
   }
   
   .search-container {
@@ -915,6 +1242,11 @@ export default {
   
   .choice-buttons {
     flex-direction: column;
+    gap: 15px;
+  }
+  
+  .choice-buttons .btn {
+    min-width: 100%;
   }
   
   .loan-details {
@@ -923,6 +1255,27 @@ export default {
   
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .profile-image,
+  .profile-placeholder {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .bill-image {
+    max-width: 200px;
+    max-height: 200px;
+  }
+  
+  .section {
+    padding: 20px;
+  }
+  
+  .form-actions .btn {
+    margin: 5px;
+    padding: 12px 20px;
+    font-size: 1rem;
   }
 }
 </style> 

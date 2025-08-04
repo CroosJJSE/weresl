@@ -1,19 +1,14 @@
 <template>
   <div class="container">
-    <!-- Header with Logo -->
+    <!-- Header -->
     <div class="header">
-      <img 
-        src="https://drive.google.com/thumbnail?id=1AEEWccjf_sMoXJgAaYIPZZm5rM-OCFe2" 
-        alt="WERESL Logo" 
-        class="logo"
-      />
-      <h1 class="title">WERESL Top View</h1>
-      <p class="subtitle">Central Hub for All Project Links</p>
+      <h1 class="title">WERESL Links</h1>
+      <p class="subtitle">Access your project links</p>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="loading">
-      Loading links...
+      Loading...
     </div>
 
     <!-- Error Message -->
@@ -26,109 +21,48 @@
       {{ successMessage }}
     </div>
 
-    <!-- Links Grid -->
-    <div v-if="!loading && links.length > 0" class="links-grid">
-      <div v-for="link in links" :key="link.id" class="link-card">
-        <div class="link-title">
-          {{ link.title }}
-          <span v-if="link.secure" class="secure-badge">🔒 Secure</span>
-          <span v-if="link.button" class="button-badge">🔘 Button</span>
+    <!-- Links List -->
+    <div v-if="!loading && links.length > 0" class="links-list">
+      <div v-for="link in links" :key="link.id" class="link-item">
+        <div class="link-content">
+          <h3 class="link-title">{{ link.title }}</h3>
+          <p class="link-description">{{ link.description }}</p>
         </div>
-        <p class="link-description">{{ link.description }}</p>
-        <a :href="link.url" class="link-url" target="_blank" rel="noopener noreferrer">
-          {{ link.url }}
-        </a>
         <div class="link-actions">
           <button 
-            v-if="link.secure" 
-            @click="showPasswordModalForLink(link)" 
-            class="btn btn-primary"
+            @click="copyLink(link.url)" 
+            class="btn btn-copy"
+            title="Copy link"
           >
-            🔒 Access Secure Link
+            Copy
           </button>
-          <a 
-            v-else 
-            :href="link.url" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            class="btn btn-primary"
+          <button 
+            @click="openLink(link)" 
+            class="btn btn-open"
+            title="Open link"
           >
-            🌐 Visit Link
-          </a>
-          <button @click="copyLink(link.url)" class="btn btn-secondary">
-            📋 Copy Link
+            Open
           </button>
         </div>
       </div>
     </div>
 
     <!-- No Links Message -->
-    <div v-if="!loading && links.length === 0" class="loading">
-      <p>No links available at the moment.</p>
-    </div>
-
-    <!-- Feedback Section -->
-    <div class="feedback-section">
-      <h2 class="feedback-title">Send Feedback to Developer</h2>
-      <form @submit.prevent="submitFeedback" class="feedback-form">
-        <div class="form-group">
-          <label for="name">Your Name</label>
-          <input 
-            type="text" 
-            id="name" 
-            v-model="feedbackData.name" 
-            class="form-control" 
-            required
-          />
-        </div>
-        <div class="form-group">
-          <label for="email">Your Email</label>
-          <input 
-            type="email" 
-            id="email" 
-            v-model="feedbackData.email" 
-            class="form-control" 
-            required
-          />
-        </div>
-        <div class="form-group">
-          <label for="subject">Subject</label>
-          <input 
-            type="text" 
-            id="subject" 
-            v-model="feedbackData.subject" 
-            class="form-control" 
-            required
-          />
-        </div>
-        <div class="form-group">
-          <label for="message">Message</label>
-          <textarea 
-            id="message" 
-            v-model="feedbackData.message" 
-            class="form-control" 
-            required
-            placeholder="Please describe your feedback, suggestions, or report any issues..."
-          ></textarea>
-        </div>
-        <button type="submit" class="btn btn-success" :disabled="submittingFeedback">
-          {{ submittingFeedback ? 'Sending...' : 'Send Feedback' }}
-        </button>
-      </form>
+    <div v-if="!loading && links.length === 0" class="no-links">
+      <p>No links available.</p>
     </div>
 
     <!-- Password Modal -->
-    <div v-if="showPasswordModal" class="password-modal" @click="closePasswordModal">
+    <div v-if="showPasswordModal" class="modal-overlay" @click="closePasswordModal">
       <div class="modal-content" @click.stop>
         <h3 class="modal-title">Enter Password</h3>
         <div class="form-group">
-          <label for="password">Password</label>
           <input 
             type="password" 
-            id="password" 
             v-model="passwordInput" 
             class="form-control" 
             @keyup.enter="checkPassword"
+            placeholder="Enter password"
             autofocus
           />
         </div>
@@ -137,7 +71,7 @@
             Cancel
           </button>
           <button @click="checkPassword" class="btn btn-primary">
-            Access Link
+            Access
           </button>
         </div>
       </div>
@@ -146,9 +80,9 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { db } from './firebase/index.js'
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
 
 export default {
   name: 'App',
@@ -162,15 +96,6 @@ export default {
     const showPasswordModal = ref(false)
     const passwordInput = ref('')
     const currentSecureLink = ref(null)
-    
-    // Feedback state
-    const submittingFeedback = ref(false)
-    const feedbackData = reactive({
-      name: '',
-      email: '',
-      subject: '',
-      message: ''
-    })
 
     // Load links from Firestore
     const loadLinks = async () => {
@@ -212,11 +137,15 @@ export default {
       }
     }
 
-    // Show password modal for secure links
-    const showPasswordModalForLink = (link) => {
-      currentSecureLink.value = link
-      showPasswordModal.value = true
-      passwordInput.value = ''
+    // Open link (with password check if secure)
+    const openLink = (link) => {
+      if (link.secure) {
+        currentSecureLink.value = link
+        showPasswordModal.value = true
+        passwordInput.value = ''
+      } else {
+        window.open(link.url, '_blank', 'noopener,noreferrer')
+      }
     }
 
     // Close password modal
@@ -228,8 +157,7 @@ export default {
 
     // Check password and access secure link
     const checkPassword = () => {
-      // For now, using a dummy password "weresl123"
-      if (passwordInput.value === 'weresl123') {
+      if (passwordInput.value === '1234') {
         if (currentSecureLink.value) {
           window.open(currentSecureLink.value.url, '_blank', 'noopener,noreferrer')
         }
@@ -247,45 +175,6 @@ export default {
       }
     }
 
-    // Submit feedback
-    const submitFeedback = async () => {
-      try {
-        submittingFeedback.value = true
-        errorMessage.value = ''
-        
-        const feedbackDoc = {
-          name: feedbackData.name,
-          email: feedbackData.email,
-          subject: feedbackData.subject,
-          message: feedbackData.message,
-          date: serverTimestamp(),
-          userAgent: navigator.userAgent,
-          timestamp: new Date().toISOString()
-        }
-        
-        await addDoc(collection(db, 'webapp-feedback'), feedbackDoc)
-        
-        // Reset form
-        feedbackData.name = ''
-        feedbackData.email = ''
-        feedbackData.subject = ''
-        feedbackData.message = ''
-        
-        successMessage.value = 'Thank you for your feedback! We will get back to you soon.'
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 5000)
-      } catch (error) {
-        console.error('Error submitting feedback:', error)
-        errorMessage.value = 'Error submitting feedback. Please try again.'
-        setTimeout(() => {
-          errorMessage.value = ''
-        }, 5000)
-      } finally {
-        submittingFeedback.value = false
-      }
-    }
-
     // Load links on component mount
     onMounted(() => {
       loadLinks()
@@ -298,13 +187,10 @@ export default {
       successMessage,
       showPasswordModal,
       passwordInput,
-      submittingFeedback,
-      feedbackData,
-      showPasswordModalForLink,
-      closePasswordModal,
-      checkPassword,
       copyLink,
-      submitFeedback
+      openLink,
+      closePasswordModal,
+      checkPassword
     }
   }
 }

@@ -1,6 +1,8 @@
 // Google Drive API Service
 // This service handles file uploads to Google Drive using the same folder as your Google Sheets
 
+import { extractFileId as extractFileIdFromUtils } from '../utils/driveUtils.js'
+
 const GOOGLE_DRIVE_FOLDER_ID = "1l8yBRcK_QHMSjrdxwYHgVjwyBSM"
 
 export const googleDriveService = {
@@ -118,8 +120,7 @@ export const googleDriveService = {
 
   // Extract file ID from Google Drive URL
   extractFileId(url) {
-    const match = url.match(/\/d\/(.+?)(\/|$)/) || url.match(/id=([^&]+)/)
-    return match ? match[1] : null
+    return extractFileIdFromUtils(url);
   },
 
   // Check if file exists in Google Drive
@@ -152,8 +153,7 @@ export const fallbackDriveService = {
   },
 
   extractFileId(url) {
-    const match = url.match(/\/d\/(.+?)(\/|$)/) || url.match(/id=([^&]+)/)
-    return match ? match[1] : null
+    return extractFileIdFromUtils(url);
   }
 }
 

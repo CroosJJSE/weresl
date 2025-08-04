@@ -1,12 +1,9 @@
-// Image Service for Google Drive Integration and Cloudinary Upload
-// This service handles fetching images from your Google Drive folder and uploading to Cloudinary
+// Image Service for Google Drive Integration
+// This service handles fetching images from your Google Drive folder and uploading via Google Apps Script
+
+import { uploadToDrive, uploadImageWithProgress } from './driveUploadService.js'
 
 const GOOGLE_DRIVE_FOLDER_ID = "1l8yBRcK_QHMSjrdxwYHgVjwyBSM"
-
-// Cloudinary configuration
-const CLOUDINARY_CLOUD_NAME = 'db1jrcyun';
-const CLOUDINARY_UPLOAD_PRESET = 'wereSL'; // unsigned preset
-const CLOUDINARY_FOLDER = 'profile_images';
 
 export const imageService = {
   // Get logo image from Google Drive
@@ -144,44 +141,137 @@ export const imageService = {
     }
   },
 
-  // Upload file to Cloudinary (for bill uploads)
-  async uploadImage(file, Reg_ID) {
+  // Upload file to Google Drive via Apps Script (replaces Cloudinary)
+  // Now supports images and PDFs for bill uploads
+  async uploadImage(file, regId) {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-      formData.append('folder', CLOUDINARY_FOLDER);
-      formData.append('public_id', `${Reg_ID}_${Date.now()}`);
-
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+      console.log('📤 Uploading file to Google Drive via Apps Script...')
+      console.log('📁 File:', file.name, 'Size:', file.size, 'Type:', file.type)
+      console.log('🆔 RegID:', regId)
+      
+      // Use the drive upload service
+      const result = await uploadToDrive(file)
+      
+      if (result.success && result.driveUrl) {
+        console.log('✅ File uploaded successfully to Google Drive')
+        console.log('🔗 Drive URL:', result.driveUrl)
+        console.log('🆔 File ID:', result.fileId)
+        
+        // Return the drive URL for storage in database
+        return result.driveUrl
+      } else {
+        throw new Error('Upload failed - no drive URL returned')
       }
-
-      const result = await response.json();
-      // result.secure_url is the direct image URL
-      return result.secure_url;
     } catch (error) {
-      console.error('Error uploading to Cloudinary:', error);
-      throw error;
+      console.error('❌ Error uploading to Google Drive:', error)
+      throw error
     }
   },
 
-  // Convert Cloudinary URL to thumbnail URL (200x200 crop)
-  convertToThumbnailUrl(cloudinaryUrl) {
-    if (!cloudinaryUrl) return cloudinaryUrl;
-    // Insert transformation string after /upload/
-    return cloudinaryUrl.replace('/upload/', '/upload/c_thumb,w_200,h_200/');
+  // Upload file with progress callback
+  async uploadImageWithProgress(file, regId, onProgress) {
+    try {
+      console.log('📤 Uploading file with progress tracking...')
+      
+      const result = await uploadImageWithProgress(file, onProgress)
+      
+      if (result.success && result.driveUrl) {
+        console.log('✅ File uploaded successfully with progress tracking')
+        return result.driveUrl
+      } else {
+        throw new Error('Upload failed - no drive URL returned')
+      }
+    } catch (error) {
+      console.error('❌ Error uploading with progress:', error)
+      throw error
+    }
   },
 
-  // Convert Cloudinary URL to direct/optimized URL (auto format/quality)
-  convertToDirectUrl(cloudinaryUrl) {
-    if (!cloudinaryUrl) return cloudinaryUrl;
-    return cloudinaryUrl.replace('/upload/', '/upload/f_auto,q_auto/');
+  // Convert Google Drive URL to thumbnail URL (200x200 crop)
+  convertToThumbnailUrl(driveUrl) {
+    if (!driveUrl) return driveUrl;
+    const fileId = this.extractFileId(driveUrl)
+    if (fileId) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
+    }
+    return driveUrl
+  },
+
+  // Convert Google Drive URL to direct/optimized URL
+  convertToOptimizedUrl(driveUrl) {
+    if (!driveUrl) return driveUrl;
+    const fileId = this.extractFileId(driveUrl)
+    if (fileId) {
+      return `https://drive.google.com/uc?export=view&id=${fileId}`
+    }
+    return driveUrl
+  },
+
+  // Check if URL is a Google Drive URL
+  isGoogleDriveUrl(url) {
+    return url && (url.includes('drive.google.com') || url.includes('docs.google.com'))
+  },
+
+  // Check if URL is a Cloudinary URL (for backward compatibility)
+  isCloudinaryUrl(url) {
+    return url && url.includes('cloudinary.com')
+  },
+
+  // Check if file is an image
+  isImageFile(file) {
+    return file && file.type && file.type.startsWith('image/')
+  },
+
+  // Check if file is a PDF
+  isPdfFile(file) {
+    return file && file.type && file.type === 'application/pdf'
+  },
+
+  // Extract file ID from various URL formats
+  extractDriveFileId(url) {
+    return this.extractFileId(url)
+  },
+
+  // Debug image URL (for troubleshooting)
+  async debugImageUrl(url) {
+    console.log('🔍 Debugging image URL:', url)
+    
+    if (this.isGoogleDriveUrl(url)) {
+      const fileId = this.extractFileId(url)
+      console.log('📁 Google Drive file ID:', fileId)
+      return url
+    } else if (this.isCloudinaryUrl(url)) {
+      console.log('☁️ Cloudinary URL detected')
+      return url
+    } else {
+      console.log('❓ Unknown URL format')
+      return url
+    }
+  },
+
+  // Test image processing functionality
+  async testImageProcessing() {
+    console.log('🧪 Testing image processing...')
+    
+    // Test file ID extraction
+    const testUrl = 'https://drive.google.com/thumbnail?id=1ABC123DEF456&sz=w300'
+    const fileId = this.extractFileId(testUrl)
+    console.log('📁 Test file ID extraction:', fileId === '1ABC123DEF456' ? '✅ PASS' : '❌ FAIL')
+    
+    // Test URL format detection
+    console.log('🔗 Google Drive URL detection:', this.isGoogleDriveUrl(testUrl) ? '✅ PASS' : '❌ FAIL')
+    console.log('☁️ Cloudinary URL detection:', this.isCloudinaryUrl('https://res.cloudinary.com/test/image/upload/v123/test.jpg') ? '✅ PASS' : '❌ FAIL')
+  },
+
+  // Test thumbnail URL conversion
+  testThumbnailUrl() {
+    console.log('🖼️ Testing thumbnail URL conversion...')
+    
+    const testUrl = 'https://drive.google.com/uc?export=view&id=1ABC123DEF456'
+    const thumbnailUrl = this.convertToThumbnailUrl(testUrl)
+    console.log('📸 Thumbnail URL:', thumbnailUrl)
+    
+    return thumbnailUrl
   }
 }
 

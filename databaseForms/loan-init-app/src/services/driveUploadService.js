@@ -5,14 +5,14 @@
 
 // Configuration - Update these for your specific use case
 const DRIVE_CONFIG = {
-  // Google Apps Script Web App URL
-  GAS_WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbynGkTSjRG2jFRcyinfWsEYbD_H0x7Pfl_DEZuJmuh2BfxpuCM_T3AxpHvKVNJ7N4Le5Q/exec',
+  // Google Apps Script Web App URL with cache busting
+  GAS_WEBAPP_URL: `https://script.google.com/macros/s/AKfycbx7gzXVudbZmnPxGMxWNmNmKnYnIrRxq50bkWOYj_Mary7evIi38X43cEMO_jP1ZAGb9g/exec?v=${Date.now()}`,
   
   // Authentication token
   AUTH_TOKEN: 'test-token',
   
-  // Maximum file size in bytes (1MB = 1024 * 1024)
-  MAX_FILE_SIZE: 1024 * 1024,
+  // Maximum file size in bytes (10MB = 10 * 1024 * 1024)
+  MAX_FILE_SIZE: 10 * 1024 * 1024,
   
   // Allowed image types
   ALLOWED_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -102,7 +102,6 @@ export const uploadToDrive = async (file, retryCount = 0) => {
     }
     
   } catch (error) {
-    console.error('Drive upload error:', error);
     
     // Retry logic for network errors or 5xx status
     if (retryCount < 3 && (error.message.includes('5') || error.message.includes('network'))) {
@@ -176,9 +175,13 @@ export const testConnection = async () => {
     }
     
     const result = await response.json();
-    return result.success;
+    
+    if (result.success) {
+      return true;
+    } else {
+      return false;
+    }
   } catch (error) {
-    console.error('Connection test failed:', error);
     return false;
   }
 };

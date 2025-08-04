@@ -56,5 +56,13 @@
   "form.repaymentRequestSubmitted": "Repayment request submitted successfully!",
   "form.errorSubmittingRepaymentRequest": "Error submitting repayment request",
   "form.pleaseUploadBill": "Please upload a bill/receipt",
-  "form.overpaymentNotAllowed": "Repayment cannot exceed the total outstanding loan balance"
+  "form.overpaymentNotAllowed": "Repayment cannot exceed the total outstanding loan balance",
+  "form.pleaseCompleteAllRequiredFields": "Please complete all required fields before submitting",
+  "form.noGrantLoans": "No Grant loans found for this profile",
+  "form.activeStatus": "Active",
+  "form.completedStatus": "Completed",
+  "form.pendingStatus": "Pending",
+  "form.chooseFile": "Choose File",
+  "form.noFileChosen": "No file chosen",
+  "form.gifReturnRecordedSuccessfully": "GIF return recorded successfully in GIF_return_record"
 } 

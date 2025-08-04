@@ -1,5 +1,5 @@
 import { dbOperations, utils } from '@/firebase/db.js'
-import { storageOperations } from '@/firebase/storage.js'
+import { convertGoogleDriveUrl } from '@/utils/driveUtils.js'
 
 export const profileService = {
   // Get all profiles with filtering
@@ -30,98 +30,6 @@ export const profileService = {
       }
     } catch (error) {
       console.error('Error getting profile:', error)
-      throw error
-    }
-  },
-
-  // Create new profile
-  async createProfile(profileData) {
-    try {
-      // Generate RegID if not provided
-      if (!profileData.regId) {
-        const existingProfiles = await dbOperations.getAllProfiles()
-        const existingIds = existingProfiles.map(p => p.id)
-        profileData.regId = utils.generateRegId(profileData.basicInfo.District, existingIds)
-      }
-
-      // Process image if provided
-      if (profileData.imageFile) {
-        const imageUrl = await storageOperations.uploadImage(profileData.imageFile, profileData.regId)
-        profileData.imageUrl = imageUrl
-      }
-
-      const regId = await dbOperations.createProfile(profileData)
-      
-      // Log operation
-      await dbOperations.logOperation('CREATE_PROFILE', {
-        regId,
-        basicInfo: profileData.basicInfo
-      })
-
-      return regId
-    } catch (error) {
-      console.error('Error creating profile:', error)
-      throw error
-    }
-  },
-
-  // Update profile
-  async updateProfile(regId, updates) {
-    try {
-      // Process image if provided
-      if (updates.imageFile) {
-        const imageUrl = await storageOperations.uploadImage(updates.imageFile, regId)
-        updates.imageUrl = imageUrl
-        delete updates.imageFile
-      }
-
-      await dbOperations.updateProfile(regId, updates)
-      
-      // Log operation
-      await dbOperations.logOperation('UPDATE_PROFILE', {
-        regId,
-        updates
-      })
-
-      return regId
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      throw error
-    }
-  },
-
-  // Add loan to profile
-  async addLoan(regId, loanData) {
-    try {
-      const loan = await dbOperations.addLoan(regId, loanData)
-      
-      // Log operation
-      await dbOperations.logOperation('ADD_LOAN', {
-        regId,
-        loan
-      })
-
-      return loan
-    } catch (error) {
-      console.error('Error adding loan:', error)
-      throw error
-    }
-  },
-
-  // Process payment
-  async processPayment(paymentData) {
-    try {
-      const updatedProfile = await dbOperations.processPayment(paymentData)
-      
-      // Log operation
-      await dbOperations.logOperation('PROCESS_PAYMENT', {
-        regId: paymentData.regId,
-        payment: paymentData
-      })
-
-      return updatedProfile
-    } catch (error) {
-      console.error('Error processing payment:', error)
       throw error
     }
   },

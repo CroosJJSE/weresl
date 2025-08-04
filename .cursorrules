@@ -1,0 +1,292 @@
+# WERESL Database Structure & Coding Guidelines
+
+## Database Structure (Firebase Firestore)
+
+**IMPORTANT**: For complete database structure, field names, and collection details, refer to `enums/db.ts` file.
+
+### Main Collections
+
+#### 1. `profiles` Collection
+- **Document ID**: Reg_ID (Registration ID)
+- **Purpose**: Main profile data for each person
+- **Key Fields**: See `ProfileField` enum in `enums/db.ts`
+- **Subcollections**: See `ProfileFieldTypes` enum in `enums/db.ts`
+
+#### 2. Subcollections under `profiles/{regId}`
+
+##### `RF_Loans` Subcollection
+- **Purpose**: RF (Revolving Fund) loan records
+- **Key Fields**: See `RF_LOAN_FIELD` enum in `enums/db.ts`
+
+##### `GRANT` Subcollection
+- **Purpose**: Grant loan records
+- **Key Fields**: See `GRANT_FIELD` enum in `enums/db.ts`
+
+#### 3. `SearchElements` Collection
+- **Purpose**: System-wide search and status tracking
+- **Documents**: See `SearchElementDoc` enum in `enums/db.ts`
+
+### Centralized Utils and Enums Structure
+
+#### Root-level `utils/` folder
+- **Purpose**: Centralized utility functions for all projects
+- **Structure**:
+  ```
+  utils/
+  ├── index.js          # Main export file
+  ├── driveUtils.js     # Google Drive utilities
+  ├── formatUtils.ts    # Formatting functions
+  ├── validationUtils.js # Validation functions
+  ├── dbUtils.js        # Database operations
+  ├── regIdUtils.js     # Registration ID utilities
+  └── README.md         # Documentation
+  ```
+
+#### Root-level `enums/` folder
+- **Purpose**: TypeScript enums for type safety and consistency
+- **Structure**:
+  ```
+  enums/
+  ├── index.ts          # Main export file
+  ├── districts.ts      # District enums and mappings
+  ├── loans.ts          # Loan statuses and types
+  ├── db.ts            # Firestore collection enums
+  ├── ui.ts            # UI configuration and constants
+  ├── validation.ts    # Validation rules and types
+  ├── messages.ts      # Error and success messages
+  └── README.md        # Documentation
+  ```
+
+## Important Coding Guidelines
+
+### 1. Database Operations
+- **ALWAYS** use enums from `enums/db.ts` for collection and field names
+- **NEVER** hardcode collection or field names
+- Always use `Reg_ID` as the document ID for profiles
+- Use subcollections for loans: `profiles/{regId}/RF_Loans` and `profiles/{regId}/GRANT`
+- Always include `createdAt` and `lastUpdated` timestamps
+- Use `serverTimestamp()` for Firebase timestamps
+
+### 2. Image Storage
+- **DO NOT** use Firebase Storage (user preference)
+- Use Google Drive for image storage
+- **Store only Google Drive file ID** in the `profileImageDriveId` field (not full URLs)
+- Use `convertGoogleDriveUrl()` utility from `utils/driveUtils.js` for displaying images
+- File ID format: `1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms`
+- Benefits: Smaller storage, easier URL manipulation, consistent display
+
+### 3. Loan Types
+- **RF**: Rural Finance loans (stored in `RF_Loans` subcollection)
+- **GRANT**: Grant loans (stored in `GRANT` subcollection)
+- Always specify loan type when querying loans
+- Use `LoanType` enum from `enums/loans.ts`
+
+### 4. Status Tracking
+- Use `SearchElements` collection for system-wide status tracking
+- `pending-loan` document tracks pending loan approvals
+- Use `SearchElementDoc` enum from `enums/db.ts`
+
+### 5. Error Handling
+- Always wrap database operations in try-catch blocks
+- Log errors with descriptive messages
+- Handle cases where documents don't exist
+- Use `ErrorMessage` enum from `enums/messages.ts` for consistent error messages
+
+### 6. Data Validation
+- Validate `Reg_ID` format before database operations
+- Check for required fields before saving
+- Validate district codes against `DISTRICT_MAPPING`
+- Use consistent field names across all applications
+- Field naming convention: `camelCase` for all fields
+- Use validation functions from `utils/validationUtils.js`
+
+### 7. Common Database Queries
+
+```javascript
+// Import utilities and enums
+import { getProfileByRegId, getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
+import { ROOT_COLLECTIONS, PROFILE_FIELDS } from '../enums/db.js'
+import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
+
+// Get profile by Reg_ID
+const profileResult = await getProfileByRegId(regId)
+
+// Get RF loans for a profile
+const rfLoansResult = await getRFLoans(regId)
+
+// Get Grant loans for a profile
+const grantLoansResult = await getGrantLoans(regId)
+```
+
+### 8. File Structure Guidelines
+- Keep Firebase config in `src/firebase/index.js`
+- Database operations in `src/firebase/db.js`
+- Services in `src/services/` directory
+- Components in `src/components/` directory
+- Pages in `src/pages/` directory
+- **ALWAYS** import utilities from root-level `utils/` folder
+- **ALWAYS** import enums from root-level `enums/` folder
+
+### 9. Naming Conventions
+- Use `camelCase` for JavaScript variables and functions
+- Use `PascalCase` for Vue components
+- Use `kebab-case` for file names
+- Use `UPPER_SNAKE_CASE` for constants
+- Use `PascalCase` for TypeScript enums
+
+### 10. Vue.js Guidelines
+- Use Composition API for new components
+- Use `<script setup>` syntax
+- Use `ref()` and `reactive()` for reactive data
+- Use `computed()` for derived state
+- Use `watch()` for side effects
+
+### 11. Internationalization
+- Use i18n for multi-language support
+- Store translations in `src/locales/` directory
+- Support English (en), Sinhala (si), and Tamil (ta)
+
+### 12. Security Considerations
+- Never expose Firebase config keys in client-side code
+- Use environment variables for sensitive data
+- Implement proper authentication and authorization
+- Validate all user inputs
+
+## Project-Specific Notes
+
+### Loan Admin App
+- Manages loan approvals
+- Uses `SearchElements` collection for pending items
+- Implements approval workflow
+
+### Loan Init App
+- Handles initial loan applications
+- Creates profiles and loan records
+- Supports image upload to Google Drive
+
+### RFGIF Return App
+- Handles RF/GIF return forms
+- Searches profiles by NIC
+- Updates return history
+
+### Database Web App
+- Main web application
+- Profile management and loan tracking
+- Analytics dashboard
+
+### Dev Data Dashboard
+- Development data management tool
+- CRUD operations for all collections
+- Data migration utilities
+
+## Migration and Data Management
+- Use migration scripts for bulk data operations
+- Always backup data before migrations
+- Test migrations on development data first
+- Document all schema changes
+
+### Field Name Migration Guide
+When migrating from old field names to new descriptive names:
+
+**Profiles Collection:**
+- `Name` → `fullName`
+- `District` → `district`
+- `Address` → `address`
+- `NIC` → `nic`
+- `contact` → `phoneNumber`
+- `total_children` → `totalChildren`
+- `school_kids` → `schoolGoingChildren`
+- `others` → `otherDependents`
+- `Description` → `description`
+- `Occupation` → `occupation`
+- `Image` → `profileImageDriveId`
+
+**RF_Loans Subcollection:**
+- `amount` → `loanAmount`
+- `purpose` → `loanPurpose`
+- `source` → `loanSource`
+- `status` → `loanStatus`
+
+**GRANT Subcollection:**
+- `amount` → `grantAmount`
+- `purpose` → `grantPurpose`
+- `source` → `grantSource`
+- `status` → `grantStatus`
+
+## Performance Considerations
+- Use pagination for large datasets
+- Implement proper indexing
+- Cache frequently accessed data
+- Optimize image loading and display
+
+## Testing Guidelines
+- Test all database operations
+- Mock Firebase in unit tests
+- Test error scenarios
+- Validate data integrity
+
+## Critical Rules for All Future Actions
+
+### 1. **NEVER Hardcode Collection or Field Names**
+- Always use enums from `enums/db.ts`
+- Example: Use `ROOT_COLLECTIONS.PROFILES` instead of `'profiles'`
+- Example: Use `PROFILE_FIELDS.RF_LOANS` instead of `'RF_Loans'`
+
+### 2. **ALWAYS Import from Centralized Utils**
+- Import database functions from `utils/dbUtils.js`
+- Import validation functions from `utils/validationUtils.js`
+- Import drive utilities from `utils/driveUtils.js`
+- Import formatting functions from `utils/formatUtils.ts`
+- Import registration ID utilities from `utils/regIdUtils.js`
+
+### 3. **ALWAYS Import from Centralized Enums**
+- Import district mappings from `enums/districts.ts`
+- Import loan enums from `enums/loans.ts`
+- Import collection enums from `enums/db.ts`
+- Import message enums from `enums/messages.ts`
+- Import UI enums from `enums/ui.ts`
+- Import validation enums from `enums/validation.ts`
+
+### 4. **NO Payment-Related Functions**
+- Payment functionality has been completely removed
+- Do not add any payment-related functions or enums
+- Focus only on RF loans and Grant loans
+
+### 5. **Type Safety First**
+- Use TypeScript enums for all constants
+- Leverage type checking for database operations
+- Use proper interfaces for data structures
+
+### 6. **Use Centralized Functions for Common Operations**
+- **District Operations**: Use `getDistrictCode()`, `getDistrictName()` from `enums/districts.ts`
+- **Registration ID Generation**: Use `generateNextRegId()`, `generateRegIdFromDistrict()` from `utils/regIdUtils.js`
+- **Database Operations**: Use `getProfileByRegId()`, `saveProfile()`, `addLoan()` from `utils/dbUtils.js`
+- **Validation**: Use `validateRegId()`, `validateDistrict()`, `validateNIC()` from `utils/validationUtils.js`
+- **Image Handling**: Use `convertGoogleDriveUrl()`, `extractFileId()` from `utils/driveUtils.js`
+- **Formatting**: Use `formatAmount()`, `formatDate()`, `getInitials()` from `utils/formatUtils.ts`
+
+### 7. **Import Examples for All Projects**
+```javascript
+// Database operations
+import { getProfileByRegId, saveProfile, addLoan } from '../utils/dbUtils.js'
+
+// Validation functions
+import { validateRegId, validateDistrict } from '../utils/validationUtils.js'
+
+// Image utilities
+import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
+
+// Formatting utilities
+import { formatAmount, formatDate } from '../utils/formatUtils.ts'
+
+// Registration ID utilities
+import { generateNextRegId, getDistrictCode } from '../utils/regIdUtils.js'
+
+// Enums and constants
+import { ROOT_COLLECTIONS, PROFILE_FIELDS } from '../enums/db.js'
+import { DISTRICT_MAPPING, District } from '../enums/districts.ts'
+import { LoanStatus, LoanType } from '../enums/loans.ts'
+import { ErrorMessage, SuccessMessage } from '../enums/messages.ts'
+```
+
+Remember: This database is shared across all projects, so any changes to the schema or structure will affect all applications. Always coordinate changes and test thoroughly. **ALWAYS** use the centralized utils and enums structure for consistency. 

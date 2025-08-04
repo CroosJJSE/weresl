@@ -5,21 +5,21 @@
       :class="['lang-btn', { active: currentLang === 'en' }]"
       title="English"
     >
-      EN
+      English
     </button>
     <button 
       @click="setLanguage('ta')" 
       :class="['lang-btn', { active: currentLang === 'ta' }]"
       title="Tamil"
     >
-      த
+      தமிழ்
     </button>
     <button 
       @click="setLanguage('si')" 
       :class="['lang-btn', { active: currentLang === 'si' }]"
       title="Sinhala"
     >
-      සි
+      සිංහල
     </button>
   </div>
 </template>
@@ -48,18 +48,18 @@ export default {
 <style scoped>
 .language-toggle {
   display: flex;
-  gap: 5px;
+  gap: 8px;
   background: white;
   border-radius: 25px;
-  padding: 5px;
+  padding: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .lang-btn {
-  width: 40px;
+  min-width: 80px;
   height: 40px;
   border: none;
-  border-radius: 50%;
+  border-radius: 20px;
   background: #f5f5f5;
   color: #666;
   font-weight: bold;
@@ -69,12 +69,14 @@ export default {
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  padding: 0 15px;
+  white-space: nowrap;
 }
 
 .lang-btn:hover {
   background: #e3f2fd;
   color: #1565c0;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .lang-btn.active {
@@ -105,9 +107,10 @@ export default {
   }
   
   .lang-btn {
-    width: 35px;
+    min-width: 60px;
     height: 35px;
     font-size: 12px;
+    padding: 0 10px;
   }
 }
 </style> 

@@ -19,7 +19,14 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase-config.js'
-import { ROOT_COLLECTIONS, SEARCH_ELEMENT_DOCS, PROFILE_FIELDS } from '../enums/db.js'
+import { 
+  ROOT_COLLECTIONS, 
+  SEARCH_ELEMENT_DOCS, 
+  PROFILE_FIELDS, 
+  COORDINATOR_FIELDS,
+  BANK_ACCOUNT_FIELDS,
+  RootCollection 
+} from '../enums/db.js'
 
 /**
  * Get profile by Registration ID
@@ -410,6 +417,160 @@ export const generateLoanId = async (regId, loanType = 'RF') => {
   } catch (error) {
     console.error('Error generating loan ID:', error)
     throw error
+  }
+}
+
+/**
+ * Get coordinator by NIC number
+ */
+export const getCoordinatorByNIC = async (nic) => {
+  try {
+    // Query bank accounts collection to find coordinator by NIC
+    const bankAccountsRef = collection(db, RootCollection.BANK_ACCOUNTS)
+    const q = query(bankAccountsRef, where(BANK_ACCOUNT_FIELDS.nic, '==', nic))
+    const snapshot = await getDocs(q)
+    
+    if (snapshot.empty) {
+      return { success: false, message: 'Coordinator not found', data: null }
+    }
+    
+    const coordinatorDoc = snapshot.docs[0]
+    return { success: true, data: { id: coordinatorDoc.id, ...coordinatorDoc.data() } }
+  } catch (error) {
+    console.error('Error getting coordinator:', error)
+    return { success: false, message: 'Failed to get coordinator', error }
+  }
+}
+
+/**
+ * Get all coordinators
+ */
+export const getAllCoordinators = async () => {
+  try {
+    const bankAccountsRef = collection(db, RootCollection.BANK_ACCOUNTS)
+    const snapshot = await getDocs(bankAccountsRef)
+    const coordinators = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+    
+    return { success: true, data: coordinators }
+  } catch (error) {
+    console.error('Error getting coordinators:', error)
+    return { success: false, message: 'Failed to get coordinators', error }
+  }
+}
+
+/**
+ * Create or update coordinator
+ */
+export const saveCoordinator = async (coordinatorData, documentId = null) => {
+  try {
+    const coordinatorToSave = {
+      ...coordinatorData,
+      currentBankBalance: 0, // Initialize bank balance to 0
+      lastUpdated: serverTimestamp()
+    }
+    
+    if (!documentId) {
+      // Create new coordinator
+      coordinatorToSave.createdAt = serverTimestamp()
+      const docRef = await addDoc(collection(db, RootCollection.BANK_ACCOUNTS), coordinatorToSave)
+      return { success: true, data: { id: docRef.id, ...coordinatorToSave } }
+    } else {
+      // Update existing coordinator
+      const coordinatorRef = doc(db, RootCollection.BANK_ACCOUNTS, documentId)
+      await setDoc(coordinatorRef, coordinatorToSave, { merge: true })
+      return { success: true, data: { id: documentId, ...coordinatorToSave } }
+    }
+  } catch (error) {
+    console.error('Error saving coordinator:', error)
+    return { success: false, message: 'Failed to save coordinator', error }
+  }
+}
+
+/**
+ * Delete coordinator by document ID
+ */
+export const deleteCoordinator = async (documentId) => {
+  try {
+    const coordinatorRef = doc(db, RootCollection.BANK_ACCOUNTS, documentId)
+    await deleteDoc(coordinatorRef)
+    return { success: true, message: 'Coordinator deleted successfully' }
+  } catch (error) {
+    console.error('Error deleting coordinator:', error)
+    return { success: false, message: 'Failed to delete coordinator', error }
+  }
+}
+
+/**
+ * Get bank account balance by name
+ */
+export const getBankBalanceByName = async (name) => {
+  try {
+    const bankAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, name)
+    const bankAccountDoc = await getDoc(bankAccountRef)
+    
+    if (!bankAccountDoc.exists()) {
+      return { success: false, message: 'Bank account not found', data: null }
+    }
+    
+    const data = bankAccountDoc.data()
+    const balance = data[BANK_ACCOUNT_FIELDS.currentBankBalance] || 0
+    
+    return { 
+      success: true, 
+      data: { 
+        name: bankAccountDoc.id,
+        balance: balance,
+        firstName: data[BANK_ACCOUNT_FIELDS.firstName],
+        lastName: data[BANK_ACCOUNT_FIELDS.lastName],
+        position: data[BANK_ACCOUNT_FIELDS.position]
+      } 
+    }
+  } catch (error) {
+    console.error('Error getting bank balance:', error)
+    return { success: false, message: 'Failed to get bank balance', error }
+  }
+}
+
+/**
+ * Update bank balance by name
+ */
+export const updateBankBalance = async (name, newAmount) => {
+  try {
+    // Validate amount
+    if (typeof newAmount !== 'number' || isNaN(newAmount)) {
+      return { success: false, message: 'Invalid amount provided' }
+    }
+    
+    const bankAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, name)
+    const bankAccountDoc = await getDoc(bankAccountRef)
+    
+    if (!bankAccountDoc.exists()) {
+      return { success: false, message: 'Bank account not found' }
+    }
+    
+    // Update the bank balance
+    await updateDoc(bankAccountRef, {
+      [BANK_ACCOUNT_FIELDS.currentBankBalance]: newAmount,
+      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+    })
+    
+    return { 
+      success: true, 
+      message: 'Bank balance updated successfully',
+      data: {
+        name: name,
+        newBalance: newAmount,
+        firstName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.firstName],
+        lastName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.lastName],
+        position: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.position]
+      }
+    }
+  } catch (error) {
+    console.error('Error updating bank balance:', error)
+    return { success: false, message: 'Failed to update bank balance', error }
   }
 }
 

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAS Integration Test Runner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }        
+        h1 {
+            color: #1565c0;
+            text-align: center;
+            margin-bottom: 30px;
+        }       
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }        
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #1565c0;
+            padding-bottom: 10px;
+        }        
+        .test-button {
+            background: #1565c0;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.3s;
+        }        
+        .test-button:hover {
+            background: #0d47a1;
+        }        
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }        
+        .success {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }        
+        .error {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+        }
+        
+        .loading {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            color: #f57c00;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: #1565c0;
+            transition: width 0.3s;
+        }
+        
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .config-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #1565c0;
+            box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 GAS Integration Test Runner</h1>
+        
+        <!-- Configuration Section -->
+        <div class="config-section">
+            <h3>⚙️ Configuration</h3>
+            <div class="form-group">
+                <label for="gasUrl">GAS Web App URL:</label>
+                <input type="text" id="gasUrl" class="form-control" 
+                       placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+                       value="https://script.google.com/macros/s/AKfycbzaXn7q0Ze-I-s8zw18RxFJxHuDxSrVFbq8WLiaZgRaHhn8aBvl4Nc55HsCJS-dfd3zzg/exec">
+            </div>
+            <div class="form-group">
+                <label for="authToken">Authentication Token:</label>
+                <input type="text" id="authToken" class="form-control" 
+                       placeholder="test-token" value="test-token">
+            </div>
+            <button onclick="updateConfig()" class="test-button">Update Configuration</button>
+            <div id="configResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Connection Test -->
+        <div class="test-section">
+            <h2>🔗 Connection Test</h2>
+            <p>Test the basic connection to the GAS web app.</p>
+            <button onclick="testConnection()" class="test-button">Test GAS Connection</button>
+            <div id="connectionResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Email Notification Tests -->
+        <div class="test-section">
+            <h2>📧 Email Notification Tests</h2>
+            <p>Test email notification functionality.</p>
+            <button onclick="testEmailNotifications()" class="test-button">Test Email Notifications</button>
+            <div id="emailResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Sheet Operation Tests -->
+        <div class="test-section">
+            <h2>📊 Sheet Operation Tests</h2>
+            <p>Test Google Sheets integration functionality.</p>
+            <button onclick="testSheetOperations()" class="test-button">Test Sheet Operations</button>
+            <div id="sheetResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Data Preparation Tests -->
+        <div class="test-section">
+            <h2>📋 Data Preparation Tests</h2>
+            <p>Test data formatting and preparation functions.</p>
+            <button onclick="testDataPreparation()" class="test-button">Test Data Preparation</button>
+            <div id="dataResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Activity Logging Tests -->
+        <div class="test-section">
+            <h2>📝 Activity Logging Tests</h2>
+            <p>Test activity logging functionality.</p>
+            <button onclick="testActivityLogging()" class="test-button">Test Activity Logging</button>
+            <div id="activityResults" class="results" style="display: none;"></div>
+        </div>
+        
+        <!-- Comprehensive Test Suite -->
+        <div class="test-section">
+            <h2>🚀 Comprehensive Test Suite</h2>
+            <p>Run all tests and generate a comprehensive report.</p>
+            <button onclick="runComprehensiveTests()" class="test-button">Run All Tests</button>
+            <div id="comprehensiveResults" class="results" style="display: none;"></div>
+            <div id="progressContainer" style="display: none;">
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let currentConfig = {
+            gasUrl: 'https://script.google.com/macros/s/AKfycbzaXn7q0Ze-I-s8zw18RxFJxHuDxSrVFbq8WLiaZgRaHhn8aBvl4Nc55HsCJS-dfd3zzg/exec',
+            authToken: 'test-token'
+        };
+
+        // Test data
+        const testProfile = {
+            regId: 'TEST001',
+            fullName: 'John Doe',
+            district: 'Colombo',
+            address: '123 Test Street',
+            nic: '123456789V',
+            phoneNumber: '+94123456789',
+            description: 'Test profile description',
+            occupation: 'Software Developer',
+            yearOfBirth: 1990
+        };
+
+        const testLoanData = {
+            type: 'RF',
+            amount: 50000,
+            purpose: 'Business expansion',
+            status: 'approved'
+        };
+
+        const testReturnRecord = {
+            paidAmount: 10000,
+            receiptDriveLinkId: 'test-receipt-id'
+        };
+
+        // Helper function to send data to GAS
+        async function sendToGAS(data) {
+            try {
+                // Add authentication token to all requests
+                const requestData = {
+                    ...data,
+                    token: currentConfig.authToken
+                };
+
+                const response = await fetch(currentConfig.gasUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(requestData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                throw new Error(`GAS request failed: ${error.message}`);
+            }
+        }
+
+        // Update configuration
+        window.updateConfig = function() {
+            currentConfig.gasUrl = document.getElementById('gasUrl').value;
+            currentConfig.authToken = document.getElementById('authToken').value;
+            showResult('Configuration updated successfully!', 'info', 'configResults');
+        };
+
+        // Test connection
+        window.testConnection = async function() {
+            showResult('Testing GAS connection...', 'loading', 'connectionResults');
+            
+            try {
+                const result = await sendToGAS({
+                    action: 'test',
+                    message: 'Testing GAS connection',
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (result.success) {
+                    showResult(`✅ Connection test passed!\n\nResult: ${JSON.stringify(result, null, 2)}`, 'success', 'connectionResults');
+                } else {
+                    showResult(`❌ Connection test failed!\n\nError: ${result.message}`, 'error', 'connectionResults');
+                }
+            } catch (error) {
+                showResult(`❌ Connection test failed!\n\nError: ${error.message}`, 'error', 'connectionResults');
+            }
+        };
+
+        // Test email notifications
+        window.testEmailNotifications = async function() {
+            showResult('Testing email notifications...', 'loading', 'emailResults');
+            
+            try {
+                const results = [];
+                
+                // Test new loan approval notification
+                try {
+                    const loanNotification = await sendToGAS({
+                        action: 'sendEmail',
+                        emailType: 'NEW_LOAN_APPROVAL',
+                        subject: 'New Loan Approval - TEST',
+                        body: 'Test loan approval notification',
+                        timestamp: new Date().toISOString()
+                    });
+                    results.push({
+                        name: 'New Loan Approval Email',
+                        success: loanNotification.success,
+                        result: loanNotification,
+                        error: loanNotification.success ? null : loanNotification.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'New Loan Approval Email',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test payment approval notification
+                try {
+                    const paymentNotification = await sendToGAS({
+                        action: 'sendEmail',
+                        emailType: 'PAYMENT_APPROVAL',
+                        subject: 'Payment Approval - TEST',
+                        body: 'Test payment approval notification',
+                        timestamp: new Date().toISOString()
+                    });
+                    results.push({
+                        name: 'Payment Approval Email',
+                        success: paymentNotification.success,
+                        result: paymentNotification,
+                        error: paymentNotification.success ? null : paymentNotification.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Payment Approval Email',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                const successCount = results.filter(r => r.success).length;
+                const totalCount = results.length;
+                
+                let resultText = `Email notification tests completed!\n\n`;
+                resultText += `Passed: ${successCount}/${totalCount}\n\n`;
+                
+                results.forEach(result => {
+                    resultText += `${result.success ? '✅' : '❌'} ${result.name}\n`;
+                    if (result.success) {
+                        resultText += `  Result: ${JSON.stringify(result.result, null, 2)}\n`;
+                    } else {
+                        resultText += `  Error: ${result.error}\n`;
+                    }
+                    resultText += '\n';
+                });
+                
+                const className = successCount === totalCount ? 'success' : 'error';
+                showResult(resultText, className, 'emailResults');
+            } catch (error) {
+                showResult(`❌ Email notification tests failed!\n\nError: ${error.message}`, 'error', 'emailResults');
+            }
+        };
+
+        // Test sheet operations
+        window.testSheetOperations = async function() {
+            showResult('Testing sheet operations...', 'loading', 'sheetResults');
+            
+            try {
+                const results = [];
+                
+                // Test main tab update
+                try {
+                    const mainTabData = {
+                        'Reg_ID': testProfile.regId,
+                        'District': testProfile.district,
+                        'Name': testProfile.fullName,
+                        'Age': new Date().getFullYear() - testProfile.yearOfBirth,
+                        'Address': testProfile.address,
+                        'NIC': testProfile.nic,
+                        'contact': testProfile.phoneNumber,
+                        'Background_Description': testProfile.description,
+                        'Occupation': testProfile.occupation,
+                        'RF loan': 'Yes',
+                        'Grant': 'No'
+                    };
+
+                    const mainTabResult = await sendToGAS({
+                        action: 'updateSheetRow',
+                        tabName: 'Main',
+                        regId: testProfile.regId,
+                        data: JSON.stringify(mainTabData),
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    results.push({
+                        name: 'Main Tab Update',
+                        success: mainTabResult.success,
+                        result: mainTabResult,
+                        error: mainTabResult.success ? null : mainTabResult.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Main Tab Update',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test RF return record
+                try {
+                    const rfReturnData = {
+                        'Timestamp': new Date().toISOString(),
+                        'RegID': testProfile.regId,
+                        'Name': testProfile.fullName,
+                        'Amount_Deposited': testReturnRecord.paidAmount,
+                        'Receiver': 'Admin'
+                    };
+
+                    const rfReturnResult = await sendToGAS({
+                        action: 'createSheetRow',
+                        tabName: 'RF_return',
+                        regId: testProfile.regId,
+                        data: JSON.stringify(rfReturnData),
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    results.push({
+                        name: 'RF Return Record',
+                        success: rfReturnResult.success,
+                        result: rfReturnResult,
+                        error: rfReturnResult.success ? null : rfReturnResult.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'RF Return Record',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test loan initiation record
+                try {
+                    const loanInitData = {
+                        'Timestamp': new Date().toISOString(),
+                        'RegID': testProfile.regId,
+                        'Name': testProfile.fullName,
+                        'Age': new Date().getFullYear() - testProfile.yearOfBirth,
+                        'NIC': testProfile.nic,
+                        'Phone number': testProfile.phoneNumber,
+                        'District': testProfile.district,
+                        'Address': testProfile.address,
+                        'Description': testProfile.description,
+                        'Industry': testProfile.occupation,
+                        'Loan_type': testLoanData.type,
+                        'Amount': testLoanData.amount,
+                        'Purpose': testLoanData.purpose,
+                        'Source': 'Web App'
+                    };
+
+                    const loanInitResult = await sendToGAS({
+                        action: 'createSheetRow',
+                        tabName: 'Loan_initiation',
+                        regId: testProfile.regId,
+                        data: JSON.stringify(loanInitData),
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    results.push({
+                        name: 'Loan Initiation Record',
+                        success: loanInitResult.success,
+                        result: loanInitResult,
+                        error: loanInitResult.success ? null : loanInitResult.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Loan Initiation Record',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                const successCount = results.filter(r => r.success).length;
+                const totalCount = results.length;
+                
+                let resultText = `Sheet operation tests completed!\n\n`;
+                resultText += `Passed: ${successCount}/${totalCount}\n\n`;
+                
+                results.forEach(result => {
+                    resultText += `${result.success ? '✅' : '❌'} ${result.name}\n`;
+                    if (result.success) {
+                        resultText += `  Result: ${JSON.stringify(result.result, null, 2)}\n`;
+                    } else {
+                        resultText += `  Error: ${result.error}\n`;
+                    }
+                    resultText += '\n';
+                });
+                
+                const className = successCount === totalCount ? 'success' : 'error';
+                showResult(resultText, className, 'sheetResults');
+            } catch (error) {
+                showResult(`❌ Sheet operation tests failed!\n\nError: ${error.message}`, 'error', 'sheetResults');
+            }
+        };
+
+        // Test data preparation
+        window.testDataPreparation = function() {
+            showResult('Testing data preparation...', 'loading', 'dataResults');
+            
+            try {
+                const results = [];
+                
+                // Test main tab data preparation
+                try {
+                    const mainTabData = {
+                        'Reg_ID': testProfile.regId,
+                        'District': testProfile.district,
+                        'Name': testProfile.fullName,
+                        'Age': new Date().getFullYear() - testProfile.yearOfBirth,
+                        'Address': testProfile.address,
+                        'NIC': testProfile.nic,
+                        'contact': testProfile.phoneNumber,
+                        'Background_Description': testProfile.description,
+                        'Occupation': testProfile.occupation,
+                        'RF loan': 'Yes',
+                        'Grant': 'No'
+                    };
+                    
+                    results.push({
+                        name: 'Main Tab Data Preparation',
+                        success: true,
+                        result: mainTabData,
+                        error: null
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Main Tab Data Preparation',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test RF return data preparation
+                try {
+                    const rfReturnData = {
+                        'Timestamp': new Date().toISOString(),
+                        'RegID': testProfile.regId,
+                        'Name': testProfile.fullName,
+                        'Amount_Deposited': testReturnRecord.paidAmount,
+                        'Receiver': 'Admin'
+                    };
+                    
+                    results.push({
+                        name: 'RF Return Data Preparation',
+                        success: true,
+                        result: rfReturnData,
+                        error: null
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'RF Return Data Preparation',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test loan initiation data preparation
+                try {
+                    const loanInitData = {
+                        'Timestamp': new Date().toISOString(),
+                        'RegID': testProfile.regId,
+                        'Name': testProfile.fullName,
+                        'Age': new Date().getFullYear() - testProfile.yearOfBirth,
+                        'NIC': testProfile.nic,
+                        'Phone number': testProfile.phoneNumber,
+                        'District': testProfile.district,
+                        'Address': testProfile.address,
+                        'Description': testProfile.description,
+                        'Industry': testProfile.occupation,
+                        'Loan_type': testLoanData.type,
+                        'Amount': testLoanData.amount,
+                        'Purpose': testLoanData.purpose,
+                        'Source': 'Web App'
+                    };
+                    
+                    results.push({
+                        name: 'Loan Initiation Data Preparation',
+                        success: true,
+                        result: loanInitData,
+                        error: null
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Loan Initiation Data Preparation',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                const successCount = results.filter(r => r.success).length;
+                const totalCount = results.length;
+                
+                let resultText = `Data preparation tests completed!\n\n`;
+                resultText += `Passed: ${successCount}/${totalCount}\n\n`;
+                
+                results.forEach(result => {
+                    resultText += `${result.success ? '✅' : '❌'} ${result.name}\n`;
+                    if (result.success) {
+                        resultText += `  Result: ${JSON.stringify(result.result, null, 2)}\n`;
+                    } else {
+                        resultText += `  Error: ${result.error}\n`;
+                    }
+                    resultText += '\n';
+                });
+                
+                const className = successCount === totalCount ? 'success' : 'error';
+                showResult(resultText, className, 'dataResults');
+            } catch (error) {
+                showResult(`❌ Data preparation tests failed!\n\nError: ${error.message}`, 'error', 'dataResults');
+            }
+        };
+
+        // Test activity logging
+        window.testActivityLogging = async function() {
+            showResult('Testing activity logging...', 'loading', 'activityResults');
+            
+            try {
+                const results = [];
+                
+                // Test basic activity logging
+                try {
+                    const logResult = await sendToGAS({
+                        action: 'logActivity',
+                        activity: 'Test activity logging',
+                        data: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    results.push({
+                        name: 'Basic Activity Logging',
+                        success: logResult.success,
+                        result: logResult,
+                        error: logResult.success ? null : logResult.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Basic Activity Logging',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                // Test complex activity logging
+                try {
+                    const complexLogResult = await sendToGAS({
+                        action: 'logActivity',
+                        activity: 'Complex test activity',
+                        data: JSON.stringify({
+                            operation: 'test',
+                            profile: testProfile,
+                            loanData: testLoanData,
+                            timestamp: new Date().toISOString()
+                        }),
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    results.push({
+                        name: 'Complex Activity Logging',
+                        success: complexLogResult.success,
+                        result: complexLogResult,
+                        error: complexLogResult.success ? null : complexLogResult.message
+                    });
+                } catch (error) {
+                    results.push({
+                        name: 'Complex Activity Logging',
+                        success: false,
+                        error: error.message
+                    });
+                }
+
+                const successCount = results.filter(r => r.success).length;
+                const totalCount = results.length;
+                
+                let resultText = `Activity logging tests completed!\n\n`;
+                resultText += `Passed: ${successCount}/${totalCount}\n\n`;
+                
+                results.forEach(result => {
+                    resultText += `${result.success ? '✅' : '❌'} ${result.name}\n`;
+                    if (result.success) {
+                        resultText += `  Result: ${JSON.stringify(result.result, null, 2)}\n`;
+                    } else {
+                        resultText += `  Error: ${result.error}\n`;
+                    }
+                    resultText += '\n';
+                });
+                
+                const className = successCount === totalCount ? 'success' : 'error';
+                showResult(resultText, className, 'activityResults');
+            } catch (error) {
+                showResult(`❌ Activity logging tests failed!\n\nError: ${error.message}`, 'error', 'activityResults');
+            }
+        };
+
+        // Run comprehensive tests
+        window.runComprehensiveTests = async function() {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            
+            showResult('Starting comprehensive test suite...', 'loading', 'comprehensiveResults');
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            
+            try {
+                const allResults = {};
+                let totalTests = 0;
+                let passedTests = 0;
+
+                // Test connection
+                progressBar.style.width = '10%';
+                try {
+                    const connectionResult = await sendToGAS({
+                        action: 'test',
+                        message: 'Comprehensive test - connection',
+                        timestamp: new Date().toISOString()
+                    });
+                    allResults.connection = [{ success: connectionResult.success, name: 'GAS Connection' }];
+                    if (connectionResult.success) passedTests++;
+                    totalTests++;
+                } catch (error) {
+                    allResults.connection = [{ success: false, name: 'GAS Connection', error: error.message }];
+                    totalTests++;
+                }
+
+                // Test email notifications
+                progressBar.style.width = '30%';
+                const emailResults = [];
+                try {
+                    const emailResult = await sendToGAS({
+                        action: 'sendEmail',
+                        emailType: 'NEW_LOAN_APPROVAL',
+                        subject: 'Comprehensive Test - Email',
+                        body: 'Test email from comprehensive test suite',
+                        timestamp: new Date().toISOString()
+                    });
+                    emailResults.push({ success: emailResult.success, name: 'Email Notification' });
+                    if (emailResult.success) passedTests++;
+                    totalTests++;
+                } catch (error) {
+                    emailResults.push({ success: false, name: 'Email Notification', error: error.message });
+                    totalTests++;
+                }
+                allResults.email = emailResults;
+
+                // Test sheet operations
+                progressBar.style.width = '50%';
+                const sheetResults = [];
+                try {
+                    const sheetResult = await sendToGAS({
+                        action: 'updateSheetRow',
+                        tabName: 'Main',
+                        regId: 'COMPREHENSIVE_TEST',
+                        data: JSON.stringify({
+                            'Reg_ID': 'COMPREHENSIVE_TEST',
+                            'District': 'Test District',
+                            'Name': 'Comprehensive Test User',
+                            'Age': 30,
+                            'Address': 'Test Address',
+                            'NIC': 'TEST123456V',
+                            'contact': '+94123456789',
+                            'Background_Description': 'Comprehensive test description',
+                            'Occupation': 'Tester',
+                            'RF loan': 'Yes',
+                            'Grant': 'No'
+                        }),
+                        timestamp: new Date().toISOString()
+                    });
+                    sheetResults.push({ success: sheetResult.success, name: 'Sheet Operation' });
+                    if (sheetResult.success) passedTests++;
+                    totalTests++;
+                } catch (error) {
+                    sheetResults.push({ success: false, name: 'Sheet Operation', error: error.message });
+                    totalTests++;
+                }
+                allResults.sheets = sheetResults;
+
+                // Test activity logging
+                progressBar.style.width = '70%';
+                const activityResults = [];
+                try {
+                    const activityResult = await sendToGAS({
+                        action: 'logActivity',
+                        activity: 'Comprehensive test suite execution',
+                        data: JSON.stringify({ testSuite: 'comprehensive', timestamp: new Date().toISOString() }),
+                        timestamp: new Date().toISOString()
+                    });
+                    activityResults.push({ success: activityResult.success, name: 'Activity Logging' });
+                    if (activityResult.success) passedTests++;
+                    totalTests++;
+                } catch (error) {
+                    activityResults.push({ success: false, name: 'Activity Logging', error: error.message });
+                    totalTests++;
+                }
+                allResults.activity = activityResults;
+
+                progressBar.style.width = '100%';
+
+                const successRate = (passedTests / totalTests) * 100;
+                const overallSuccess = successRate >= 80; // 80% threshold
+
+                let resultText = `Comprehensive test suite completed!\n\n`;
+                resultText += `Overall Success: ${overallSuccess ? '✅ PASSED' : '❌ FAILED'}\n`;
+                resultText += `Success Rate: ${successRate.toFixed(2)}% (${passedTests}/${totalTests})\n\n`;
+                
+                // Add detailed results
+                Object.keys(allResults).forEach(category => {
+                    const categoryResults = allResults[category];
+                    if (Array.isArray(categoryResults)) {
+                        const successCount = categoryResults.filter(r => r.success).length;
+                        resultText += `${category.toUpperCase()}: ${successCount}/${categoryResults.length} passed\n`;
+                    }
+                });
+                
+                const className = overallSuccess ? 'success' : 'error';
+                showResult(resultText, className, 'comprehensiveResults');
+            } catch (error) {
+                showResult(`❌ Comprehensive test suite failed!\n\nError: ${error.message}`, 'error', 'comprehensiveResults');
+                progressBar.style.width = '0%';
+            }
+        };
+
+        // Helper function to show results
+        function showResult(message, type, elementId) {
+            const resultsDiv = document.getElementById(elementId);
+            resultsDiv.textContent = message;
+            resultsDiv.className = `results ${type}`;
+            resultsDiv.style.display = 'block';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('GAS Integration Test Runner loaded');
+            // Set initial values
+            document.getElementById('gasUrl').value = currentConfig.gasUrl;
+            document.getElementById('authToken').value = currentConfig.authToken;
+        });
+    </script>
+</body>
+</html> 

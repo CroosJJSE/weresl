@@ -21,16 +21,9 @@
     </div>
     
     <div class="profile-info">
-      <p><strong>RegID:</strong> {{ profile.id }}</p>
-      <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
       <p><strong>District:</strong> {{ profile.basicInfo?.District || 'N/A' }}</p>
-      <p><strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}</p>
-    </div>
-    
-    <div v-if="profile.computed" class="profile-stats">
-      <p><strong>Active Loans:</strong> {{ profile.computed.activeLoansCount }}</p>
-      <p><strong>Total Loan Amount:</strong> Rs. {{ formatAmount(profile.computed.totalLoanAmount) }}</p>
-      <p><strong>Remaining:</strong> Rs. {{ formatAmount(profile.computed.remainingLoanAmount) }}</p>
+      <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
+      <p><strong>Occupation:</strong> {{ profile.basicInfo?.occupation || 'N/A' }}</p>
     </div>
   </div>
 </template>
@@ -72,6 +65,17 @@ export default {
           return
         }
         
+        // Check if it's just a file ID (no URL structure)
+        if (imageUrl && !imageUrl.includes('http') && !imageUrl.includes('drive.google.com')) {
+          // It's likely just a file ID, convert to Google Drive URL
+          const fileId = imageUrl.trim();
+          if (fileId && fileId.length > 10) { // Basic validation for file ID
+            const driveUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
+            profileImageUrl.value = driveUrl;
+            return;
+          }
+        }
+        
         // Use debug function for better troubleshooting
         const directUrl = await imageService.debugImageUrl(imageUrl)
         profileImageUrl.value = directUrl
@@ -85,10 +89,19 @@ export default {
       console.error(`[ProfileCard] Image failed to load for profile: ${props.profile?.id}`);
       console.error(`[ProfileCard] Failed URL: ${profileImageUrl.value}`);
       
-      // Try fallback URL if it's a Google Drive URL
+      // Try fallback URL if it's a Google Drive URL or file ID
       const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
-      if (imageService.isGoogleDriveUrl(imageUrl)) {
-        const fileId = imageService.extractDriveFileId(imageUrl);
+      
+      if (imageUrl) {
+        let fileId = null;
+        
+        if (imageService.isGoogleDriveUrl(imageUrl)) {
+          fileId = imageService.extractDriveFileId(imageUrl);
+        } else if (imageUrl && !imageUrl.includes('http') && imageUrl.length > 10) {
+          // It might be just a file ID
+          fileId = imageUrl.trim();
+        }
+        
         if (fileId) {
           // Try multiple fallback formats in sequence
           const fallbackUrls = [
@@ -152,8 +165,8 @@ export default {
 <style scoped>
 .profile-box {
   border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 15px;
+  border-radius: 8px;
+  padding: 8px;
   width: 100%;
   text-align: left;
   background-color: #f9f9f9;
@@ -169,10 +182,10 @@ export default {
 
 .profile-box img {
   width: 100%;
-  height: 200px;
+  height: 120px;
   object-fit: cover;
-  border-radius: 10px;
-  margin-bottom: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
   background-color: #f5f5f5;
   aspect-ratio: 1;
 }
@@ -187,7 +200,7 @@ export default {
 
 .profile-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   color: #333;
   flex: 1;
@@ -227,12 +240,12 @@ export default {
 }
 
 .profile-info {
-  font-size: 14px;
-  margin-bottom: 10px;
+  font-size: 10px;
+  margin-bottom: 5px;
 }
 
 .profile-info p {
-  margin: 5px 0;
+  margin: 2px 0;
 }
 
 .profile-info strong {

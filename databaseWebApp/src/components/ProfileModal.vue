@@ -2,139 +2,92 @@
   <div v-if="isVisible && profile" class="modal" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="close-button" @click="closeModal">&times;</div>
-      
       <div class="modal-header">
         <div class="header-content">
-          <h2>{{ profile.basicInfo?.name || 'Unknown' }}</h2>
+          <h2>{{ profile[ProfileField.FULL_NAME] || profile.basicInfo?.name || 'Unknown' }}</h2>
           <div class="profile-types">
-            <span 
-              v-for="type in profileTypes" 
-              :key="type"
-              :class="`profile-type ${type.toLowerCase()}-type`"
-            >
-              {{ type }}
-            </span>
+            <span v-for="type in profileTypes" :key="type" :class="`profile-type ${type.toLowerCase()}-type`">{{ type }}</span>
           </div>
         </div>
       </div>
-
       <div class="modal-body">
         <div class="profile-image-section">
-          <img 
-            :src="profileImageUrl" 
-            :alt="profile.basicInfo?.name || 'Profile Image'"
-            @error="handleImageError"
-            @load="handleImageLoad"
-            class="profile-image"
-          />
+          <img :src="profileImageUrl" :alt="profile[ProfileField.FULL_NAME] || 'Profile Image'" @error="handleImageError" @load="handleImageLoad" class="profile-image" />
         </div>
-        
         <div class="basic-info">
-          <h3>Basic Information</h3>
           <div class="info-grid">
-            <div class="info-row">
-              <div class="info-item">
-                <strong>RegID:</strong> {{ profile.id }}
-              </div>
-              <div class="info-item">
-                <strong>Name:</strong> {{ profile.basicInfo?.name || 'N/A' }}
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-item">
-                <strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}
-              </div>
-              <div class="info-item">
-                <strong>District:</strong> {{ profile.basicInfo?.District || 'N/A' }}
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-item">
-                <strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}
-              </div>
-              <div class="info-item">
-                <strong>NIC:</strong> {{ profile.basicInfo?.nic || 'N/A' }}
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-item full-width">
-                <strong>Address:</strong> {{ profile.basicInfo?.address || 'N/A' }}
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-item">
-                <strong>Children:</strong> {{ profile.basicInfo?.totalChildren || 'N/A' }}
-              </div>
-            </div>
+            <div class="info-row"><div class="info-item"><strong>Registration ID:</strong> {{ profile[ProfileField.REG_ID] || profile.id }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>District:</strong> {{ profile[ProfileField.DISTRICT] || profile.basicInfo?.District || 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>Age:</strong> {{ profile[ProfileField.YEAR_OF_BIRTH] || profile.basicInfo?.age || 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>Address:</strong> {{ profile[ProfileField.ADDRESS] || profile.basicInfo?.address || 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>NIC:</strong> {{ profile[ProfileField.NIC] || profile.basicInfo?.nic || 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>Contact:</strong> {{ profile[ProfileField.PHONE_NUMBER] || profile.basicInfo?.phone || 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>Arms:</strong> {{ profile.arms?.length > 0 ? profile.arms.join(', ') : 'N/A' }}</div></div>
+            <div class="info-row"><div class="info-item"><strong>Family Members:</strong></div></div>
+            <div class="info-row"><div class="info-item" style="margin-left: 20px;"><ul><li>Total Children: {{ profile[ProfileField.TOTAL_CHILDREN] || profile.basicInfo?.totalChildren || 0 }}</li><li>School Kids: {{ profile[ProfileField.SCHOOL_GOING_CHILDREN] || profile.basicInfo?.schoolKids || 0 }}</li><li>Others: {{ profile[ProfileField.OTHER_DEPENDENTS] || profile.basicInfo?.others || 0 }}</li></ul></div></div>
+            <div class="info-row"><div class="info-item"><strong>Occupation:</strong> {{ profile[ProfileField.OCCUPATION] || profile.basicInfo?.occupation || 'N/A' }}</div></div>
           </div>
         </div>
-
-        <!-- Loading indicator -->
-        <div v-if="loadingDetails" class="loading-section">
-          <div class="loading-spinner"></div>
-          <p>Loading profile details...</p>
+        <!-- Description -->
+        <div v-if="profile[ProfileField.DESCRIPTION]" class="project-section">
+          <div class="project-header">Additional Information</div>
+          <p>{{ profile[ProfileField.DESCRIPTION] }}</p>
         </div>
-
-        <!-- Simplified Project Section -->
-        <div v-if="profileDetails && !loadingDetails" class="project-section">
+        <!-- RF Projects Section -->
+        <div v-if="profileDetails && profileDetails.activeRFLoans && profileDetails.activeRFLoans.length > 0" class="project-section">
           <div class="project-header">RF Projects</div>
-          
-          <!-- Combined RF Loans (Pending + Distributed) -->
-          <div v-if="(profileDetails.activeRFLoans && profileDetails.activeRFLoans.length > 0) || (profileDetails.completedRFLoans && profileDetails.completedRFLoans.length > 0)" class="project-details" style="flex-direction: column;">
+          <div class="project-details" style="flex-direction: column;">
             <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">RF Loans</div>
-            
-            <!-- Active/Pending RF Loans -->
             <div v-for="loan in profileDetails.activeRFLoans" :key="loan.id" style="display: flex; justify-content: space-between; padding: 8px 0; margin-left: 20px; border-bottom: 1px solid #eee;">
               <div style="flex: 1;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <span>{{ loan.purpose }}</span>
+                  <span>{{ loan[RF_LOAN_FIELD.PURPOSE] || loan[RF_LOAN_FIELD.PROJECT_DESCRIPTION] || 'RF Project' }}</span>
                   <span style="color: #d32f2f; font-weight: bold; font-size: 12px;">(Active)</span>
                 </div>
-                <div v-if="loan.currentBalance" style="margin-top: 3px; font-size: 12px; color: #d32f2f;">
-                  Current Balance: Rs. {{ formatAmount(loan.currentBalance) }}
-                </div>
+                <div v-if="loan[RF_LOAN_FIELD.CURRENT_BALANCE]" style="margin-top: 3px; font-size: 12px; color: #d32f2f;">Current Balance: Rs. {{ formatAmount(loan[RF_LOAN_FIELD.CURRENT_BALANCE]) }}</div>
               </div>
               <div style="text-align: right;">
-                <div>Rs. {{ formatAmount(loan.amount) }}</div>
-                <div style="font-size: 12px; color: #666;">{{ formatDate(loan.initiationDate) }}</div>
-              </div>
-            </div>
-            
-            <!-- Completed RF Loans -->
-            <div v-for="loan in profileDetails.completedRFLoans" :key="loan.id" style="display: flex; justify-content: space-between; padding: 8px 0; margin-left: 20px; border-bottom: 1px solid #eee;">
-              <div style="flex: 1;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span>{{ loan.purpose }}</span>
-                  <span style="color: #2e7d32; font-weight: bold; font-size: 12px;">(Completed)</span>
-                </div>
-              </div>
-              <div style="text-align: right;">
-                <div>Rs. {{ formatAmount(loan.amount) }}</div>
-                <div style="font-size: 12px; color: #666;">{{ formatDate(loan.initiationDate) }}</div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- RF Paid History -->
-          <div v-if="profileDetails.returnHistory && profileDetails.returnHistory.length > 0" class="project-details" style="flex-direction: column;">
-            <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Paid History</div>
-            <div v-for="payment in profileDetails.returnHistory" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
-              <span style="color: #2e7d32">{{ payment.parsedDate }}</span>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
-                <a 
-                  v-if="payment.proofUrl && isValidUrl(payment.proofUrl)" 
-                  :href="payment.proofUrl" 
-                  target="_blank" 
-                  style="color: #1565c0; text-decoration: none; font-size: 12px; font-weight: 500;"
-                >
-                  View Bill
-                </a>
+                <div>Rs. {{ formatAmount(loan[RF_LOAN_FIELD.AMOUNT]) }}</div>
+                <div style="font-size: 12px; color: #666;">{{ formatDate(loan[RF_LOAN_FIELD.INITIATION_DATE]) }}</div>
               </div>
             </div>
           </div>
         </div>
-
+        <!-- RF Payment History: prefer parsed array, fallback to map -->
+        <div v-if="profileDetails && profileDetails.returnHistory && profileDetails.returnHistory.length > 0" class="project-details" style="flex-direction: column;">
+          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History</div>
+          <div v-for="payment in profileDetails.returnHistory" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
+            <span style="color: #2e7d32">{{ payment.parsedDate || payment.dateKey }}</span>
+            <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
+          </div>
+        </div>
+        <div v-else-if="getRFReturnHistoryArray().length > 0" class="project-details" style="flex-direction: column;">
+          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History</div>
+          <div v-for="payment in getRFReturnHistoryArray()" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
+            <span style="color: #2e7d32">{{ payment.dateKey }}</span>
+            <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
+          </div>
+        </div>
+        <!-- GRANT Projects Section: prefer map, fallback to array -->
+        <div v-if="getGrantArray().length > 0" class="project-section">
+          <div class="project-header">GRANT Projects</div>
+          <div class="project-details" style="flex-direction: column;">
+            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">GRANT Loans</div>
+            <div v-for="(grant, idx) in getGrantArray()" :key="grant.id || idx" style="display: flex; justify-content: space-between; padding: 8px 0; margin-left: 20px; border-bottom: 1px solid #eee;">
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span>{{ grant[GRANT_FIELD.PURPOSE] || grant[GRANT_FIELD.PROJECT_DESCRIPTION] || grant.purpose || grant.projectDescription || 'GRANT Project' }}</span>
+                  <span style="color: #c62828; font-weight: bold; font-size: 12px;">(GRANT)</span>
+                </div>
+                <div v-if="grant.currentBalance" style="margin-top: 3px; font-size: 12px; color: #c62828;">Current Balance: Rs. {{ formatAmount(grant.currentBalance) }}</div>
+              </div>
+              <div style="text-align: right;">
+                <div>Rs. {{ formatAmount(grant[GRANT_FIELD.AMOUNT] || grant[GRANT_FIELD.APPROVED_AMOUNT] || grant.amount || grant.approvedAmount || grant.currentBalance) }}</div>
+                <div style="font-size: 12px; color: #666;">{{ formatDate(grant[GRANT_FIELD.REQUESTED_DATE] || grant[GRANT_FIELD.CREATED_AT] || grant.requestedDate || grant.createdAt || grant.initiationDate || grant.approvedAt) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
         <!-- Error message -->
         <div v-if="loadError" class="error-section">
           <p style="color: #d32f2f; text-align: center;">Error loading profile details. Please try again.</p>
@@ -149,6 +102,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
 import { dbOperations } from '@/firebase/db.js'
+import { ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '@/enums/db.js'
 
 export default {
   name: 'ProfileModal',
@@ -181,55 +135,65 @@ export default {
 
     const formatDate = (date) => {
       if (!date) return 'N/A'
-      
       try {
-        // Handle Firestore timestamp objects
         if (date && typeof date === 'object' && date.toDate) {
           return date.toDate().toLocaleDateString('en-IN')
         }
-        
-        // Handle regular Date objects
         if (date instanceof Date) {
           return date.toLocaleDateString('en-IN')
         }
-        
-        // Handle string dates
-        if (typeof date === 'string') {
+        if (typeof date === 'string' || typeof date === 'number') {
           return new Date(date).toLocaleDateString('en-IN')
         }
-        
-        // Handle timestamp numbers
-        if (typeof date === 'number') {
-          return new Date(date).toLocaleDateString('en-IN')
-        }
-        
         return 'N/A'
       } catch (error) {
-        console.error('[ProfileModal] Error formatting date:', error, date)
         return 'N/A'
       }
     }
 
+    // Helper: parse RF_return_history map to array
+    const getRFReturnHistoryArray = () => {
+      const map = props.profile[ProfileField.RF_RETURN_HISTORY]
+      if (!map || typeof map !== 'object') return []
+      return Object.entries(map).map(([key, value]) => ({
+        dateKey: key,
+        amount: value
+      }))
+    }
+
+    // Helper: get GRANTs as array
+    const getGrantArray = () => {
+      // First try to get from profile details (subcollection data)
+      if (profileDetails.value?.activeGrants && profileDetails.value.activeGrants.length > 0) {
+        return profileDetails.value.activeGrants;
+      }
+      
+      // Then try to get from profile's Grant field
+      const grantMap = props.profile[ProfileField.GRANT];
+      if (grantMap && typeof grantMap === 'object') {
+        return Object.values(grantMap);
+      }
+      
+      // Finally try from profile's GRANT field (different casing)
+      const grantData = props.profile.GRANT;
+      if (grantData && typeof grantData === 'object') {
+        return Object.values(grantData);
+      }
+      
+      return [];
+    }
+
     const loadProfileDetails = async () => {
       if (!props.profile?.id) return
-      
       try {
-        console.log('[ProfileModal] Loading detailed profile data for:', props.profile.id)
         loadingDetails.value = true
         loadError.value = false
-        
-        // Reset profile details for this specific profile
         profileDetails.value = null
-        
         const details = await dbOperations.getProfileDetails(props.profile.id)
-        console.log('[ProfileModal] Profile details loaded:', details)
-        
-        // Only set the details if this is still the same profile (to prevent race conditions)
         if (props.profile?.id === props.profile?.id) {
           profileDetails.value = details
         }
       } catch (error) {
-        console.error('[ProfileModal] Error loading profile details:', error)
         loadError.value = true
       } finally {
         loadingDetails.value = false
@@ -238,103 +202,50 @@ export default {
 
     const loadProfileImage = async () => {
       try {
-        // Check multiple possible image field names
         const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
-        
         if (!props.profile || !imageUrl) {
           profileImageUrl.value = '/placeholder-profile.jpg'
           return
         }
-        
-        // Test the URL format
-        if (imageService.isGoogleDriveUrl(imageUrl)) {
-          const fileId = imageService.extractDriveFileId(imageUrl);
-        } else if (imageService.isCloudinaryUrl(imageUrl)) {
-        } else {
+        if (imageUrl && !imageUrl.includes('http') && !imageUrl.includes('drive.google.com')) {
+          const fileId = imageUrl.trim();
+          if (fileId && fileId.length > 10) {
+            const driveUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
+            profileImageUrl.value = driveUrl;
+            return;
+          }
         }
-        
-        // Use debug function for better troubleshooting
         const directUrl = await imageService.debugImageUrl(imageUrl)
         profileImageUrl.value = directUrl
       } catch (error) {
-        console.error(`[ProfileModal] Error loading image for profile: ${props.profile?.id}:`, error)
         profileImageUrl.value = '/placeholder-profile.jpg'
       }
     }
 
     const handleImageError = () => {
-      console.error(`[ProfileModal] Image failed to load for profile: ${props.profile?.id}`);
-      console.error(`[ProfileModal] Failed URL: ${profileImageUrl.value}`);
-      
-      // Try fallback URL if it's a Google Drive URL
-      const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
-      if (imageService.isGoogleDriveUrl(imageUrl)) {
-        const fileId = imageService.extractDriveFileId(imageUrl);
-        if (fileId) {
-          // Try multiple fallback formats in sequence
-          const fallbackUrls = [
-            `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`,
-            `https://drive.google.com/file/d/${fileId}/preview`,
-            `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`,
-            `https://drive.google.com/uc?export=view&id=${fileId}`
-          ];
-          
-          // Find the next URL to try (skip the one that just failed)
-          const currentUrl = profileImageUrl.value;
-          const currentIndex = fallbackUrls.findIndex(url => url === currentUrl);
-          const nextIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
-          
-          if (nextIndex < fallbackUrls.length) {
-            const nextUrl = fallbackUrls[nextIndex];
-            profileImageUrl.value = nextUrl;
-            return;
-          } else {
-            console.log(`[ProfileModal] All fallback URLs exhausted, using placeholder`);
-          }
-        }
-      }
-      
       profileImageUrl.value = '/placeholder-profile.jpg'
       imageLoading.value = false
     }
-
     const handleImageLoad = () => {
       imageLoading.value = false
     }
-
-    const isValidUrl = (url) => {
-      if (!url) return false;
-      try {
-        new URL(url);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    // Watch for modal visibility and profile changes
-    watch(() => [props.isVisible, props.profile?.id], ([isVisible, profileId]) => {
-      if (isVisible && profileId) {
-        // Reset state when modal opens
-        profileDetails.value = null
-        loadError.value = false
-        // Load profile details automatically
-        loadProfileDetails()
-        loadProfileImage()
-      }
-    }, { immediate: true })
-
+    const closeModal = () => {
+      emit('close')
+    }
     onMounted(() => {
       if (props.isVisible && props.profile?.id) {
         loadProfileDetails()
         loadProfileImage()
       }
     })
-
-    const closeModal = () => {
-      emit('close')
-    }
-
+    watch(() => [props.isVisible, props.profile?.id], ([isVisible, profileId]) => {
+      if (isVisible && profileId) {
+        profileDetails.value = null
+        loadError.value = false
+        loadProfileDetails()
+        loadProfileImage()
+      }
+    }, { immediate: true })
     return {
       profileImageUrl,
       imageLoading,
@@ -347,7 +258,11 @@ export default {
       loadingDetails,
       profileDetails,
       loadError,
-      isValidUrl
+      getRFReturnHistoryArray,
+      getGrantArray,
+      ProfileField,
+      RF_LOAN_FIELD,
+      GRANT_FIELD
     }
   }
 }

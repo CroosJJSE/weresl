@@ -6,7 +6,6 @@
             :src="logoUrl || '/placeholder-logo.png'" 
             alt="WERESL Logo" 
             class="logo" 
-            @click="handleLogoClick"
             @error="handleLogoError"
           />
         </div>
@@ -15,6 +14,18 @@
     <h1>WERESL Database</h1>
 
     <div class="profiles-view">
+      <!-- Search Bar -->
+      <div class="search-container">
+        <input 
+          v-model="searchQuery" 
+          @input="handleSearch"
+          type="text" 
+          placeholder="Search by name, NIC, or RegID..."
+          class="search-input"
+        />
+      </div>
+
+      <!-- Filters -->
       <div class="filters">
         <select v-model="filters.District" @change="loadProfiles">
           <option value="">All Districts</option>
@@ -27,7 +38,6 @@
           <option value="">All Types</option>
           <option value="RF">RF</option>
           <option value="GRANT">GRANT</option>
-          <option value="GIF">GIF</option>
         </select>
 
         <select v-model="filters.year" @change="loadProfiles">
@@ -48,7 +58,7 @@
 
       <div v-else class="profile-container">
         <ProfileCard
-          v-for="profile in profiles.filter(p => p && p.id)"
+          v-for="profile in filteredProfiles"
           :key="profile.id"
           :profile="profile"
           @open-modal="openProfileModal"
@@ -65,29 +75,7 @@
       @close="closeProfileModal"
     />
 
-    <!-- Developer Tools Modal -->
-    <div v-if="showDevTools" class="dev-tools-modal">
-      <div class="dev-tools-content">
-        <div class="dev-tools-header">
-          <h3>Developer Tools</h3>
-          <button @click="showDevTools = false" class="close-btn">&times;</button>
-        </div>
-        <div class="dev-tools-body">
-          <div class="raw-data">
-            <h4>Raw Firebase Data</h4>
-            <pre>{{ JSON.stringify(profiles, null, 2) }}</pre>
-          </div>
-          <div class="system-logs">
-            <h4>System Logs</h4>
-            <div v-for="log in systemLogs" :key="log.id" class="log-entry">
-              <span class="log-level">{{ log.level }}</span>
-              <span class="log-message">{{ log.details }}</span>
-              <span class="log-time">{{ formatDate(log.timestamp) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+
 
     <div class="footer">
       <p>WERESL Database Management System</p>
@@ -112,14 +100,13 @@ export default {
   },
   setup() {
     const profiles = ref([])
+    const filteredProfiles = ref([])
     const loading = ref(false)
     const error = ref(null)
     const showModal = ref(false)
     const selectedProfile = ref(null)
-    const showDevTools = ref(false)
-    const logoClickCount = ref(0)
-    const systemLogs = ref([])
     const logoUrl = ref(null)
+    const searchQuery = ref('')
 
     const loadLogo = async () => {
       try {
@@ -173,12 +160,37 @@ export default {
           return true
         })
         
+        // Apply search filter
+        applySearchFilter()
+        
       } catch (err) {
         console.error('[HomePage] Error loading profiles:', err);
         error.value = 'Failed to load profiles: ' + err.message
       } finally {
         loading.value = false
       }
+    }
+
+    const applySearchFilter = () => {
+      if (!searchQuery.value.trim()) {
+        filteredProfiles.value = profiles.value
+        return
+      }
+      
+      const query = searchQuery.value.toLowerCase().trim()
+      filteredProfiles.value = profiles.value.filter(profile => {
+        const name = profile.basicInfo?.name || ''
+        const nic = profile.basicInfo?.nic || ''
+        const regId = profile.id || ''
+        
+        return name.toLowerCase().includes(query) ||
+               nic.toLowerCase().includes(query) ||
+               regId.toLowerCase().includes(query)
+      })
+    }
+
+    const handleSearch = () => {
+      applySearchFilter()
     }
 
     const openProfileModal = (profile) => {
@@ -191,31 +203,6 @@ export default {
       selectedProfile.value = null
     }
 
-    const handleLogoClick = () => {
-      logoClickCount.value++
-      if (logoClickCount.value >= 3) {
-        showDevTools.value = true
-        logoClickCount.value = 0
-        loadSystemLogs()
-      }
-    }
-
-    const loadSystemLogs = async () => {
-      try {
-        // This would load actual system logs from Firebase
-        systemLogs.value = [
-          { id: 1, level: 'info', details: 'System initialized', timestamp: new Date() },
-          { id: 2, level: 'info', details: 'Profiles loaded', timestamp: new Date() }
-        ]
-      } catch (err) {
-        console.error('Error loading system logs:', err)
-      }
-    }
-
-    const formatDate = (date) => {
-      return new Date(date).toLocaleString()
-    }
-
     const handleLogoError = () => {
       logoUrl.value = '/placeholder-logo.png'
     }
@@ -223,14 +210,11 @@ export default {
     onMounted(() => {
       loadProfiles()
       loadLogo()
-      // Test image processing
-      imageService.testImageProcessing()
-      // Test specific problematic thumbnail URL
-      imageService.testThumbnailUrl()
     })
 
           return {
         profiles,
+        filteredProfiles,
         loading,
         error,
         filters,
@@ -238,17 +222,14 @@ export default {
         years,
         showModal,
         selectedProfile,
-        showDevTools,
-        systemLogs,
-        logoClickCount,
         logoUrl,
+        searchQuery,
         loadProfiles,
         loadLogo,
         openProfileModal,
         closeProfileModal,
-        handleLogoClick,
-        handleLogoError,
-        formatDate
+        handleSearch,
+        handleLogoError
       }
   }
 }
@@ -338,11 +319,31 @@ h1 {
   margin: 20px;
 }
 
+.search-container {
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  background-color: #fff;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1565c0;
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
+}
+
 .profile-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  padding: 20px 0;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 10px 0;
 }
 
 .footer {
@@ -390,8 +391,8 @@ h1 {
   }
   
   .profile-container {
-    grid-template-columns: 1fr;
-    gap: 15px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
     padding: 10px 0;
   }
   

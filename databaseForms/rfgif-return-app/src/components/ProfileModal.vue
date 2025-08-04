@@ -4,7 +4,7 @@
       <div class="close-button" @click="closeModal">&times;</div>
       
       <div class="modal-header">
-        <h2>{{ profile.basicInfo?.name || 'Unknown' }}</h2>
+        <h2>{{ profile[ProfileField.FULL_NAME] || 'Unknown' }}</h2>
         <div class="profile-types">
           <span 
             v-for="type in profileTypes" 
@@ -20,7 +20,7 @@
         <div class="profile-image-section">
           <img 
             :src="profileImageUrl" 
-            :alt="profile.basicInfo?.name || 'Profile Image'"
+            :alt="profile[ProfileField.FULL_NAME] || 'Profile Image'"
             @error="handleImageError"
             @load="handleImageLoad"
             class="profile-image"
@@ -31,28 +31,28 @@
           <h3>Basic Information</h3>
           <div class="info-grid">
             <div class="info-item">
-              <strong>RegID:</strong> {{ profile.id }}
+              <strong>RegID:</strong> {{ profile[ProfileField.REG_ID] }}
             </div>
             <div class="info-item">
-              <strong>Name:</strong> {{ profile.basicInfo?.name || 'N/A' }}
+              <strong>Name:</strong> {{ profile[ProfileField.FULL_NAME] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}
+              <strong>Age:</strong> {{ profile[ProfileField.YEAR_OF_BIRTH] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>District:</strong> {{ profile.basicInfo?.district || 'N/A' }}
+              <strong>District:</strong> {{ profile[ProfileField.DISTRICT] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Phone:</strong> {{ profile.basicInfo?.phone || 'N/A' }}
+              <strong>Phone:</strong> {{ profile[ProfileField.PHONE_NUMBER] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Address:</strong> {{ profile.basicInfo?.address || 'N/A' }}
+              <strong>Address:</strong> {{ profile[ProfileField.ADDRESS] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>NIC:</strong> {{ profile.basicInfo?.nic || 'N/A' }}
+              <strong>NIC:</strong> {{ profile[ProfileField.NIC] || 'N/A' }}
             </div>
             <div class="info-item">
-              <strong>Total Children:</strong> {{ profile.basicInfo?.totalChildren || 'N/A' }}
+              <strong>Total Children:</strong> {{ profile[ProfileField.TOTAL_CHILDREN] || 'N/A' }}
             </div>
           </div>
         </div>
@@ -152,6 +152,8 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
+import { ProfileField } from '../enums/db.js'
+import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
 
 export default {
   name: 'ProfileModal',
@@ -187,7 +189,7 @@ export default {
     }
 
     const handleImageError = (event) => {
-      console.log('Image failed to load for profile:', props.profile.id)
+      console.log('Image failed to load for profile:', props.profile[ProfileField.REG_ID])
       
       // Try next URL format if available
       if (currentUrlIndex.value < urlFormats.value.length - 1) {
@@ -213,27 +215,27 @@ export default {
         // Wait a bit to ensure props are properly set
         await new Promise(resolve => setTimeout(resolve, 0))
         
-        if (!props.profile || !props.profile.id) {
-          console.log('Profile or profile.id is null/undefined:', props.profile)
+        if (!props.profile || !props.profile[ProfileField.REG_ID]) {
+          console.log('Profile or profile.regId is null/undefined:', props.profile)
           profileImageUrl.value = '/placeholder-profile.jpg'
           return
         }
         
-        // Check if profile has an Image field with Google Drive URL
+        // Check if profile has profile image drive ID
         let fileId = null;
         
-        if (props.profile.Image) {
-          // Extract file ID from the Image URL (like the original system)
-          const match = props.profile.Image.match(/[-\w]{25,}/);
-          if (match) {
-            fileId = match[0];
-            console.log('Extracted file ID from Image URL:', fileId);
-          }
+        if (props.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID]) {
+          fileId = props.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID];
+          console.log('Using profile image drive ID:', fileId);
+        } else if (props.profile.Image) {
+          // Extract file ID from the Image URL (fallback for old data)
+          fileId = extractFileId(props.profile.Image);
+          console.log('Extracted file ID from Image URL:', fileId);
         }
         
-        // If no file ID from Image field, use placeholder
+        // If no file ID found, use placeholder
         if (!fileId) {
-          console.log('No Image URL found for profile:', props.profile.id);
+          console.log('No image found for profile:', props.profile[ProfileField.REG_ID]);
           profileImageUrl.value = '/placeholder-profile.jpg';
           return;
         }
@@ -246,7 +248,7 @@ export default {
           `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`
         ]
         
-        console.log('Generated URL formats for profile:', props.profile.id, urlFormats.value)
+        console.log('Generated URL formats for profile:', props.profile[ProfileField.REG_ID], urlFormats.value)
         
         // Start with the first URL format
         currentUrlIndex.value = 0
@@ -262,7 +264,7 @@ export default {
     })
 
     // Reload image when profile changes
-    watch(() => props.profile.id, () => {
+    watch(() => props.profile[ProfileField.REG_ID], () => {
       loadProfileImage()
     })
 
