@@ -8,6 +8,7 @@
   "form.searchExisting": "Search Existing Applicant",
   "form.enterRegID": "Enter RegID:",
   "form.search": "Search",
+  "form.searching": "Searching...",
   "form.foundApplicant": "Found existing applicant:",
   "form.noProfilePhoto": "No Profile Photo",
   "form.profileImage": "Profile Photo",

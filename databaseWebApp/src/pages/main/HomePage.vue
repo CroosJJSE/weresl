@@ -14,6 +14,19 @@
     <h1>WERESL Database</h1>
 
     <div class="profiles-view">
+      <!-- Action Bar -->
+      <div class="action-bar">
+        <div class="action-buttons">
+          <button 
+            class="btn btn-primary export-btn" 
+            @click="openPdfExportModal"
+          >
+            <i class="fas fa-file-pdf" style="margin-right: 8px;"></i>
+            Export to PDF
+          </button>
+        </div>
+      </div>
+
       <!-- Search Bar -->
       <div class="search-container">
         <input 
@@ -75,6 +88,11 @@
       @close="closeProfileModal"
     />
 
+    <!-- PDF Export Modal -->
+    <PdfExportModal
+      :is-visible="showPdfExportModal"
+      @close="closePdfExportModal"
+    />
 
 
     <div class="footer">
@@ -87,6 +105,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import ProfileCard from '@/components/ProfileCard.vue'
 import ProfileModal from '@/components/ProfileModal.vue'
+import PdfExportModal from '@/components/PdfExportModal.vue'
 
 import { profileService } from '@/services/profile.js'
 import { dbOperations } from '@/firebase/db.js'
@@ -96,7 +115,8 @@ export default {
   name: 'HomePage',
   components: {
     ProfileCard,
-    ProfileModal
+    ProfileModal,
+    PdfExportModal
   },
   setup() {
     const profiles = ref([])
@@ -107,6 +127,7 @@ export default {
     const selectedProfile = ref(null)
     const logoUrl = ref(null)
     const searchQuery = ref('')
+    const showPdfExportModal = ref(false)
 
     const loadLogo = async () => {
       try {
@@ -203,6 +224,14 @@ export default {
       selectedProfile.value = null
     }
 
+    const openPdfExportModal = () => {
+      showPdfExportModal.value = true
+    }
+
+    const closePdfExportModal = () => {
+      showPdfExportModal.value = false
+    }
+
     const handleLogoError = () => {
       logoUrl.value = '/placeholder-logo.png'
     }
@@ -229,7 +258,10 @@ export default {
         openProfileModal,
         closeProfileModal,
         handleSearch,
-        handleLogoError
+        handleLogoError,
+        showPdfExportModal,
+        openPdfExportModal,
+        closePdfExportModal
       }
   }
 }
@@ -276,6 +308,42 @@ h1 {
 .profiles-view {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.btn-primary {
+  background-color: #1565c0;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1976d2;
+}
+
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.5);
 }
 
 .filters {
@@ -341,9 +409,11 @@ h1 {
 
 .profile-container {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 10px 0;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  padding: 15px 0;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .footer {
@@ -391,8 +461,8 @@ h1 {
   }
   
   .profile-container {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
     padding: 10px 0;
   }
   
@@ -425,7 +495,8 @@ h1 {
   }
   
   .profile-container {
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
   }
 }
 </style> 

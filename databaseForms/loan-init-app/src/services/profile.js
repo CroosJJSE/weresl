@@ -1,5 +1,9 @@
 import { dbOperations } from '@/firebase/db.js'
 import { storageOperations } from '@/firebase/storage.js'
+import { sendLoanRequestEmail, addLoanInitiationRecord, logActivity } from '@/utils/gasUtils.js'
+import { generateLoanId } from '@/utils/dbUtils.js'
+import { LoanType } from '@/enums/loans.js'
+import { ProfileField } from '@/enums/db.js'
 
 export const profileService = {
   // Get all profiles with filtering
@@ -98,16 +102,78 @@ export const profileService = {
   },
 
   // Add loan to profile
-  async addLoan(Reg_ID, loanData, loanType = 'RF') {
+  async addLoan(Reg_ID, loanData, loanType = LoanType.REVOLVING_FUND) {
     try {
-      const loan = await dbOperations.addLoan(Reg_ID, loanData, loanType)
+      console.log('🔧 Starting loan addition for type:', loanType)
       
-      // Log operation
-      await dbOperations.logOperation('ADD_LOAN', {
+      // Validate loan type
+      if (!Object.values(LoanType).includes(loanType)) {
+        throw new Error(`Invalid loan type: ${loanType}. Must be one of: ${Object.values(LoanType).join(', ')}`)
+      }
+
+      // Generate loan ID if not provided
+      if (!loanData.loanId) {
+        console.log('🔧 Generating loan ID for type:', loanType)
+        loanData.loanId = await generateLoanId(Reg_ID, loanType)
+        console.log('✅ Generated loan ID:', loanData.loanId)
+      }
+
+      // Start the main loan creation - this is the critical path
+      const loanPromise = dbOperations.addLoan(Reg_ID, loanData, loanType)
+      
+      // Start getting profile data in parallel (needed for notifications)
+      const profilePromise = dbOperations.getProfileByRegId(Reg_ID)
+      
+      // Wait for both critical operations to complete
+      const [loan, profile] = await Promise.all([loanPromise, profilePromise])
+      
+      // Now run all the independent notification/logging tasks in parallel
+      if (profile) {
+        const notificationTasks = []
+        
+        // Email notification (independent task)
+        notificationTasks.push(
+          sendLoanRequestEmail(profile, { ...loanData, type: loanType })
+            .then(() => console.log('✅ Email notification sent for loan request'))
+            .catch(error => console.warn('⚠️ Email notification failed:', error.message))
+        )
+        
+        // Google Sheets update (independent task)
+        notificationTasks.push(
+          addLoanInitiationRecord({ ...loanData, type: loanType }, profile)
+            .then(() => console.log('✅ Loan initiation record added to Google Sheets'))
+            .catch(error => console.warn('⚠️ Google Sheets update failed:', error.message))
+        )
+        
+        // Activity logging (independent task)
+        notificationTasks.push(
+          logActivity('New loan request submitted', {
+            regId: Reg_ID,
+            loanType: loanType,
+            loanData: loanData,
+            profile: profile
+          })
+            .then(() => console.log('✅ Activity logged successfully'))
+            .catch(error => console.warn('⚠️ Activity logging failed:', error.message))
+        )
+        
+        // Run all notification tasks in parallel (don't wait for them)
+        Promise.allSettled(notificationTasks)
+          .then(results => {
+            const succeeded = results.filter(r => r.status === 'fulfilled').length
+            const failed = results.filter(r => r.status === 'rejected').length
+            console.log(`📊 Notification tasks completed: ${succeeded} succeeded, ${failed} failed`)
+          })
+      }
+      
+      // Log operation (independent task - don't wait for it)
+      dbOperations.logOperation('ADD_LOAN', {
         Reg_ID,
         loan,
         loanType
       })
+        .then(() => console.log('✅ Operation logged successfully'))
+        .catch(error => console.warn('⚠️ Operation logging failed:', error.message))
 
       return loan
     } catch (error) {
@@ -181,13 +247,13 @@ export const profileService = {
     const types = []
     
     // Check for RF loans (both new and old structure)
-    if (profile.loans?.some(loan => loan.type === 'RF') || profile.RF_Loan) {
-      types.push('RF')
+    if (profile.loans?.some(loan => loan.type === LoanType.REVOLVING_FUND) || profile.RF_Loan) {
+      types.push(LoanType.REVOLVING_FUND)
     }
     
     // Check for grants (both new and old structure)
     if (profile.grants?.length > 0 || profile.GRANT) {
-      types.push('GRANT')
+      types.push(LoanType.GRANT)
     }
     
     return types
@@ -236,8 +302,8 @@ export const profileService = {
   validateLoanData(loanData) {
     const errors = []
     
-    if (!loanData.type || !['RF', 'GRANT'].includes(loanData.type)) {
-      errors.push('Valid loan type is required (RF or GRANT)')
+    if (!loanData.type || !Object.values(LoanType).includes(loanData.type)) {
+      errors.push(`Valid loan type is required (${Object.values(LoanType).join(' or ')})`)
     }
     
     if (!loanData.amount || loanData.amount <= 0) {
@@ -259,15 +325,15 @@ export const profileService = {
       errors.push('RegID is required')
     }
     
-    if (!paymentData.type || !['RF', 'GRANT'].includes(paymentData.type)) {
-      errors.push('Valid payment type is required')
+    if (!paymentData.type || !Object.values(LoanType).includes(paymentData.type)) {
+      errors.push(`Valid payment type is required (${Object.values(LoanType).join(' or ')})`)
     }
     
-    if (paymentData.type === 'RF' && (!paymentData.amount || paymentData.amount <= 0)) {
+    if (paymentData.type === LoanType.REVOLVING_FUND && (!paymentData.amount || paymentData.amount <= 0)) {
       errors.push('Valid amount is required for RF payments')
     }
     
-    if (paymentData.type === 'GRANT' && !paymentData.details) {
+    if (paymentData.type === LoanType.GRANT && !paymentData.details) {
       errors.push('Details are required for GRANT payments')
     }
     

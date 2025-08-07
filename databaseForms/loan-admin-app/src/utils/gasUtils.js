@@ -14,6 +14,7 @@ import {
 } from '../enums/sheets.js'
 import { ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '../enums/db.js'
 import { convertGoogleDriveUrl } from './driveUtils.js'
+import { convertProfileToMainTabFormat } from './dbUtils.js'
 
 // GAS Web App URL - Update this with your actual GAS deployment URL
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzaXn7q0Ze-I-s8zw18RxFJxHuDxSrVFbq8WLiaZgRaHhn8aBvl4Nc55HsCJS-dfd3zzg/exec'
@@ -84,31 +85,38 @@ export const sendDataParcelToGAS = async (dataParcel) => {
 /**
  * Prepare main tab data from profile
  * @param {Object} profile - Profile data from Firestore
- * @returns {Object} Formatted data for Main tab
+ * @returns {Promise<Object>} Formatted data for Main tab
  */
-export const prepareMainTabData = (profile) => {
+export const prepareMainTabData = async (profile) => {
   try {
-    // Calculate age from year of birth
-    const currentYear = new Date().getFullYear()
-    const yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth
-    const age = yearOfBirth ? currentYear - yearOfBirth : 'N/A'
-
-    return {
-      [MAIN_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || '',
-      [MAIN_TAB_FIELDS.DISTRICT]: profile[ProfileField.DISTRICT] || profile.district || '',
-      [MAIN_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || '',
-      [MAIN_TAB_FIELDS.AGE]: age,
-      [MAIN_TAB_FIELDS.ADDRESS]: profile[ProfileField.ADDRESS] || profile.address || '',
-      [MAIN_TAB_FIELDS.NIC]: profile[ProfileField.NIC] || profile.nic || '',
-      [MAIN_TAB_FIELDS.CONTACT]: profile[ProfileField.PHONE_NUMBER] || profile.contact || '',
-      [MAIN_TAB_FIELDS.BACKGROUND_DESCRIPTION]: profile[ProfileField.DESCRIPTION] || profile.description || '',
-      [MAIN_TAB_FIELDS.OCCUPATION]: profile[ProfileField.OCCUPATION] || profile.occupation || '',
-      [MAIN_TAB_FIELDS.RF_LOAN]: 'Yes', // Placeholder - will be updated based on actual loans
-      [MAIN_TAB_FIELDS.GRANT]: 'No' // Placeholder - will be updated based on actual grants
+    // Use the new conversion function to get properly formatted data
+    const conversionResult = await convertProfileToMainTabFormat(profile)
+    
+    if (!conversionResult.success) {
+      return { success: false, message: conversionResult.message || 'Failed to convert profile data' }
     }
+
+    const convertedData = conversionResult.data
+
+    // Map the converted data to Main tab field names
+    const mainTabData = {
+      [MAIN_TAB_FIELDS.REG_ID]: convertedData[ProfileField.REG_ID] || '',
+      [MAIN_TAB_FIELDS.DISTRICT]: convertedData[ProfileField.DISTRICT] || '',
+      [MAIN_TAB_FIELDS.NAME]: convertedData[ProfileField.FULL_NAME] || '',
+      [MAIN_TAB_FIELDS.AGE]: convertedData.age || 'N/A',
+      [MAIN_TAB_FIELDS.ADDRESS]: convertedData[ProfileField.ADDRESS] || '',
+      [MAIN_TAB_FIELDS.NIC]: convertedData[ProfileField.NIC] || '',
+      [MAIN_TAB_FIELDS.CONTACT]: convertedData[ProfileField.PHONE_NUMBER] || '',
+      [MAIN_TAB_FIELDS.BACKGROUND_DESCRIPTION]: convertedData[ProfileField.DESCRIPTION] || '',
+      [MAIN_TAB_FIELDS.OCCUPATION]: convertedData[ProfileField.OCCUPATION] || '',
+      [MAIN_TAB_FIELDS.RF_LOAN]: convertedData.rfLoan || 'No',
+      [MAIN_TAB_FIELDS.GRANT]: convertedData.grant || 'No'
+    }
+
+    return { success: true, data: mainTabData }
   } catch (error) {
     console.error('Error preparing main tab data:', error)
-    throw error
+    return { success: false, message: 'Failed to prepare main tab data', error }
   }
 }
 
@@ -126,8 +134,8 @@ export const prepareRFReturnTabData = (paymentData, profile) => {
 
     return {
       [RF_RETURN_TAB_FIELDS.TIMESTAMP]: new Date().toISOString(),
-      [RF_RETURN_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || '',
-      [RF_RETURN_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || '',
+      [RF_RETURN_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || profile.Reg_ID || '',
+      [RF_RETURN_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || profile.Name || profile.name || '',
       [RF_RETURN_TAB_FIELDS.AMOUNT_DEPOSITED]: paymentData.amount || 0,
       [RF_RETURN_TAB_FIELDS.RECEIVER]: paymentData.receiver || 'Admin',
       [RF_RETURN_TAB_FIELDS.RECEIPT]: receiptUrl
@@ -148,20 +156,20 @@ export const prepareLoanInitiationTabData = (loanData, profile) => {
   try {
     // Calculate age from year of birth
     const currentYear = new Date().getFullYear()
-    const yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth
+    const yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth || profile.YearOfBirth
     const age = yearOfBirth ? currentYear - yearOfBirth : 'N/A'
 
     const preparedData = {
       [LOAN_INITIATION_TAB_FIELDS.TIMESTAMP]: new Date().toISOString(),
-      [LOAN_INITIATION_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || '',
-      [LOAN_INITIATION_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || '',
+      [LOAN_INITIATION_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || profile.Reg_ID || '',
+      [LOAN_INITIATION_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || profile.Name || profile.name || '',
       [LOAN_INITIATION_TAB_FIELDS.AGE]: age,
-      [LOAN_INITIATION_TAB_FIELDS.NIC]: profile[ProfileField.NIC] || profile.nic || '',
-      [LOAN_INITIATION_TAB_FIELDS.PHONE_NUMBER]: profile[ProfileField.PHONE_NUMBER] || profile.contact || '',
-      [LOAN_INITIATION_TAB_FIELDS.DISTRICT]: profile[ProfileField.DISTRICT] || profile.district || '',
-      [LOAN_INITIATION_TAB_FIELDS.ADDRESS]: profile[ProfileField.ADDRESS] || profile.address || '',
-      [LOAN_INITIATION_TAB_FIELDS.DESCRIPTION]: profile[ProfileField.DESCRIPTION] || profile.description || '',
-      [LOAN_INITIATION_TAB_FIELDS.INDUSTRY]: profile[ProfileField.OCCUPATION] || profile.occupation || '',
+      [LOAN_INITIATION_TAB_FIELDS.NIC]: profile[ProfileField.NIC] || profile.nic || profile.NIC || '',
+      [LOAN_INITIATION_TAB_FIELDS.PHONE_NUMBER]: profile[ProfileField.PHONE_NUMBER] || profile.phoneNumber || profile.contact || profile.phone || '',
+      [LOAN_INITIATION_TAB_FIELDS.DISTRICT]: profile[ProfileField.DISTRICT] || profile.district || profile.District || '',
+      [LOAN_INITIATION_TAB_FIELDS.ADDRESS]: profile[ProfileField.ADDRESS] || profile.address || profile.Address || '',
+      [LOAN_INITIATION_TAB_FIELDS.DESCRIPTION]: profile[ProfileField.DESCRIPTION] || profile.description || profile.Description || '',
+      [LOAN_INITIATION_TAB_FIELDS.INDUSTRY]: profile[ProfileField.OCCUPATION] || profile.occupation || profile.Occupation || '',
       [LOAN_INITIATION_TAB_FIELDS.LOAN_TYPE]: loanData.type || '',
       [LOAN_INITIATION_TAB_FIELDS.AMOUNT]: loanData.amount || 0,
       [LOAN_INITIATION_TAB_FIELDS.PURPOSE]: loanData.purpose || '',
@@ -183,14 +191,18 @@ export const prepareLoanInitiationTabData = (loanData, profile) => {
  */
 export const updateMainTabRow = async (profile) => {
   try {
-    const data = prepareMainTabData(profile)
+    const dataResult = await prepareMainTabData(profile)
+    
+    if (!dataResult.success) {
+      throw new Error(dataResult.message || 'Failed to prepare profile data')
+    }
     
     const dataParcel = {
       action: GAS_ACTION_TYPES.UPDATE_SHEET_ROW,
       tabName: SHEET_TABS.MAIN,
-      regId: profile[ProfileField.REG_ID],
-      data: data,
-      source: 'admin-profile-update'
+      regId: profile[ProfileField.REG_ID] || profile.regId || profile.id,
+      data: dataResult.data,
+      source: 'loan-admin-app'
     }
 
     return await sendDataParcelToGAS(dataParcel)
@@ -214,7 +226,7 @@ export const addRFReturnRecord = async (paymentData, profile) => {
     const dataParcel = {
       action: GAS_ACTION_TYPES.CREATE_SHEET_ROW,
       tabName: SHEET_TABS.RF_RETURN,
-      regId: profile[ProfileField.REG_ID],
+      regId: profile[ProfileField.REG_ID] || profile.regId || profile.Reg_ID || '',
       data: data,
       source: 'admin-payment-approval'
     }
@@ -240,7 +252,7 @@ export const addLoanInitiationRecord = async (loanData, profile) => {
     const dataParcel = {
       action: GAS_ACTION_TYPES.CREATE_SHEET_ROW,
       tabName: SHEET_TABS.LOAN_INITIATION,
-      regId: profile[ProfileField.REG_ID],
+      regId: profile[ProfileField.REG_ID] || profile.regId || profile.Reg_ID || '',
       data: data,
       source: 'admin-loan-approval'
     }

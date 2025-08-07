@@ -288,6 +288,8 @@ import {
 import { getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
 import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
 import { createTimestamp } from '../utils/regIdUtils.js'
+import { sendRepaymentRequestEmail, sendGIFReturnRequestEmail, logActivity } from '../utils/gasUtils.js'
+import { SuccessMessage, ErrorMessage, InfoMessage } from '../enums/messages.js'
 
 export default {
   name: 'RFGIFReturnForm',
@@ -536,7 +538,26 @@ export default {
         const gifReturnRef = doc(db, RootCollection.GIF_RETURN_RECORD, timestamp)
         await setDoc(gifReturnRef, gifReturnRecord)
 
-        successMessage.value = t('form.gifReturnRecordedSuccessfully')
+        // Send email notification
+        try {
+          await sendGIFReturnRequestEmail(currentProfile.value, {
+            description: gifData.description.trim()
+          })
+          
+          // Log activity
+          await logActivity('GIF_RETURN_REQUEST_SUBMITTED', {
+            regId: regId,
+            description: gifData.description.trim(),
+            timestamp: timestamp
+          })
+          
+          successMessage.value = SuccessMessage.REPAYMENT_REQUEST_SUBMITTED
+        } catch (emailError) {
+          console.error('Error sending email notification:', emailError)
+          // Still show success message even if email fails
+          successMessage.value = t('form.gifReturnRecordedSuccessfully')
+        }
+
         gifData.description = ''
         returnType.value = ''
       } catch (error) {
@@ -623,7 +644,28 @@ export default {
         const repaymentRef = doc(db, RootCollection.RF_RETURN_RECORD, timestamp)
         await setDoc(repaymentRef, repaymentRequest)
 
-        successMessage.value = t('form.repaymentRequestSubmitted')
+        // Send email notification
+        try {
+          await sendRepaymentRequestEmail(currentProfile.value, {
+            amount: repaymentAmount,
+            type: 'RF',
+            description: `RF Loan Repayment - ${repaymentAmount} LKR`
+          })
+          
+          // Log activity
+          await logActivity('RF_REPAYMENT_REQUEST_SUBMITTED', {
+            regId: regId,
+            amount: repaymentAmount,
+            timestamp: timestamp
+          })
+          
+          successMessage.value = SuccessMessage.REPAYMENT_REQUEST_SUBMITTED
+        } catch (emailError) {
+          console.error('Error sending email notification:', emailError)
+          // Still show success message even if email fails
+          successMessage.value = t('form.repaymentRequestSubmitted')
+        }
+
         rfData.amount = ''
         rfData.receiver = ''
         rfData.billFile = null

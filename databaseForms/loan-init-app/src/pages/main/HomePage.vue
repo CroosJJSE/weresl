@@ -89,6 +89,10 @@
           <button @click="showDevTools = false" class="close-btn">&times;</button>
         </div>
         <div class="dev-tools-body">
+          <div class="email-test-section">
+            <h4>Email Notification Test</h4>
+            <EmailTest />
+          </div>
           <div class="raw-data">
             <h4>Raw Firebase Data</h4>
             <pre>{{ JSON.stringify(profiles, null, 2) }}</pre>
@@ -116,6 +120,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import ProfileCard from '@/components/ProfileCard.vue'
 import ProfileModal from '@/components/ProfileModal.vue'
 import AnalyticsDashboard from '@/pages/analytics/AnalyticsDashboard.vue'
+import EmailTest from '@/components/EmailTest.vue'
 import { profileService } from '@/services/profile.js'
 import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
@@ -126,7 +131,8 @@ export default {
   components: {
     ProfileCard,
     ProfileModal,
-    AnalyticsDashboard
+    AnalyticsDashboard,
+    EmailTest
   },
   setup() {
     const currentView = ref('profiles')

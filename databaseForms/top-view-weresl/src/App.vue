@@ -3,7 +3,6 @@
     <!-- Header -->
     <div class="header">
       <h1 class="title">WERESL Links</h1>
-      <p class="subtitle">Access your project links</p>
     </div>
 
     <!-- Loading State -->
@@ -11,35 +10,21 @@
       Loading...
     </div>
 
-    <!-- Error Message -->
-    <div v-if="errorMessage" class="error-message">
-      {{ errorMessage }}
-    </div>
-
-    <!-- Success Message -->
-    <div v-if="successMessage" class="success-message">
-      {{ successMessage }}
-    </div>
-
     <!-- Links List -->
     <div v-if="!loading && links.length > 0" class="links-list">
       <div v-for="link in links" :key="link.id" class="link-item">
-        <div class="link-content">
-          <h3 class="link-title">{{ link.title }}</h3>
-          <p class="link-description">{{ link.description }}</p>
-        </div>
+        <h3 class="link-title">{{ link.title }}</h3>
+        <p class="link-description">{{ link.description }}</p>
         <div class="link-actions">
           <button 
             @click="copyLink(link.url)" 
             class="btn btn-copy"
-            title="Copy link"
           >
             Copy
           </button>
           <button 
             @click="openLink(link)" 
             class="btn btn-open"
-            title="Open link"
           >
             Open
           </button>
@@ -61,10 +46,14 @@
             type="password" 
             v-model="passwordInput" 
             class="form-control" 
+            :class="{ 'error': passwordError }"
             @keyup.enter="checkPassword"
             placeholder="Enter password"
             autofocus
           />
+          <div v-if="passwordError" class="error-message">
+            Incorrect password. Please try again.
+          </div>
         </div>
         <div class="modal-actions">
           <button @click="closePasswordModal" class="btn btn-secondary">
@@ -89,19 +78,17 @@ export default {
   setup() {
     const loading = ref(false)
     const links = ref([])
-    const errorMessage = ref('')
-    const successMessage = ref('')
     
     // Password modal state
     const showPasswordModal = ref(false)
     const passwordInput = ref('')
     const currentSecureLink = ref(null)
+    const passwordError = ref(false)
 
     // Load links from Firestore
     const loadLinks = async () => {
       try {
         loading.value = true
-        errorMessage.value = ''
         
         const linksQuery = collection(db, 'topview-links')
         const linksSnapshot = await getDocs(linksQuery)
@@ -112,9 +99,10 @@ export default {
         }))
         
         console.log('Loaded links:', links.value)
+        console.log('Links with secure property:', links.value.filter(link => link.secure))
+        console.log('Links without secure property:', links.value.filter(link => !link.secure))
       } catch (error) {
         console.error('Error loading links:', error)
-        errorMessage.value = 'Error loading links. Please try again later.'
       } finally {
         loading.value = false
       }
@@ -124,54 +112,65 @@ export default {
     const copyLink = async (url) => {
       try {
         await navigator.clipboard.writeText(url)
-        successMessage.value = 'Link copied to clipboard!'
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 3000)
       } catch (error) {
         console.error('Error copying link:', error)
-        errorMessage.value = 'Failed to copy link to clipboard.'
-        setTimeout(() => {
-          errorMessage.value = ''
-        }, 3000)
       }
     }
 
     // Open link (with password check if secure)
     const openLink = (link) => {
+      console.log('Opening link:', link)
+      console.log('Link secure status:', link.secure)
+      
       if (link.secure) {
+        console.log('Link is secure, showing password modal')
         currentSecureLink.value = link
         showPasswordModal.value = true
         passwordInput.value = ''
       } else {
+        console.log('Link is not secure, opening directly')
         window.open(link.url, '_blank', 'noopener,noreferrer')
       }
     }
 
     // Close password modal
     const closePasswordModal = () => {
+      console.log('Closing password modal')
       showPasswordModal.value = false
       currentSecureLink.value = null
       passwordInput.value = ''
+      passwordError.value = false
     }
 
     // Check password and access secure link
     const checkPassword = () => {
-      if (passwordInput.value === '1234') {
+      console.log('Checking password:', passwordInput.value)
+      console.log('Password length:', passwordInput.value.length)
+      console.log('Current secure link:', currentSecureLink.value)
+      
+      // Trim whitespace and check password
+      const trimmedPassword = passwordInput.value.trim()
+      console.log('Trimmed password:', trimmedPassword)
+      
+      if (trimmedPassword === '1234') {
+        console.log('Password correct, opening secure link')
+        passwordError.value = false
         if (currentSecureLink.value) {
+          console.log('Opening URL:', currentSecureLink.value.url)
           window.open(currentSecureLink.value.url, '_blank', 'noopener,noreferrer')
+        } else {
+          console.error('No current secure link found')
         }
         closePasswordModal()
-        successMessage.value = 'Access granted!'
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 3000)
       } else {
-        errorMessage.value = 'Incorrect password. Please try again.'
-        setTimeout(() => {
-          errorMessage.value = ''
-        }, 3000)
+        console.log('Password incorrect, clearing input')
+        console.log('Expected: 1234, Got:', trimmedPassword)
         passwordInput.value = ''
+        passwordError.value = true
+        // Clear error after 3 seconds
+        setTimeout(() => {
+          passwordError.value = false
+        }, 3000)
       }
     }
 
@@ -183,14 +182,13 @@ export default {
     return {
       loading,
       links,
-      errorMessage,
-      successMessage,
       showPasswordModal,
       passwordInput,
       copyLink,
       openLink,
       closePasswordModal,
-      checkPassword
+      checkPassword,
+      passwordError
     }
   }
 }

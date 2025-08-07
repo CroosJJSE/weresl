@@ -1,29 +1,34 @@
 <template>
   <div v-if="profile" class="profile-box" @click="openModal">
-    <img 
-      :src="profileImageUrl" 
-      :alt="profile.basicInfo?.name || 'Profile Image'"
-      @error="handleImageError"
-      @load="handleImageLoad"
-    />
-    
-    <div class="profile-header">
-      <h3>{{ profile.basicInfo?.name || 'Unknown' }}</h3>
-      <div class="profile-types">
-        <span 
-          v-for="type in profileTypes" 
-          :key="type"
-          :class="`profile-type ${type.toLowerCase()}-type`"
-        >
-          {{ type }}
-        </span>
-      </div>
+    <div class="profile-image-container">
+      <img 
+        :src="profileImageUrl" 
+        :alt="profile.basicInfo?.name || 'Profile Image'"
+        @error="handleImageError"
+        @load="handleImageLoad"
+        class="profile-image"
+      />
     </div>
     
-    <div class="profile-info">
-      <p><strong>District:</strong> {{ profile.basicInfo?.District || 'N/A' }}</p>
-      <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
-      <p><strong>Occupation:</strong> {{ profile.basicInfo?.occupation || 'N/A' }}</p>
+    <div class="profile-content">
+      <div class="profile-header">
+        <h3>{{ profile.basicInfo?.name || 'Unknown' }}</h3>
+        <div class="profile-types">
+          <span 
+            v-for="type in profileTypes" 
+            :key="type"
+            :class="`profile-type ${type.toLowerCase()}-type`"
+          >
+            {{ type }}
+          </span>
+        </div>
+      </div>
+      
+      <div class="profile-info">
+        <p><strong>District:</strong> {{ profile.basicInfo?.District || 'N/A' }}</p>
+        <p><strong>Age:</strong> {{ profile.basicInfo?.age || 'N/A' }}</p>
+        <p><strong>Occupation:</strong> {{ profile.basicInfo?.occupation || 'N/A' }}</p>
+      </div>
     </div>
   </div>
 </template>
@@ -165,60 +170,79 @@ export default {
 <style scoped>
 .profile-box {
   border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 12px;
+  padding: 0;
   width: 100%;
   text-align: left;
-  background-color: #f9f9f9;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .profile-box:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.profile-box img {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 8px;
-  margin-bottom: 8px;
+.profile-image-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
   background-color: #f5f5f5;
-  aspect-ratio: 1;
+}
+
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: #f5f5f5;
+}
+
+.profile-content {
+  padding: 8px;
+  flex-shrink: 0;
+  background-color: #ffffff;
 }
 
 .profile-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 10px;
-  gap: 10px;
+  margin-bottom: 6px;
+  gap: 6px;
 }
 
 .profile-header h3 {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #333;
   flex: 1;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-types {
   display: flex;
-  gap: 5px;
+  gap: 3px;
   flex-wrap: wrap;
 }
 
 .profile-type {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  line-height: 1;
 }
 
 .rf-type {
@@ -240,12 +264,16 @@ export default {
 }
 
 .profile-info {
-  font-size: 10px;
-  margin-bottom: 5px;
+  font-size: 9px;
+  margin-bottom: 0;
 }
 
 .profile-info p {
-  margin: 2px 0;
+  margin: 1px 0;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-info strong {
@@ -253,14 +281,14 @@ export default {
 }
 
 .profile-stats {
-  font-size: 13px;
+  font-size: 11px;
   color: #666;
   border-top: 1px solid #eee;
-  padding-top: 10px;
+  padding-top: 6px;
 }
 
 .profile-stats p {
-  margin: 3px 0;
+  margin: 2px 0;
 }
 
 .profile-stats strong {
@@ -270,65 +298,64 @@ export default {
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .profile-box {
-    padding: 12px;
+    border-radius: 10px;
   }
   
-  .profile-box img {
-    height: 150px;
+  .profile-content {
+    padding: 6px;
   }
   
   .profile-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .profile-header h3 {
-    font-size: 14px;
-  }
-  
-  .profile-types {
+    margin-bottom: 4px;
     gap: 4px;
   }
   
+  .profile-header h3 {
+    font-size: 10px;
+  }
+  
+  .profile-types {
+    gap: 2px;
+  }
+  
   .profile-type {
-    padding: 3px 6px;
-    font-size: 9px;
+    padding: 1px 3px;
+    font-size: 7px;
   }
   
   .profile-info {
-    font-size: 13px;
+    font-size: 8px;
   }
   
   .profile-stats {
-    font-size: 12px;
+    font-size: 9px;
   }
 }
 
 @media (max-width: 480px) {
   .profile-box {
-    padding: 10px;
+    border-radius: 8px;
   }
   
-  .profile-box img {
-    height: 120px;
+  .profile-content {
+    padding: 5px;
   }
   
   .profile-header h3 {
-    font-size: 13px;
+    font-size: 9px;
   }
   
   .profile-type {
-    padding: 2px 5px;
-    font-size: 8px;
+    padding: 1px 2px;
+    font-size: 6px;
   }
   
   .profile-info {
-    font-size: 12px;
+    font-size: 7px;
   }
   
   .profile-stats {
-    font-size: 11px;
+    font-size: 8px;
   }
 }
 </style> 

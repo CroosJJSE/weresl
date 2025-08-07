@@ -43,21 +43,84 @@ onMounted(() => {
 .language-toggle {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
+
 .lang-btn {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 4px;
-  background: #f0f0f0;
-  color: #333;
+  padding: 8px 16px;
+  border: 2px solid #1565c0;
+  border-radius: 8px;
+  background: #f5faff;
+  color: #1565c0;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .lang-btn.active {
   background: #1565c0;
   color: #fff;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.3);
+}
+
+.lang-btn:hover:not(.active) {
+  background: #e3f2fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.2);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .language-toggle {
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  
+  .lang-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 44px;
+    flex: 1;
+    min-width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .language-toggle {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .lang-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    min-height: 48px;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .lang-btn {
+    transition: none;
+  }
+  
+  .lang-btn:hover:not(.active) {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .lang-btn {
+    border: 2px solid currentColor;
+  }
 }
 </style> 

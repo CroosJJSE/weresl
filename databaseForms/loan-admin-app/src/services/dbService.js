@@ -38,6 +38,7 @@ import {
 import { convertGoogleDriveUrl, convertToHighQualityUrl } from '../utils/driveUtils.js'
 import { createTimestamp } from '../utils/regIdUtils.js'
 import { getDistrictName } from '../enums/districts.js'
+import { addLoanInitiationRecord, addRFReturnRecord } from '../utils/gasUtils.js'
 
 export const adminDbService = {
   // Get pending loans from SearchElements/pending-loan
@@ -242,6 +243,34 @@ export const adminDbService = {
       
       // Commit all changes
       await batch.commit()
+      
+      // 5. Send loan approval data to Google Sheets
+      try {
+        console.log('📊 Sending loan approval data to Google Sheets...')
+        
+        // Get profile data for Google Sheets
+        const profileResult = await getProfileByRegId(regId)
+        if (!profileResult.success) {
+          console.warn('⚠️ Could not get profile data for Google Sheets:', profileResult.message)
+        } else {
+          const profileData = profileResult.data
+          
+          // Prepare loan data for Google Sheets
+          const loanSheetData = {
+            type: loanType,
+            amount: loanAmount,
+            purpose: loanData.purpose || loanData.loanPurpose || '',
+            source: sourceAccount
+          }
+          
+          // Send to Google Sheets
+          const sheetResult = await addLoanInitiationRecord(loanSheetData, profileData)
+          console.log('✅ Loan approval data sent to Google Sheets:', sheetResult)
+        }
+      } catch (sheetError) {
+        console.error('❌ Error sending loan data to Google Sheets:', sheetError)
+        // Don't throw error - Google Sheets integration is not critical for loan approval
+      }
       
       console.log('✅ Loan approved successfully:', regId, loanId)
       console.log('💰 Reduced Rs.', loanAmount, 'from', sourceAccount)
@@ -530,6 +559,33 @@ export const adminDbService = {
       // Commit all changes
       await batch.commit()
       
+      // 6. Send payment approval data to Google Sheets
+      try {
+        console.log('📊 Sending payment approval data to Google Sheets...')
+        
+        // Get profile data for Google Sheets
+        const profileResult = await getProfileByRegId(paymentData.regId)
+        if (!profileResult.success) {
+          console.warn('⚠️ Could not get profile data for Google Sheets:', profileResult.message)
+        } else {
+          const profileData = profileResult.data
+          
+          // Prepare payment data for Google Sheets
+          const paymentSheetData = {
+            amount: paidAmount,
+            receiver: receiverAccount,
+            receiptDriveLinkId: paymentData.receiptDriveLinkId || paymentData.driveLink || ''
+          }
+          
+          // Send to Google Sheets
+          const sheetResult = await addRFReturnRecord(paymentSheetData, profileData)
+          console.log('✅ Payment approval data sent to Google Sheets:', sheetResult)
+        }
+      } catch (sheetError) {
+        console.error('❌ Error sending payment data to Google Sheets:', sheetError)
+        // Don't throw error - Google Sheets integration is not critical for payment approval
+      }
+      
       console.log('✅ Payment approved successfully. Remaining amount:', remainingAmount)
       console.log('💰 Added Rs.', paidAmount, 'to', receiverAccount)
       return { success: true }
@@ -553,16 +609,20 @@ export const adminDbService = {
   // Get all profiles (for search functionality)
   async getAllProfiles() {
     try {
+      console.log('🔄 Getting all profiles...')
       const profilesQuery = query(collection(db, RootCollection.PROFILES))
       const querySnapshot = await getDocs(profilesQuery)
       
-      return querySnapshot.docs.map(doc => ({
+      const profiles = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }))
+      
+      console.log(`✅ Found ${profiles.length} profiles`)
+      return { success: true, data: profiles }
     } catch (error) {
-      console.error('Error getting all profiles:', error)
-      throw error
+      console.error('❌ Error getting all profiles:', error)
+      return { success: false, message: 'Failed to get profiles', error }
     }
   },
 

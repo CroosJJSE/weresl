@@ -5,7 +5,7 @@
         <!-- Header -->
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-gray-900">
-            Loan Information - {{ document?.Name || 'Profile' }}
+            Loan Information - {{ document?.[ProfileField.FULL_NAME] || document?.fullName || document?.Name || 'Profile' }}
           </h3>
           <button
             @click="closeModal"
@@ -34,10 +34,10 @@
           <div class="bg-gray-50 p-4 rounded-lg">
             <h4 class="font-medium text-gray-900 mb-2">Profile Information</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div><span class="font-medium">Name:</span> {{ document?.Name || 'N/A' }}</div>
-              <div><span class="font-medium">Reg ID:</span> {{ document?.Reg_ID || 'N/A' }}</div>
-              <div><span class="font-medium">NIC:</span> {{ document?.NIC || 'N/A' }}</div>
-              <div><span class="font-medium">District:</span> {{ document?.District || 'N/A' }}</div>
+              <div><span class="font-medium">Name:</span> {{ document?.[ProfileField.FULL_NAME] || document?.fullName || document?.Name || 'N/A' }}</div>
+              <div><span class="font-medium">Reg ID:</span> {{ document?.[ProfileField.REG_ID] || document?.regId || document?.Reg_ID || 'N/A' }}</div>
+              <div><span class="font-medium">NIC:</span> {{ document?.[ProfileField.NIC] || document?.nic || document?.NIC || 'N/A' }}</div>
+              <div><span class="font-medium">District:</span> {{ document?.[ProfileField.DISTRICT] || document?.district || document?.District || 'N/A' }}</div>
             </div>
           </div>
 
@@ -48,16 +48,16 @@
             <div v-if="rfLoans.length > 0" class="space-y-3">
               <div v-for="loan in rfLoans" :key="loan.id" class="bg-white border border-gray-200 rounded-lg p-4">
                 <div class="flex justify-between items-start mb-3">
-                  <h5 class="font-medium text-gray-900">{{ loan.purpose || 'RF Loan' }}</h5>
+                  <h5 class="font-medium text-gray-900">{{ loan[RF_LOAN_FIELD.PURPOSE] || loan.purpose || 'RF Loan' }}</h5>
                   <div class="flex items-center gap-2">
                     <span :class="[
                       'px-2 py-1 rounded-full text-xs font-medium',
-                      loan.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                      loan[RF_LOAN_FIELD.STATUS] === 'active' || loan.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                     ]">
-                      {{ loan.status }}
+                      {{ loan[RF_LOAN_FIELD.STATUS] || loan.status }}
                     </span>
                     <button
-                      v-if="loan.status === 'active'"
+                      v-if="loan[RF_LOAN_FIELD.STATUS] === 'active' || loan.status === 'active'"
                       @click="editLoan(loan)"
                       class="text-primary-600 hover:text-primary-800 text-sm font-medium"
                     >
@@ -69,21 +69,21 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span class="font-medium text-gray-700">Initial Amount:</span>
-                    <div class="text-gray-900">LKR {{ formatCurrency(loan.amount) }}</div>
+                    <div class="text-gray-900">LKR {{ formatCurrency(loan[RF_LOAN_FIELD.AMOUNT] || loan.amount) }}</div>
                   </div>
                   <div>
                     <span class="font-medium text-gray-700">Current Balance:</span>
-                    <div class="text-gray-900">LKR {{ formatCurrency(loan.currentBalance) }}</div>
+                    <div class="text-gray-900">LKR {{ formatCurrency(loan[RF_LOAN_FIELD.CURRENT_BALANCE] || loan.currentBalance) }}</div>
                   </div>
                   <div>
                     <span class="font-medium text-gray-700">Initiation Date:</span>
-                    <div class="text-gray-900">{{ formatDate(loan.initiationDate) }}</div>
+                    <div class="text-gray-900">{{ formatDate(loan[RF_LOAN_FIELD.INITIATION_DATE] || loan.initiationDate) }}</div>
                   </div>
                 </div>
                 
-                <div v-if="loan.description" class="mt-3 pt-3 border-t border-gray-100">
+                <div v-if="loan[RF_LOAN_FIELD.PROJECT_DESCRIPTION] || loan.description" class="mt-3 pt-3 border-t border-gray-100">
                   <span class="font-medium text-gray-700">Description:</span>
-                  <div class="text-gray-900 mt-1">{{ loan.description }}</div>
+                  <div class="text-gray-900 mt-1">{{ loan[RF_LOAN_FIELD.PROJECT_DESCRIPTION] || loan.description }}</div>
                 </div>
               </div>
             </div>
@@ -100,16 +100,16 @@
             <div v-if="grantLoans.length > 0" class="space-y-3">
               <div v-for="loan in grantLoans" :key="loan.id" class="bg-white border border-gray-200 rounded-lg p-4">
                 <div class="flex justify-between items-start mb-3">
-                  <h5 class="font-medium text-gray-900">{{ loan.purpose || 'GRANT Loan' }}</h5>
+                  <h5 class="font-medium text-gray-900">{{ loan[GRANT_FIELD.PURPOSE] || loan.purpose || 'GRANT Loan' }}</h5>
                   <div class="flex items-center gap-2">
                     <span :class="[
                       'px-2 py-1 rounded-full text-xs font-medium',
-                      loan.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                      loan[GRANT_FIELD.STATUS] === 'active' || loan.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                     ]">
-                      {{ loan.status }}
+                      {{ loan[GRANT_FIELD.STATUS] || loan.status }}
                     </span>
                     <button
-                      v-if="loan.status === 'active'"
+                      v-if="loan[GRANT_FIELD.STATUS] === 'active' || loan.status === 'active'"
                       @click="editLoan(loan)"
                       class="text-primary-600 hover:text-primary-800 text-sm font-medium"
                     >
@@ -120,22 +120,22 @@
                 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span class="font-medium text-gray-700">Initial Amount:</span>
-                    <div class="text-gray-900">LKR {{ formatCurrency(loan.amount) }}</div>
+                    <span class="font-medium text-gray-700">Approved Amount:</span>
+                    <div class="text-gray-900">LKR {{ formatCurrency(loan[GRANT_FIELD.APPROVED_AMOUNT] || loan.amount) }}</div>
                   </div>
                   <div>
-                    <span class="font-medium text-gray-700">Current Balance:</span>
-                    <div class="text-gray-900">LKR {{ formatCurrency(loan.currentBalance) }}</div>
+                    <span class="font-medium text-gray-700">Requested Date:</span>
+                    <div class="text-gray-900">{{ formatDate(loan[GRANT_FIELD.REQUESTED_DATE] || loan.requestedDate) }}</div>
                   </div>
                   <div>
-                    <span class="font-medium text-gray-700">Initiation Date:</span>
-                    <div class="text-gray-900">{{ formatDate(loan.initiationDate) }}</div>
+                    <span class="font-medium text-gray-700">Approved Date:</span>
+                    <div class="text-gray-900">{{ formatDate(loan[GRANT_FIELD.APPROVED_AT] || loan.approvedAt) }}</div>
                   </div>
                 </div>
                 
-                <div v-if="loan.description" class="mt-3 pt-3 border-t border-gray-100">
+                <div v-if="loan[GRANT_FIELD.PROJECT_DESCRIPTION] || loan.description" class="mt-3 pt-3 border-t border-gray-100">
                   <span class="font-medium text-gray-700">Description:</span>
-                  <div class="text-gray-900 mt-1">{{ loan.description }}</div>
+                  <div class="text-gray-900 mt-1">{{ loan[GRANT_FIELD.PROJECT_DESCRIPTION] || loan.description }}</div>
                 </div>
               </div>
             </div>
@@ -184,7 +184,7 @@
           <!-- Header -->
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-medium text-gray-900">
-              Edit Loan - {{ editingLoan?.purpose || 'Loan' }}
+              Edit Loan - {{ editingLoan?.[RF_LOAN_FIELD.PURPOSE] || editingLoan?.[GRANT_FIELD.PURPOSE] || editingLoan?.purpose || 'Loan' }}
             </h3>
             <button
               @click="closeEditLoanModal"
@@ -209,53 +209,45 @@
 
           <!-- Edit Form -->
           <form v-else @submit.prevent="saveLoan" class="space-y-4">
-            <div class="grid grid-cols-1 gap-4">
-              <div>
-                <label for="loanAmount" class="block text-sm font-medium text-gray-700 mb-2">
-                  Initial Amount (LKR) *
-                </label>
-                <input
-                  id="loanAmount"
-                  v-model.number="editForm.amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input w-full text-base"
-                  :class="{ 'border-red-300': amountError }"
-                  required
-                  @input="validateAmount"
-                />
-                <p v-if="amountError" class="text-red-600 text-sm mt-1">{{ amountError }}</p>
-                <p class="text-gray-500 text-sm mt-1">
-                  Current Balance: LKR {{ formatCurrency(editingLoan?.currentBalance || 0) }}
-                </p>
-              </div>
+            <div>
+              <label for="amount" class="block text-sm font-medium text-gray-700 mb-2">
+                Amount (LKR)
+              </label>
+              <input
+                id="amount"
+                v-model.number="editForm.amount"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input w-full text-base"
+                required
+              />
+            </div>
 
-              <div>
-                <label for="loanDate" class="block text-sm font-medium text-gray-700 mb-2">
-                  Initiation Date *
-                </label>
-                <input
-                  id="loanDate"
-                  v-model="editForm.initiationDate"
-                  type="date"
-                  class="input w-full text-base"
-                  required
-                />
-              </div>
+            <div>
+              <label for="purpose" class="block text-sm font-medium text-gray-700 mb-2">
+                Purpose
+              </label>
+              <input
+                id="purpose"
+                v-model="editForm.purpose"
+                type="text"
+                class="input w-full text-base"
+                required
+              />
+            </div>
 
-              <div>
-                <label for="loanDescription" class="block text-sm font-medium text-gray-700 mb-2">
-                  Description (Optional)
-                </label>
-                <textarea
-                  id="loanDescription"
-                  v-model="editForm.description"
-                  rows="3"
-                  class="input w-full text-base"
-                  placeholder="Enter loan description..."
-                ></textarea>
-              </div>
+            <div>
+              <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                id="description"
+                v-model="editForm.description"
+                rows="3"
+                class="input w-full text-base"
+                placeholder="Enter loan description..."
+              ></textarea>
             </div>
 
             <!-- Success/Error Messages -->
@@ -264,7 +256,7 @@
             </div>
 
             <!-- Actions -->
-            <div class="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
+            <div class="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
                 @click="closeEditLoanModal"
@@ -276,7 +268,7 @@
               <button
                 type="submit"
                 class="btn btn-primary w-full sm:w-auto px-6 py-3 text-base"
-                :disabled="saving || amountError"
+                :disabled="saving"
               >
                 Save Changes
               </button>
@@ -290,6 +282,7 @@
 
 <script>
 import firestoreService from '../services/firestoreService.js';
+import { ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '../enums/db.js';
 
 export default {
   name: 'LoanModal',
@@ -313,18 +306,27 @@ export default {
       editingLoan: null,
       editForm: {
         amount: 0,
-        initiationDate: '',
+        purpose: '',
         description: ''
       },
-      amountError: '',
       message: '',
-      messageType: ''
+      messageType: '',
+      ProfileField,
+      RF_LOAN_FIELD,
+      GRANT_FIELD
     }
   },
   computed: {
     totalBalance() {
-      const allLoans = [...this.rfLoans, ...this.grantLoans];
-      return allLoans.reduce((sum, loan) => sum + (loan.currentBalance || 0), 0);
+      const rfBalance = this.rfLoans.reduce((sum, loan) => {
+        return sum + (loan[RF_LOAN_FIELD.CURRENT_BALANCE] || loan.currentBalance || 0);
+      }, 0);
+      
+      const grantBalance = this.grantLoans.reduce((sum, loan) => {
+        return sum + (loan[GRANT_FIELD.APPROVED_AMOUNT] || loan.amount || 0);
+      }, 0);
+      
+      return rfBalance + grantBalance;
     },
     messageClass() {
       return {
@@ -350,97 +352,64 @@ export default {
   },
   methods: {
     async loadLoans() {
-      if (!this.document?.Reg_ID) return;
+      if (!this.document) return;
       
       this.loading = true;
       try {
-        const loans = await firestoreService.getLoans(this.document.Reg_ID);
+        const loans = await firestoreService.getLoans(this.document.id);
         
-        // Separate RF and GRANT loans
-        this.rfLoans = loans
-          .filter(loan => loan.type === 'RF')
-          .sort((a, b) => {
-            const dateA = a.initiationDate?.toDate?.() || new Date(a.initiationDate);
-            const dateB = b.initiationDate?.toDate?.() || new Date(b.initiationDate);
-            return dateA - dateB;
-          });
-          
-        this.grantLoans = loans
-          .filter(loan => loan.type === 'GRANT')
-          .sort((a, b) => {
-            const dateA = a.initiationDate?.toDate?.() || new Date(a.initiationDate);
-            const dateB = b.initiationDate?.toDate?.() || new Date(b.initiationDate);
-            return dateA - dateB;
-          });
-          
-        console.log('Loans loaded:', { rfLoans: this.rfLoans, grantLoans: this.grantLoans });
+        this.rfLoans = loans.filter(loan => loan.type === 'RF');
+        this.grantLoans = loans.filter(loan => loan.type === 'GRANT');
+        
+        console.log('LoanModal: Loaded loans:', { rf: this.rfLoans.length, grant: this.grantLoans.length });
       } catch (error) {
-        console.error('Error loading loans:', error);
+        console.error('LoanModal: Error loading loans:', error);
       } finally {
         this.loading = false;
       }
     },
+    
     editLoan(loan) {
-      console.log('Editing loan:', loan);
+      console.log('LoanModal: Editing loan:', loan);
       this.editingLoan = loan;
       this.editForm = {
-        amount: loan.amount || 0,
-        initiationDate: this.formatDateForInput(loan.initiationDate),
-        description: loan.description || ''
+        amount: loan[RF_LOAN_FIELD.AMOUNT] || loan[GRANT_FIELD.APPROVED_AMOUNT] || loan.amount || 0,
+        purpose: loan[RF_LOAN_FIELD.PURPOSE] || loan[GRANT_FIELD.PURPOSE] || loan.purpose || '',
+        description: loan[RF_LOAN_FIELD.PROJECT_DESCRIPTION] || loan[GRANT_FIELD.PROJECT_DESCRIPTION] || loan.description || ''
       };
-      this.amountError = '';
-      this.message = '';
       this.showEditLoanModal = true;
-    },
-    closeEditLoanModal() {
-      this.showEditLoanModal = false;
-      this.editingLoan = null;
-      this.editForm = {
-        amount: 0,
-        initiationDate: '',
-        description: ''
-      };
-      this.amountError = '';
       this.message = '';
     },
-    validateAmount() {
-      const currentBalance = this.editingLoan?.currentBalance || 0;
-      const newAmount = parseFloat(this.editForm.amount);
-      
-      if (newAmount < currentBalance) {
-        this.amountError = `New amount (LKR ${this.formatCurrency(newAmount)}) cannot be less than current balance (LKR ${this.formatCurrency(currentBalance)})`;
-        return false;
-      } else {
-        this.amountError = '';
-        return true;
-      }
-    },
+    
     async saveLoan() {
-      if (!this.validateAmount()) {
-        return;
-      }
+      if (!this.editingLoan) return;
       
       this.saving = true;
       this.message = '';
       
       try {
         const updateData = {
-          amount: parseFloat(this.editForm.amount),
-          initiationDate: new Date(this.editForm.initiationDate),
-          description: this.editForm.description.trim() || null
+          amount: this.editForm.amount,
+          purpose: this.editForm.purpose,
+          description: this.editForm.description
         };
         
-        await firestoreService.updateLoan(
-          this.document.Reg_ID,
-          this.editingLoan.id,
-          this.editingLoan.type,
-          updateData
-        );
+        // Determine loan type and use appropriate field names
+        const loanType = this.editingLoan.type || 'RF';
+        const fieldMapping = loanType === 'RF' ? RF_LOAN_FIELD : GRANT_FIELD;
+        
+        const mappedUpdateData = {
+          [fieldMapping.AMOUNT]: this.editForm.amount,
+          [fieldMapping.PURPOSE]: this.editForm.purpose,
+          [fieldMapping.PROJECT_DESCRIPTION]: this.editForm.description
+        };
+        
+        await firestoreService.updateLoan(this.document.id, this.editingLoan.id, loanType, mappedUpdateData);
         
         this.message = 'Loan updated successfully!';
         this.messageType = 'success';
         
-        // Reload loans to get updated data
+        // Reload loans
         await this.loadLoans();
         
         // Close modal after a short delay
@@ -449,16 +418,29 @@ export default {
         }, 1500);
         
       } catch (error) {
-        console.error('Error updating loan:', error);
+        console.error('LoanModal: Error updating loan:', error);
         this.message = error.message || 'Error updating loan. Please try again.';
         this.messageType = 'error';
       } finally {
         this.saving = false;
       }
     },
+    
+    closeEditLoanModal() {
+      this.showEditLoanModal = false;
+      this.editingLoan = null;
+      this.editForm = {
+        amount: 0,
+        purpose: '',
+        description: ''
+      };
+      this.message = '';
+    },
+    
     closeModal() {
       this.$emit('close');
     },
+    
     formatCurrency(amount) {
       if (!amount) return '0.00';
       return parseFloat(amount).toLocaleString('en-US', {
@@ -466,19 +448,16 @@ export default {
         maximumFractionDigits: 2
       });
     },
+    
     formatDate(timestamp) {
       if (!timestamp) return 'N/A';
+      
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
       });
-    },
-    formatDateForInput(timestamp) {
-      if (!timestamp) return '';
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toISOString().split('T')[0];
     }
   }
 }

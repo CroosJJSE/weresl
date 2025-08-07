@@ -19,10 +19,12 @@
         <div class="registration-choice">
           <p>{{ t('form.registrationQuestion') }}</p>
           <div class="choice-buttons">
-            <button @click="setRegistrationStatus('existing')" class="btn btn-primary">
+            <button @click="setRegistrationStatus('existing')" class="btn btn-primary" :disabled="loading">
+              <span v-if="loading" class="loading-spinner"></span>
               {{ t('form.registration.existing') }}
             </button>
-            <button @click="setRegistrationStatus('new')" class="btn btn-secondary">
+            <button @click="setRegistrationStatus('new')" class="btn btn-secondary" :disabled="loading">
+              <span v-if="loading" class="loading-spinner"></span>
               {{ t('form.registration.new') }}
             </button>
           </div>
@@ -42,8 +44,12 @@
                 v-model="regidSearch" 
                 :placeholder="t('form.enterRegID')"
                 class="form-control"
+                :disabled="searching"
               />
-              <button @click="searchRegID" class="btn btn-primary">{{ t('form.search') }}</button>
+              <button @click="searchRegID" class="btn btn-primary" :disabled="searching || !regidSearch.trim()">
+                <span v-if="searching" class="loading-spinner"></span>
+                {{ searching ? t('form.searching') : t('form.search') }}
+              </button>
             </div>
           </div>
           
@@ -71,17 +77,26 @@
                   <strong>⚠️ Pending Loan:</strong> This user has a pending loan request
                 </p>
               </div>
-              <button @click="useExistingProfile" class="btn btn-primary">{{ t('form.useThisProfile') }}</button>
+              <button @click="useExistingProfile" class="btn btn-primary" :disabled="loading">
+                <span v-if="loading" class="loading-spinner"></span>
+                {{ t('form.useThisProfile') }}
+              </button>
             </div>
             <div v-else class="alert alert-warning">
               {{ t('form.noProfileFound') }}
-              <button @click="setRegistrationStatus('new')" class="btn btn-secondary">{{ t('form.registerNew') }}</button>
+              <button @click="setRegistrationStatus('new')" class="btn btn-secondary" :disabled="loading">
+                <span v-if="loading" class="loading-spinner"></span>
+                {{ t('form.registerNew') }}
+              </button>
             </div>
           </div>
           
           <!-- Back Button -->
           <div class="back-button-container">
-            <button @click="goBack" class="btn btn-secondary">{{ t('form.backToRegistration') }}</button>
+            <button @click="goBack" class="btn btn-secondary" :disabled="loading">
+              <span v-if="loading" class="loading-spinner"></span>
+              {{ t('form.backToRegistration') }}
+            </button>
           </div>
         </div>
       </div>
@@ -111,6 +126,7 @@
               @change="handleImageUpload" 
               accept="image/*"
               class="form-control"
+              :disabled="imageUploading"
               required
             />
             <small class="file-size-limit">{{ t('form.maxFileSize') }}: 10MB</small>
@@ -216,8 +232,6 @@
         </div>
       </div>
 
-
-
       <!-- Loan Details Section -->
       <div class="section" v-if="registrationStatus === 'new' || useExisting">
         <h2>{{ t('form.loanDetails') }}</h2>
@@ -275,8 +289,6 @@
             :placeholder="t('form.projectDescriptionPlaceholder')"
           ></textarea>
         </div>
-
-
       </div>
 
       <!-- Submit Section -->
@@ -288,8 +300,14 @@
             <span v-else-if="loading">{{ t('form.submitting') }}</span>
             <span v-else>{{ t('form.submit') }}</span>
           </button>
-          <button @click="resetForm" class="btn btn-secondary" :disabled="loading || imageUploading">{{ t('form.reset') }}</button>
-          <button @click="goToHome" class="btn btn-outline">{{ t('form.backToHome') }}</button>
+          <button @click="resetForm" class="btn btn-secondary" :disabled="loading || imageUploading">
+            <span v-if="loading || imageUploading" class="loading-spinner"></span>
+            {{ t('form.reset') }}
+          </button>
+          <button @click="goToHome" class="btn btn-outline" :disabled="loading || imageUploading">
+            <span v-if="loading || imageUploading" class="loading-spinner"></span>
+            {{ t('form.backToHome') }}
+          </button>
         </div>
       </div>
 
@@ -326,6 +344,7 @@ const db = getFirestore();
 
 const loading = ref(false)
 const imageUploading = ref(false)
+const searching = ref(false)
 const message = ref('')
 const messageType = ref('')
 const regidSearch = ref('')
@@ -426,7 +445,7 @@ const searchRegID = async () => {
     return
   }
 
-  loading.value = true
+  searching.value = true
   try {
     
     // Use centralized utility to get profile
@@ -454,7 +473,7 @@ const searchRegID = async () => {
   } catch (error) {
     showMessage('Error searching for profile: ' + error.message, 'error')
   } finally {
-    loading.value = false
+    searching.value = false
   }
 }
 
@@ -794,6 +813,7 @@ const goToHome = () => {
 .form-header h2 {
   color: #1565c0;
   margin-bottom: 10px;
+  font-size: 1.5rem;
 }
 
 .form-header p {
@@ -803,8 +823,8 @@ const goToHome = () => {
 
 .form-container {
   background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   padding: 30px;
 }
 
@@ -812,13 +832,15 @@ h1 {
   text-align: center;
   color: #1565c0;
   margin-bottom: 30px;
+  font-size: 1.8rem;
 }
 
 .section {
   margin-bottom: 30px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 12px;
+  background: #fafafa;
 }
 
 .section h2 {
@@ -826,38 +848,49 @@ h1 {
   margin-bottom: 20px;
   border-bottom: 2px solid #1565c0;
   padding-bottom: 10px;
+  font-size: 1.3rem;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr; /* Changed to 3 columns */
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-weight: 500;
   color: #333;
+  font-size: 14px;
 }
 
 .form-control {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
   font-size: 14px;
+  transition: all 0.3s ease;
+  background-color: #fff;
 }
 
 .form-control:focus {
   outline: none;
   border-color: #1565c0;
-  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
+  transform: translateY(-1px);
+}
+
+.form-control:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .error-message {
@@ -876,11 +909,13 @@ h1 {
 
 .form-control.error {
   border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
 }
 
 .search-container {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  align-items: flex-end;
 }
 
 .search-container .form-control {
@@ -888,40 +923,39 @@ h1 {
 }
 
 .search-result {
-  margin-top: 15px;
+  margin-top: 20px;
 }
 
 .alert {
-  padding: 15px;
-  border-radius: 5px;
+  padding: 16px 20px;
+  border-radius: 8px;
   margin-bottom: 20px;
+  border-left: 4px solid;
+  font-weight: 500;
 }
 
 .alert-success {
-  background-color: #4caf50;
-  color: #fff;
-  border: 1px solid #388e3c;
-  font-weight: bold;
-  font-size: 16px;
-  text-align: center;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-left-color: #4caf50;
 }
 
 .alert-error {
   background-color: #ffebee;
   color: #c62828;
-  border: 1px solid #ffcdd2;
+  border-left-color: #f44336;
 }
 
 .alert-warning {
   background-color: #fff3e0;
   color: #f57c00;
-  border: 1px solid #ffcc02;
+  border-left-color: #ff9800;
 }
 
 .alert-info {
   background-color: #e3f2fd;
   color: #1565c0;
-  border: 1px solid #bbdefb;
+  border-left-color: #2196f3;
 }
 
 .image-preview {
@@ -931,7 +965,7 @@ h1 {
 .image-preview img {
   max-width: 200px;
   max-height: 200px;
-  border-radius: 5px;
+  border-radius: 8px;
 }
 
 .profile-image-section {
@@ -947,6 +981,7 @@ h1 {
   border-radius: 50%;
   overflow: hidden;
   background-color: #f8f9fa;
+  margin-bottom: 16px;
 }
 
 .profile-image {
@@ -972,79 +1007,111 @@ h1 {
   text-align: left;
 }
 
-
-
 .form-actions {
   display: flex;
   gap: 15px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 24px;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  min-height: 44px;
+  position: relative;
+  overflow: hidden;
 }
 
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 .btn-primary {
   background-color: #1565c0;
   color: white;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.2);
 }
 
 .btn-primary:hover:not(:disabled) {
   background-color: #0d47a1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
 }
 
 .btn-secondary {
   background-color: #6c757d;
   color: white;
+  box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background-color: #545b62;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
 }
 
 .btn-danger {
   background-color: #dc3545;
   color: white;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 2px solid #1565c0;
+  color: #1565c0;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.1);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: #e3f2fd;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.2);
 }
 
 .profile-info p {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  line-height: 1.4;
 }
 
 .registration-choice {
   text-align: center;
-  padding: 20px;
+  padding: 24px;
   background-color: #f0f7ff;
   border: 1px solid #cce5ff;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 20px;
 }
 
 .registration-choice p {
   font-size: 18px;
   color: #333;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  font-weight: 500;
 }
 
 .choice-buttons {
   display: flex;
   gap: 15px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .language-toggle {
@@ -1052,10 +1119,14 @@ h1 {
   justify-content: center;
   margin: 24px 0 16px 0;
 }
+
 .language-toggle .lang-toggle {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
+
 .language-toggle .lang-toggle button {
   font-size: 1.5rem;
   padding: 18px 48px;
@@ -1068,23 +1139,26 @@ h1 {
   transition: background 0.2s, color 0.2s;
   min-width: 120px;
 }
-.language-toggle .lang-toggle button.active, .language-toggle .lang-toggle button:focus {
+
+.language-toggle .lang-toggle button.active, 
+.language-toggle .lang-toggle button:focus {
   background: #1565c0;
   color: #fff;
 }
+
 .language-toggle .lang-toggle button:hover:not(.active) {
   background: #e3f2fd;
 }
 
 .pending-loan-warning {
-  color: #f57c00; /* Orange color for warning */
+  color: #f57c00;
   font-size: 14px;
   font-weight: bold;
   margin-top: 10px;
-  padding: 5px 10px;
-  background-color: #fffbe6; /* Light yellow background */
-  border: 1px solid #ffe58f; /* Light orange border */
-  border-radius: 5px;
+  padding: 8px 12px;
+  background-color: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
   text-align: center;
 }
 
@@ -1092,11 +1166,11 @@ h1 {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: #fff;
   animation: spin 1s linear infinite;
-  margin-right: 10px;
+  flex-shrink: 0;
 }
 
 @keyframes spin {
@@ -1105,42 +1179,197 @@ h1 {
   }
 }
 
-.btn-outline {
-  background-color: transparent;
-  border: 1px solid #1565c0;
-  color: #1565c0;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background-color: #e3f2fd;
-}
-
+/* Enhanced mobile responsiveness */
 @media (max-width: 768px) {
+  .loan-init-form {
+    padding: 16px;
+  }
+  
+  .form-container {
+    padding: 20px;
+    margin: 0 8px;
+  }
+  
+  .section {
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  
   .form-row {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
   
   .search-container {
     flex-direction: column;
+    gap: 12px;
+  }
+  
+  .search-container .form-control {
+    width: 100%;
   }
   
   .form-actions {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   
   .form-actions .btn {
     width: 100%;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
   }
   
   .choice-buttons {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   
   .choice-buttons .btn {
     width: 100%;
+  }
+  
+  .language-toggle .lang-toggle {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .language-toggle .lang-toggle button {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 1.2rem;
+  }
+  
+  .profile-image-container {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .form-header h2 {
+    font-size: 1.3rem;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+  
+  .section h2 {
+    font-size: 1.2rem;
+  }
+  
+  .registration-choice {
+    padding: 20px;
+  }
+  
+  .registration-choice p {
+    font-size: 16px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .loan-init-form {
+    padding: 12px;
+  }
+  
+  .form-container {
+    padding: 16px;
+    margin: 0 4px;
+  }
+  
+  .section {
+    padding: 16px;
+  }
+  
+  .btn {
+    padding: 16px 20px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+  
+  .form-control {
+    padding: 16px;
+    font-size: 16px;
+  }
+  
+  .profile-image-container {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .form-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  h1 {
+    font-size: 1.3rem;
+  }
+  
+  .section h2 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  
+  .form-actions {
+    gap: 20px;
+  }
+  
+  .choice-buttons {
+    gap: 20px;
+  }
+}
+
+/* Large screen enhancements */
+@media (min-width: 1025px) {
+  .btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+  
+  .form-control:focus {
+    transform: translateY(-2px);
+  }
+  
+  .section:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .form-control,
+  .loading-spinner {
+    transition: none;
+    animation: none;
+  }
+  
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
+  
+  .form-control:focus {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn {
+    border: 2px solid currentColor;
+  }
+  
+  .form-control {
+    border: 2px solid currentColor;
+  }
+  
+  .section {
+    border: 2px solid currentColor;
   }
 }
 </style> 

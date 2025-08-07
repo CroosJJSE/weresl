@@ -14,6 +14,13 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase-config.js';
+import { 
+  RootCollection, 
+  ProfileField, 
+  SearchElementDoc,
+  RF_LOAN_FIELD,
+  GRANT_FIELD
+} from '../enums/db.js';
 
 export class FirestoreService {
   constructor() {
@@ -27,10 +34,10 @@ export class FirestoreService {
 
       // For profiles, order by Reg_ID instead of createdAt
       let q;
-      if (collectionName === 'profiles') {
+      if (collectionName === RootCollection.PROFILES) {
         q = query(
           collection(this.db, collectionName),
-          orderBy('Reg_ID', 'asc'),
+          orderBy(ProfileField.REG_ID, 'asc'),
           limit(limitCount)
         );
       } else {
@@ -51,7 +58,7 @@ export class FirestoreService {
         if (lastDocSnap.exists()) {
           q = query(
             collection(this.db, collectionName),
-            orderBy('Reg_ID', 'asc'),
+            orderBy(ProfileField.REG_ID, 'asc'),
             startAfter(lastDocSnap),
             limit(limitCount)
           );
@@ -94,7 +101,7 @@ export class FirestoreService {
 
       // Get RF_Loans from subcollection
       try {
-        const rfQuery = query(collection(this.db, 'profiles', profileId, 'RF_Loans'));
+        const rfQuery = query(collection(this.db, RootCollection.PROFILES, profileId, ProfileField.RF_LOANS));
         const rfSnapshot = await getDocs(rfQuery);
         rfSnapshot.docs.forEach(doc => {
           loans.push({ id: doc.id, ...doc.data(), type: 'RF' });
@@ -106,7 +113,7 @@ export class FirestoreService {
 
       // Get GRANT loans from subcollection
       try {
-        const grantQuery = query(collection(this.db, 'profiles', profileId, 'GRANT'));
+        const grantQuery = query(collection(this.db, RootCollection.PROFILES, profileId, ProfileField.GRANT));
         const grantSnapshot = await getDocs(grantQuery);
         grantSnapshot.docs.forEach(doc => {
           loans.push({ id: doc.id, ...doc.data(), type: 'GRANT' });
@@ -138,8 +145,8 @@ export class FirestoreService {
       console.log('FirestoreService: Update data:', updateData);
 
       // Determine the subcollection path based on loan type
-      const subcollectionPath = loanType === 'RF' ? 'RF_Loans' : 'GRANT';
-      const loanRef = doc(this.db, 'profiles', profileId, subcollectionPath, loanId);
+      const subcollectionPath = loanType === 'RF' ? ProfileField.RF_LOANS : ProfileField.GRANT;
+      const loanRef = doc(this.db, RootCollection.PROFILES, profileId, subcollectionPath, loanId);
 
       // Get the current loan data to validate
       const currentLoan = await getDoc(loanRef);
@@ -181,7 +188,7 @@ export class FirestoreService {
   }
 
   // Search documents by multiple fields with improved logic
-  async searchDocuments(collectionName, searchTerm, searchFields = ['Name', 'NIC', 'Reg_ID', 'contact']) {
+  async searchDocuments(collectionName, searchTerm, searchFields = [ProfileField.FULL_NAME, ProfileField.NIC, ProfileField.REG_ID, ProfileField.PHONE_NUMBER]) {
     try {
       console.log('FirestoreService: Searching for:', searchTerm, 'in fields:', searchFields);
 
@@ -197,7 +204,7 @@ export class FirestoreService {
       // Get more documents for better search coverage
       const q = query(
         collection(this.db, collectionName),
-        orderBy('Reg_ID', 'asc'),
+        orderBy(ProfileField.REG_ID, 'asc'),
         limit(500) // Increased limit for better search coverage
       );
 
@@ -243,31 +250,31 @@ export class FirestoreService {
       const docRef = doc(this.db, collectionName, documentId);
 
       // If this is a profile update and NIC is being changed
-      if (collectionName === 'profiles' && updateData.NIC) {
+      if (collectionName === RootCollection.PROFILES && updateData[ProfileField.NIC]) {
         // Check if this is a new NIC being added
-        const existingNic = await this.getDocumentField(collectionName, documentId, 'NIC');
+        const existingNic = await this.getDocumentField(collectionName, documentId, ProfileField.NIC);
         if (!existingNic || existingNic.trim() === '') {
           // This is a new NIC being added, check if it already exists
-          const nicExists = await this.checkNicExists(updateData.NIC);
+          const nicExists = await this.checkNicExists(updateData[ProfileField.NIC]);
           if (nicExists) {
-            throw new Error(`NIC ${updateData.NIC} already exists in the system`);
+            throw new Error(`NIC ${updateData[ProfileField.NIC]} already exists in the system`);
           }
         }
 
         // Add NIC to SearchElements mapping
-        await this.updateSearchElementsNIC(updateData.NIC, documentId);
+        await this.updateSearchElementsNIC(updateData[ProfileField.NIC], documentId);
       }
 
       // If district is being changed, generate new Reg_ID and update document ID
-      if (collectionName === 'profiles' && updateData.District) {
+      if (collectionName === RootCollection.PROFILES && updateData[ProfileField.DISTRICT]) {
         // Get the current district to compare
-        const currentDistrict = await this.getDocumentField(collectionName, documentId, 'District');
+        const currentDistrict = await this.getDocumentField(collectionName, documentId, ProfileField.DISTRICT);
         
         // Only regenerate Reg_ID if district actually changed
-        if (currentDistrict !== updateData.District) {
-          console.log('FirestoreService: District changed from', currentDistrict, 'to', updateData.District);
-          const newRegId = await this.generateNewRegId(updateData.District);
-          updateData.Reg_ID = newRegId;
+        if (currentDistrict !== updateData[ProfileField.DISTRICT]) {
+          console.log('FirestoreService: District changed from', currentDistrict, 'to', updateData[ProfileField.DISTRICT]);
+          const newRegId = await this.generateNewRegId(updateData[ProfileField.DISTRICT]);
+          updateData[ProfileField.REG_ID] = newRegId;
           console.log('FirestoreService: Generated new Reg_ID:', newRegId);
 
           // Get the current document data
@@ -280,16 +287,16 @@ export class FirestoreService {
             await setDoc(newDocRef, {
               ...currentData,
               ...updateData,
-              Reg_ID: newRegId,
-              lastUpdated: new Date()
+              [ProfileField.REG_ID]: newRegId,
+              [ProfileField.LAST_UPDATED]: new Date()
             });
 
             // Delete the old document
             await this.deleteDocument(collectionName, documentId);
 
             // Update SearchElements with new Reg_ID
-            if (updateData.NIC) {
-              await this.updateSearchElementsNIC(updateData.NIC, newRegId);
+            if (updateData[ProfileField.NIC]) {
+              await this.updateSearchElementsNIC(updateData[ProfileField.NIC], newRegId);
             }
 
             console.log('FirestoreService: Document ID updated from', documentId, 'to', newRegId);
@@ -303,7 +310,7 @@ export class FirestoreService {
       // Regular update (no district change)
       await updateDoc(docRef, {
         ...updateData,
-        lastUpdated: new Date()
+        [ProfileField.LAST_UPDATED]: new Date()
       });
 
       console.log('FirestoreService: Document updated successfully');
@@ -332,7 +339,7 @@ export class FirestoreService {
     try {
       console.log('FirestoreService: Updating SearchElements NIC mapping:', nic, '->', regId);
 
-      const searchElementsRef = doc(this.db, 'config', 'SearchElements');
+      const searchElementsRef = doc(this.db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA);
       const searchElementsDoc = await getDoc(searchElementsRef);
 
       let nicData = {};
@@ -366,8 +373,8 @@ export class FirestoreService {
 
       // Get all existing Reg_IDs for this district
       const q = query(
-        collection(this.db, 'profiles'),
-        where('District', '==', district)
+        collection(this.db, RootCollection.PROFILES),
+        where(ProfileField.DISTRICT, '==', district)
       );
 
       const querySnapshot = await getDocs(q);
@@ -375,7 +382,7 @@ export class FirestoreService {
 
       querySnapshot.forEach(doc => {
         const data = doc.data();
-        const regId = data.Reg_ID;
+        const regId = data[ProfileField.REG_ID];
         if (regId && regId.startsWith(districtCode)) {
           existingRegIds.push(regId);
         }
@@ -411,8 +418,8 @@ export class FirestoreService {
 
       // Get all existing Reg_IDs for this district
       const q = query(
-        collection(this.db, 'profiles'),
-        where('District', '==', district)
+        collection(this.db, RootCollection.PROFILES),
+        where(ProfileField.DISTRICT, '==', district)
       );
 
       const querySnapshot = await getDocs(q);
@@ -420,7 +427,7 @@ export class FirestoreService {
 
       querySnapshot.forEach(doc => {
         const data = doc.data();
-        const regId = data.Reg_ID;
+        const regId = data[ProfileField.REG_ID];
         if (regId && regId.startsWith(districtCode)) {
           existingRegIds.push(regId);
         }
@@ -453,7 +460,7 @@ export class FirestoreService {
     try {
       console.log('FirestoreService: Checking if NIC exists:', nic);
 
-      const searchElementsRef = doc(this.db, 'config', 'SearchElements');
+      const searchElementsRef = doc(this.db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA);
       const searchElementsDoc = await getDoc(searchElementsRef);
 
       if (searchElementsDoc.exists()) {
@@ -490,7 +497,7 @@ export class FirestoreService {
   // Get available collections (this would need to be implemented based on your needs)
   async getCollections() {
     // For now, return only profiles collection
-    return ['profiles'];
+    return [RootCollection.PROFILES];
   }
 
   // Get districts list

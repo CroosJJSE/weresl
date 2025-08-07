@@ -129,7 +129,7 @@ export const dbOperations = {
       } else if (loanType === 'GRANT' || loanData.type === 'GRANT') {
         collectionName = ProfileField.GRANT
       } else {
-        throw new Error('Invalid loan type. Only RF and GRANT are supported.')
+        throw new Error(`Invalid loan type: ${loanType}. Only RF and GRANT are supported.`)
       }
       
       console.log('📁 Using collection:', collectionName)
@@ -143,6 +143,7 @@ export const dbOperations = {
       const loanDocument = {
         ...loanData,
         regId: regId,
+        loanType: loanType, // Add loan type to document
         createdAt: serverTimestamp(),
         lastUpdated: serverTimestamp()
       }

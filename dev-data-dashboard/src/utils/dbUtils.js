@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { getFirestore } from 'firebase/firestore'
-import firebaseConfig from '../../firebase-config.js'
+import firebaseConfig from '../firebase-config.js'
 import { initializeApp } from 'firebase/app'
 
 // Initialize Firebase

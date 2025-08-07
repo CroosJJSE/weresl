@@ -38,6 +38,24 @@
           <div class="stat-label">Bank Account</div>
         </div>
       </div>
+      <div class="stat-card" @click="startGoogleSheetsUpdate" :class="{ active: isUpdatingSheets }">
+        <div class="stat-content">
+          <div v-if="!isUpdatingSheets" class="stat-value">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14,2 14,8 20,8"></polyline>
+            </svg>
+          </div>
+          <div v-else class="stat-value">
+            <div class="progress-spinner">
+              <div class="spinner-ring"></div>
+            </div>
+          </div>
+          <div class="stat-label">Sheets</div>
+          <div v-if="isUpdatingSheets" class="stat-subtitle">{{ sheetsProgress.status }}</div>
+          <div v-else class="stat-subtitle">Click to update all profiles</div>
+        </div>
+      </div>
     </div>
 
     <!-- Pending Loan Approvals Tab -->
@@ -651,7 +669,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { adminDbService } from '../services/dbService.js'
 import { convertGoogleDriveUrl } from '../utils/driveUtils.js'
 import { RF_RETURN_RECORD_FIELD, GIF_RETURN_RECORD_FIELD, ProfileField, RootCollection } from '../enums/db.js'
-import { addLoanInitiationRecord, addRFReturnRecord, logActivity } from '../utils/gasUtils.js'
+import { updateMainTabRow } from '../utils/gasUtils.js'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
 
@@ -678,6 +696,14 @@ export default {
     const savingPayment = ref(false)
     const savingGIFReturn = ref(false)
     const availableSources = ref([])
+
+    // Sheets Update
+    const isUpdatingSheets = ref(false)
+    const sheetsProgress = ref({
+      current: 0,
+      total: 0,
+      status: 'Ready'
+    })
 
     // Bank Account Management
     const showBankAccountModal = ref(false)
@@ -761,6 +787,96 @@ export default {
         console.log('✅ Loaded sources:', availableSources.value)
       } catch (error) {
         console.error('❌ Error loading sources:', error)
+      }
+    }
+
+    // Sheets Update Functions
+    const startGoogleSheetsUpdate = async () => {
+      if (isUpdatingSheets.value) {
+        showSuccessMessage('Sheets update already in progress', 'warning')
+        return
+      }
+
+      try {
+        isUpdatingSheets.value = true
+        sheetsProgress.value = {
+          current: 0,
+          total: 0,
+          status: '🔄 Loading profiles...'
+        }
+
+        console.log('🔄 Starting Sheets update...')
+        
+        // Get all profiles
+        const profilesResult = await adminDbService.getAllProfiles()
+        if (!profilesResult.success) {
+          throw new Error('Failed to load profiles')
+        }
+
+        const profiles = profilesResult.data
+        if (!profiles || profiles.length === 0) {
+          showSuccessMessage('No profiles found to update', 'warning')
+          return
+        }
+
+        sheetsProgress.value.total = profiles.length
+        sheetsProgress.value.status = `📊 Found ${profiles.length} profiles to update...`
+
+        let totalCompleted = 0
+        let totalFailed = 0
+        const batchSize = 5 // Process 5 profiles at a time
+        const totalBatches = Math.ceil(profiles.length / batchSize)
+
+        for (let batchNumber = 1; batchNumber <= totalBatches; batchNumber++) {
+          const startIndex = (batchNumber - 1) * batchSize
+          const endIndex = Math.min(startIndex + batchSize, profiles.length)
+          const batch = profiles.slice(startIndex, endIndex)
+
+          sheetsProgress.value.status = `⚡ Processing batch ${batchNumber}/${totalBatches} (${totalCompleted + totalFailed}/${profiles.length} completed)...`
+
+          // Process batch in parallel
+          const batchPromises = batch.map(async (profile, index) => {
+            const currentIndex = startIndex + index + 1
+            const profileId = profile[ProfileField.REG_ID] || profile.regId || profile.id
+
+            sheetsProgress.value.status = `📝 Processing ${profileId} (${currentIndex}/${profiles.length})...`
+
+            try {
+              // Update Sheets using the existing updateMainTabRow function
+              await updateMainTabRow(profile)
+              totalCompleted++
+              console.log(`✅ Updated Sheets for profile ${profileId}`)
+            } catch (error) {
+              totalFailed++
+              console.error(`❌ Failed to update Sheets for profile ${profileId}:`, error)
+            }
+          })
+
+          await Promise.all(batchPromises)
+        }
+
+        // Update final status
+        sheetsProgress.value.current = totalCompleted
+        sheetsProgress.value.status = `✅ Completed ${totalCompleted}/${profiles.length} profiles (${totalFailed} failed)`
+
+        // Show final result
+        if (totalFailed === 0) {
+          sheetsProgress.value.status = `🎉 Successfully updated ${totalCompleted} profiles!`
+          showSuccessMessage(`✅ Successfully updated Sheets with ${totalCompleted} profiles!`)
+        } else {
+          sheetsProgress.value.status = `⚠️ Updated ${totalCompleted} profiles, ${totalFailed} failed`
+          showSuccessMessage(`⚠️ Updated ${totalCompleted} profiles, ${totalFailed} failed. Check console for details.`, 'warning')
+        }
+
+        console.log(`🎉 Sheets update completed: ${totalCompleted}/${profiles.length} profiles updated`)
+
+      } catch (error) {
+        console.error('❌ Error during Sheets update:', error)
+        sheetsProgress.value.status = `❌ Update failed: ${error.message}`
+        showSuccessMessage(`❌ Sheets update failed: ${error.message}`, 'error')
+      } finally {
+        isUpdatingSheets.value = false
+        sheetsProgress.value.status = 'Ready'
       }
     }
 
@@ -956,7 +1072,7 @@ export default {
       }
     }
 
-    // Approve loan
+    // Approve loan (removed Sheets integration)
     const approveLoan = async (regId, loanId) => {
       try {
         const uniqueId = `${regId}_${loanId}`
@@ -967,54 +1083,6 @@ export default {
         console.log('🔍 DEBUG: Found loan object:', loan)
         if (loan) {
           await adminDbService.approveLoan(regId, loan.loanType, loan.loanId)
-          
-          // Add loan initiation record to Google Sheet
-          try {
-            // Get the current loan data from database to ensure we have the latest source
-            const collectionName = loan.loanType === 'RF' ? ProfileField.RF_LOANS : ProfileField.GRANT
-            const loanRef = doc(db, RootCollection.PROFILES, regId, collectionName, loan.loanId)
-            const loanDoc = await getDoc(loanRef)
-            const currentLoanData = loanDoc.exists() ? loanDoc.data() : {}
-            
-            const loanData = {
-              type: loan.loanType,
-              amount: loan.amount,
-              purpose: loan.purpose,
-              source: currentLoanData.source || currentLoanData.loanSource || loan.source || 'Admin Approval'
-            }
-            
-            console.log('🔍 DEBUG: Loan data being sent to GAS:', loanData)
-            console.log('🔍 DEBUG: Current loan data from DB:', currentLoanData)
-            console.log('🔍 DEBUG: Source value:', currentLoanData.source || currentLoanData.loanSource || loan.source || 'Admin Approval')
-            
-            const profile = {
-              [ProfileField.REG_ID]: loan.regId,
-              [ProfileField.FULL_NAME]: loan.name,
-              [ProfileField.DISTRICT]: loan.district,
-              [ProfileField.NIC]: loan.nic,
-              [ProfileField.PHONE_NUMBER]: loan.contact,
-              [ProfileField.ADDRESS]: loan.address,
-              [ProfileField.DESCRIPTION]: loan.description,
-              [ProfileField.OCCUPATION]: loan.occupation,
-              [ProfileField.YEAR_OF_BIRTH]: loan.yearOfBirth
-            }
-            
-            await addLoanInitiationRecord(loanData, profile)
-            console.log('✅ Loan initiation record added to Google Sheet')
-            
-            // Log activity
-            await logActivity('Loan Approved', {
-              regId: loan.regId,
-              loanId: loan.loanId,
-              loanType: loan.loanType,
-              amount: loan.amount,
-              approvedBy: 'Admin'
-            })
-            
-          } catch (gasError) {
-            console.error('❌ Error updating Google Sheet:', gasError)
-            // Don't fail the approval if GAS fails
-          }
           
           await loadPendingLoans()
           
@@ -1029,7 +1097,12 @@ export default {
         }
       } catch (error) {
         console.error('❌ Error approving loan:', error)
-        showSuccessMessage('Error approving loan. Please try again.', 'error')
+        // Show specific error message for insufficient balance
+        if (error.message && error.message.includes('Insufficient balance')) {
+          showSuccessMessage(error.message, 'error')
+        } else {
+          showSuccessMessage('Error approving loan. Please try again.', 'error')
+        }
       } finally {
         const uniqueId = `${regId}_${loanId}`
         approvingLoans.value = approvingLoans.value.filter(id => id !== uniqueId)
@@ -1080,62 +1153,13 @@ export default {
       }
     }
 
-    // Approve payment
+    // Approve payment (removed Sheets integration)
     const approvePayment = async (paymentId) => {
       try {
         console.log('🔄 Approving payment:', paymentId)
         approvingPayments.value.push(paymentId)
         
-        // Get payment data before approval
-        const payment = pendingPayments.value.find(p => p.id === paymentId)
-        
         await adminDbService.approvePayment(paymentId)
-        
-        // Add RF return record to Google Sheet
-        if (payment) {
-          try {
-            // Get full profile data to ensure we have all required fields
-            const fullProfile = await adminDbService.getProfileByRegId(payment.regId)
-            
-            const paymentData = {
-              amount: payment.paidAmount || payment.amount,
-              receiver: payment.receiver || 'Admin',
-              receiptDriveLinkId: payment.driveLink || ''
-            }
-            
-            console.log('🔍 DEBUG: Original payment object:', payment)
-            console.log('🔍 DEBUG: Payment data being sent to GAS:', paymentData)
-            console.log('🔍 DEBUG: Full profile data from DB:', fullProfile)
-            
-            const profile = {
-              [ProfileField.REG_ID]: payment.regId,
-              [ProfileField.FULL_NAME]: payment.name,
-              [ProfileField.DISTRICT]: payment.district,
-              [ProfileField.NIC]: fullProfile?.nic || fullProfile?.NIC || '',
-              [ProfileField.PHONE_NUMBER]: payment.contact,
-              [ProfileField.ADDRESS]: fullProfile?.address || fullProfile?.Address || '',
-              [ProfileField.DESCRIPTION]: fullProfile?.description || fullProfile?.Description || '',
-              [ProfileField.OCCUPATION]: fullProfile?.occupation || fullProfile?.Occupation || '',
-              [ProfileField.YEAR_OF_BIRTH]: fullProfile?.yearOfBirth || fullProfile?.yearOfBirth || ''
-            }
-            
-            await addRFReturnRecord(paymentData, profile)
-            console.log('✅ RF return record added to Google Sheet')
-            
-            // Log activity
-            await logActivity('Payment Approved', {
-              regId: payment.regId,
-              paymentId: paymentId,
-              amount: payment.paidAmount || payment.amount,
-              receiver: payment.receiver || 'Admin',
-              approvedBy: 'Admin'
-            })
-            
-          } catch (gasError) {
-            console.error('❌ Error updating Google Sheet:', gasError)
-            // Don't fail the approval if GAS fails
-          }
-        }
         
         await loadPendingPayments()
         
@@ -1583,7 +1607,11 @@ export default {
       getTransactionSender, // Added getTransactionSender to return
       getTransactionReceiver, // Added getTransactionReceiver to return
       getTransactionTypeClass, // Added getTransactionTypeClass to return
-      transactionFilter // Added transactionFilter to return
+      transactionFilter, // Added transactionFilter to return
+      // Sheets Update
+      isUpdatingSheets,
+      sheetsProgress,
+      startGoogleSheetsUpdate
     }
   }
 }
@@ -1629,7 +1657,7 @@ export default {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 30px;
 }
@@ -1655,6 +1683,19 @@ export default {
 .stat-card.active {
   border-color: #1565c0;
   background-color: #e3f2fd;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  50% {
+    box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
+  }
+  100% {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
 }
 
 .stat-icon {
@@ -1662,10 +1703,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 24px;
+}
+
+.stat-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
   color: #1565c0;
 }
@@ -1673,6 +1722,81 @@ export default {
 .stat-label {
   color: #666;
   font-size: 0.9rem;
+}
+
+.stat-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  animation: fadeInOut 2s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Enhanced stat card for Sheets */
+.stat-card.active {
+  border-color: #1565c0;
+  background-color: #e3f2fd;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  50% {
+    box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
+  }
+  100% {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+}
+
+.stat-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  animation: fadeInOut 2s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Enhanced loading animation for active state */
+.stat-card.active .stat-value {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
 }
 
 /* Tab Styles */
@@ -2044,13 +2168,15 @@ export default {
   }
   
   .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
   
   .stat-card {
     padding: 15px;
     text-align: center;
+    flex-direction: column;
+    gap: 10px;
   }
   
   .stat-value {
@@ -2059,6 +2185,10 @@ export default {
   
   .stat-label {
     font-size: 0.8rem;
+  }
+  
+  .stat-subtitle {
+    font-size: 0.7rem;
   }
   
   .tab-container {
@@ -2413,5 +2543,30 @@ select.form-control {
 select.form-control option {
   padding: 4px 8px;
   font-size: 0.85rem;
+}
+
+/* Progress Spinner */
+.progress-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.spinner-ring {
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(21, 101, 192, 0.2);
+  border-radius: 50%;
+  border-top-color: #1565c0;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style> 

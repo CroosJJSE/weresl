@@ -154,8 +154,8 @@
             <label for="loanType">Loan Type</label>
             <select id="loanType" v-model="formData.loanType" required>
               <option value="">Select Loan Type</option>
-              <option value="RF">RF</option>
-              <option value="GRANT">GRANT</option>
+              <option :value="LoanType.REVOLVING_FUND">RF (Revolving Fund)</option>
+              <option :value="LoanType.GRANT">GRANT</option>
             </select>
           </div>
           <div class="form-group">
@@ -226,6 +226,9 @@
 
     <div v-if="success" class="success-message">
       {{ success }}
+      <div v-if="emailStatus" style="margin-top: 10px; font-size: 14px;">
+        📧 Email Status: {{ emailStatus }}
+      </div>
     </div>
   </div>
 </template>
@@ -233,6 +236,7 @@
 <script>
 import { ref, reactive } from 'vue'
 import { profileService } from '@/services/profile.js'
+import { LoanType } from '@/enums/loans.js'
 
 export default {
   Name: 'LoanInitForm',
@@ -240,6 +244,7 @@ export default {
     const loading = ref(false)
     const error = ref(null)
     const success = ref(null)
+    const emailStatus = ref(null)
     const imagePreview = ref(null)
 
     const districts = [
@@ -316,6 +321,7 @@ export default {
     const handleSubmit = async () => {
       error.value = null
       success.value = null
+      emailStatus.value = null
       
       const validationErrors = validateForm()
       if (validationErrors.length > 0) {
@@ -324,6 +330,7 @@ export default {
       }
 
       loading.value = true
+      console.log('🔄 Starting loan submission...')
 
       try {
         const loanData = {
@@ -334,11 +341,17 @@ export default {
           date: new Date()
         }
 
+        console.log('📋 Loan data prepared:', loanData)
+
         if (formData.registered === 'Yes') {
+          console.log('📝 Adding loan to existing profile:', formData.Reg_ID)
           // Add loan to existing profile
-          await profileService.addLoan(formData.Reg_ID, loanData)
+          const result = await profileService.addLoan(formData.Reg_ID, loanData, formData.loanType)
+          console.log('✅ Loan added successfully:', result)
           success.value = `Loan added successfully to profile ${formData.Reg_ID}`
+          emailStatus.value = 'Email notification sent to admin'
         } else {
+          console.log('📝 Creating new profile with loan')
           // Check if NIC already exists
           const allProfiles = await profileService.getProfiles();
           const nicExists = allProfiles.some(
@@ -357,39 +370,55 @@ export default {
           }
           
           const Reg_ID = await profileService.createProfile(profileData)
+          console.log('✅ New profile created successfully:', Reg_ID)
           success.value = `New profile created successfully with RegID: ${Reg_ID}`
+          emailStatus.value = 'Email notification sent to admin'
         }
 
+        // Reset form after successful submission
+        console.log('🔄 Resetting form...')
         resetForm()
+        console.log('✅ Form reset completed')
       } catch (err) {
+        console.error('❌ Error in handleSubmit:', err)
         error.value = 'Failed to process loan: ' + err.message
       } finally {
         loading.value = false
+        console.log('✅ Loading state reset to false')
       }
     }
 
     const resetForm = () => {
-      Object.keys(formData).forEach(key => {
-        if (key === 'basicInfo') {
-          Object.keys(formData.basicInfo).forEach(basicKey => {
-            formData.basicInfo[basicKey] = ''
-          })
-        } else {
-          formData[key] = ''
-        }
-      })
-      imagePreview.value = null
-      error.value = null
-      success.value = null
+      try {
+        console.log('🔄 Resetting form...')
+        Object.keys(formData).forEach(key => {
+          if (key === 'basicInfo') {
+            Object.keys(formData.basicInfo).forEach(basicKey => {
+              formData.basicInfo[basicKey] = ''
+            })
+          } else {
+            formData[key] = ''
+          }
+        })
+        imagePreview.value = null
+        error.value = null
+        success.value = null
+        emailStatus.value = null
+        console.log('✅ Form reset completed')
+      } catch (resetError) {
+        console.error('❌ Error resetting form:', resetError)
+      }
     }
 
     return {
       loading,
       error,
       success,
+      emailStatus,
       districts,
       formData,
       imagePreview,
+      LoanType,
       handleImageUpload,
       handleSubmit,
       resetForm

@@ -18,6 +18,7 @@
       :search-term="searchTerm"
       @edit-document="openEditModal"
       @view-loans="openLoanModal"
+      @update-profile-image="handleProfileImageUpdate"
     />
 
     <!-- Load More Button and Page Info -->
@@ -80,6 +81,7 @@ import DataTable from '../components/DataTable.vue';
 import EditModal from '../components/EditModal.vue';
 import LoanModal from '../components/LoanModal.vue';
 import firestoreService from '../services/firestoreService.js';
+import { RootCollection, ProfileField } from '../enums/db.js';
 
 export default {
   name: 'Dashboard',
@@ -96,7 +98,7 @@ export default {
       loadingMore: false,
       searchTerm: '',
       selectedDistrict: '',
-      currentCollection: 'profiles',
+      currentCollection: RootCollection.PROFILES,
       showEditModal: false,
       showLoanModal: false,
       selectedDocument: null,
@@ -183,7 +185,7 @@ export default {
           // Filter by district if selected
           if (selectedDistrict) {
             filteredDocuments = filteredDocuments.filter(doc => 
-              doc.District === selectedDistrict
+              doc[ProfileField.DISTRICT] === selectedDistrict
             );
             console.log('Filtered by district:', selectedDistrict, 'results:', filteredDocuments.length);
           }
@@ -191,7 +193,7 @@ export default {
           // Filter by search term if provided
           if (searchTerm.trim()) {
             const searchLower = searchTerm.toLowerCase();
-            const searchFields = ['Name', 'NIC', 'Reg_ID', 'contact'];
+            const searchFields = [ProfileField.FULL_NAME, ProfileField.NIC, ProfileField.REG_ID, ProfileField.PHONE_NUMBER];
             
             filteredDocuments = filteredDocuments.filter(doc => {
               return searchFields.some(field => {
@@ -253,6 +255,42 @@ export default {
       
       // Reload documents to ensure we have the latest data
       await this.loadDocuments();
+    },
+
+    async handleProfileImageUpdate(updateData) {
+      console.log('Profile image update received:', updateData);
+      
+      try {
+        // Update the document in Firestore
+        const { documentId, imageDriveId, driveUrl } = updateData;
+        
+        // Find the document in the local array
+        const documentIndex = this.documents.findIndex(doc => doc.id === documentId);
+        if (documentIndex !== -1) {
+          // Update the local document with the new image drive ID
+          this.documents[documentIndex] = {
+            ...this.documents[documentIndex],
+            [ProfileField.PROFILE_IMAGE_DRIVE_ID]: imageDriveId
+          };
+          
+          // Update the document in Firestore
+          await firestoreService.updateDocument(
+            this.currentCollection,
+            documentId,
+            {
+              [ProfileField.PROFILE_IMAGE_DRIVE_ID]: imageDriveId,
+              [ProfileField.LAST_UPDATED]: new Date()
+            }
+          );
+          
+          console.log('Profile image updated successfully');
+        } else {
+          console.error('Document not found in local array:', documentId);
+        }
+      } catch (error) {
+        console.error('Error updating profile image:', error);
+        // You could add a toast notification here for error feedback
+      }
     }
   }
 }

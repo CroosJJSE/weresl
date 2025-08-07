@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
-import { RootCollection, SearchElementDoc, ProfileField, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES, BANK_ACCOUNT_FIELDS } from '../enums/db.js'
+import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES, BANK_ACCOUNT_FIELDS } from '../enums/db.js'
 
 /**
  * Get profile by Registration ID
@@ -675,5 +675,166 @@ export const getWereSLTransactionHistory = async (limit = 50) => {
   } catch (error) {
     console.error('Error getting transaction history:', error)
     return { success: false, message: 'Failed to get transaction history', error }
+  }
+}
+
+/**
+ * Convert profile data to Google Sheet Main tab format
+ * Formats RF loans and Grant loans according to GAS requirements
+ * @param {Object} profile - Profile data from Firestore
+ * @returns {Promise<Object>} Formatted data for Main tab
+ */
+export const convertProfileToMainTabFormat = async (profile) => {
+  try {
+    if (!profile || !profile[ProfileField.REG_ID]) {
+      throw new Error('Invalid profile data: missing Reg_ID')
+    }
+
+    const regId = profile[ProfileField.REG_ID] || profile.regId || profile.id
+
+    // Get RF loans for the profile
+    const rfLoansResult = await getRFLoans(regId)
+    const rfLoans = rfLoansResult.success ? rfLoansResult.data : []
+
+    // Get Grant loans for the profile
+    const grantLoansResult = await getGrantLoans(regId)
+    const grantLoans = grantLoansResult.success ? grantLoansResult.data : []
+
+    console.log(`🔍 DEBUG: Found ${rfLoans.length} RF loans and ${grantLoans.length} Grant loans for ${regId}`)
+
+    // Format loans: loan1[approvedAt date1](amount1)+loan2[date2](amount2)
+    const formatLoans = (loans, loanType) => {
+      if (!loans || loans.length === 0) {
+        console.log(`🔍 DEBUG: No ${loanType} loans found for ${regId}`)
+        return 'No'
+      }
+
+      console.log(`🔍 DEBUG: Processing ${loans.length} ${loanType} loans for ${regId}:`, loans)
+
+      const formattedLoans = loans
+        .filter(loan => {
+          // Check for approved status - handle different field names
+          const status = loan[RF_LOAN_FIELD.STATUS] || 
+                        loan[GRANT_FIELD.STATUS] || 
+                        loan.status || 
+                        loan.loanStatus ||
+                        loan.approvalStatus ||
+                        'pending'
+          
+          console.log(`🔍 DEBUG: Loan ${loan.id} status: ${status}`)
+          
+          // Accept various approved status formats
+          const isApproved = status === 'approved' || 
+                           status === 'Approved' || 
+                           status === 'APPROVED' ||
+                           status === 'active' ||
+                           status === 'Active' ||
+                           status === 'ACTIVE'
+          
+          if (!isApproved) {
+            console.log(`🔍 DEBUG: Skipping loan ${loan.id} - status: ${status}`)
+          }
+          
+          return isApproved
+        })
+        .map(loan => {
+          let purpose, amount, approvedAt
+
+          if (loanType === 'RF') {
+            purpose = loan[RF_LOAN_FIELD.PURPOSE] || 
+                     loan.purpose || 
+                     loan.projectDescription || 
+                     loan.project_description ||
+                     loan.description ||
+                     'Unknown'
+            amount = loan[RF_LOAN_FIELD.AMOUNT] || 
+                    loan.amount || 
+                    loan.loanAmount || 
+                    loan.loan_amount ||
+                    0
+            approvedAt = loan[RF_LOAN_FIELD.APPROVED_AT] || 
+                        loan.approvedAt || 
+                        loan.approved_at ||
+                        loan.createdAt || 
+                        loan.created_at ||
+                        loan.initiationDate ||
+                        loan.initiation_date
+          } else {
+            // Grant loans
+            purpose = loan[GRANT_FIELD.PURPOSE] || 
+                     loan.purpose || 
+                     loan.projectDescription || 
+                     loan.project_description ||
+                     loan.description ||
+                     'Unknown'
+            amount = loan[GRANT_FIELD.APPROVED_AMOUNT] || 
+                    loan.approvedAmount || 
+                    loan.approved_amount ||
+                    loan.amount || 
+                    loan.grantAmount ||
+                    loan.grant_amount ||
+                    0
+            approvedAt = loan[GRANT_FIELD.APPROVED_AT] || 
+                        loan.approvedAt || 
+                        loan.approved_at ||
+                        loan.createdAt || 
+                        loan.created_at ||
+                        loan.requestedDate ||
+                        loan.requested_date
+          }
+
+          // Format date
+          let dateStr = 'Unknown'
+          if (approvedAt) {
+            try {
+              const date = approvedAt.toDate ? approvedAt.toDate() : new Date(approvedAt)
+              dateStr = date.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric' 
+              })
+            } catch (dateError) {
+              console.warn(`⚠️ Error formatting date for loan ${loan.id}:`, dateError)
+              dateStr = 'Unknown'
+            }
+          }
+
+          const formattedLoan = `${purpose}[${dateStr}](${amount})`
+          console.log(`🔍 DEBUG: Formatted ${loanType} loan: ${formattedLoan}`)
+          return formattedLoan
+        })
+        .join('+')
+
+      const result = formattedLoans || 'No'
+      console.log(`🔍 DEBUG: Final ${loanType} result for ${regId}: ${result}`)
+      return result
+    }
+
+    // Calculate age from year of birth
+    const currentYear = new Date().getFullYear()
+    const yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth || profile.Age
+    const age = yearOfBirth ? currentYear - yearOfBirth : 'N/A'
+
+    // Prepare the formatted data
+    const formattedData = {
+      [ProfileField.REG_ID]: regId,
+      [ProfileField.DISTRICT]: profile[ProfileField.DISTRICT] || profile.district || profile.District || '',
+      [ProfileField.FULL_NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || profile.Name || profile.name || '',
+      age: age,
+      [ProfileField.ADDRESS]: profile[ProfileField.ADDRESS] || profile.address || profile.Address || '',
+      [ProfileField.NIC]: profile[ProfileField.NIC] || profile.nic || profile.NIC || '',
+      [ProfileField.PHONE_NUMBER]: profile[ProfileField.PHONE_NUMBER] || profile.phoneNumber || profile.contact || profile.phone || '',
+      [ProfileField.DESCRIPTION]: profile[ProfileField.DESCRIPTION] || profile.description || profile.Description || '',
+      [ProfileField.OCCUPATION]: profile[ProfileField.OCCUPATION] || profile.occupation || profile.Occupation || '',
+      rfLoan: formatLoans(rfLoans, 'RF'),
+      grant: formatLoans(grantLoans, 'GRANT')
+    }
+
+    console.log('🔍 DEBUG: Converted profile to Main tab format:', formattedData)
+    return { success: true, data: formattedData }
+
+  } catch (error) {
+    console.error('Error converting profile to Main tab format:', error)
+    return { success: false, message: 'Failed to convert profile to Main tab format', error }
   }
 }

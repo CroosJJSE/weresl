@@ -33,12 +33,12 @@
           <!-- Essential Fields Only -->
           <div class="grid grid-cols-1 gap-4">
             <div>
-              <label for="Name" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="fullName" class="block text-sm font-medium text-gray-700 mb-2">
                 Name
               </label>
               <input
-                id="Name"
-                v-model="formData.Name"
+                id="fullName"
+                v-model="formData[ProfileField.FULL_NAME]"
                 type="text"
                 class="input w-full text-base"
                 placeholder="Enter name"
@@ -46,12 +46,12 @@
             </div>
 
             <div>
-              <label for="NIC" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="nic" class="block text-sm font-medium text-gray-700 mb-2">
                 NIC {{ isNicEditable ? '(Add NIC)' : '(Read Only)' }}
               </label>
               <input
-                id="NIC"
-                v-model="formData.NIC"
+                id="nic"
+                v-model="formData[ProfileField.NIC]"
                 type="text"
                 class="input w-full text-base"
                 :class="isNicEditable ? '' : 'bg-gray-100'"
@@ -65,11 +65,11 @@
             </div>
 
             <div>
-              <label for="Reg_ID" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="regId" class="block text-sm font-medium text-gray-700 mb-2">
                 Reg ID (Read Only)
               </label>
               <input
-                id="Reg_ID"
+                id="regId"
                 v-model="displayRegId"
                 type="text"
                 class="input w-full text-base bg-gray-100"
@@ -82,12 +82,12 @@
             </div>
 
             <div>
-              <label for="contact" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-2">
                 Contact
               </label>
               <input
-                id="contact"
-                v-model="formData.contact"
+                id="phoneNumber"
+                v-model="formData[ProfileField.PHONE_NUMBER]"
                 type="tel"
                 class="input w-full text-base"
                 placeholder="Enter contact number"
@@ -95,12 +95,12 @@
             </div>
 
             <div>
-              <label for="District" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="district" class="block text-sm font-medium text-gray-700 mb-2">
                 District
               </label>
               <select
-                id="District"
-                v-model="formData.District"
+                id="district"
+                v-model="formData[ProfileField.DISTRICT]"
                 @change="handleDistrictChange"
                 class="input w-full text-base"
               >
@@ -117,7 +117,7 @@
               </label>
               <input
                 id="occupation"
-                v-model="formData.occupation"
+                v-model="formData[ProfileField.OCCUPATION]"
                 type="text"
                 class="input w-full text-base"
                 placeholder="Enter occupation"
@@ -126,23 +126,23 @@
 
             <!-- Profile Photo URL Field -->
             <div>
-              <label for="Image" class="block text-sm font-medium text-gray-700 mb-2">
-                Profile Photo URL
+              <label for="profileImageDriveId" class="block text-sm font-medium text-gray-700 mb-2">
+                Profile Photo Drive ID
               </label>
               <div class="space-y-2">
                 <input
-                  id="Image"
-                  v-model="formData.Image"
-                  type="url"
+                  id="profileImageDriveId"
+                  v-model="formData[ProfileField.PROFILE_IMAGE_DRIVE_ID]"
+                  type="text"
                   class="input w-full text-base"
-                  placeholder="Enter Google Drive photo URL"
+                  placeholder="Enter Google Drive file ID"
                 />
                 
                 <!-- Current Photo Preview -->
-                <div v-if="formData.Image" class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div v-if="formData[ProfileField.PROFILE_IMAGE_DRIVE_ID]" class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                   <div class="flex-shrink-0">
                     <img 
-                      :src="formData.Image" 
+                      :src="getImageUrl(formData[ProfileField.PROFILE_IMAGE_DRIVE_ID])" 
                       alt="Profile Photo"
                       class="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
                       @error="handleImageError"
@@ -150,18 +150,18 @@
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm text-gray-600">Current photo</p>
-                    <p class="text-xs text-gray-500 truncate">{{ formData.Image }}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ formData[ProfileField.PROFILE_IMAGE_DRIVE_ID] }}</p>
                   </div>
                 </div>
                 
                 <!-- No Photo Message -->
                 <div v-else class="p-3 bg-gray-50 rounded-lg">
                   <p class="text-sm text-gray-600">No profile photo set</p>
-                  <p class="text-xs text-gray-500 mt-1">Add a Google Drive photo URL to display a profile image</p>
+                  <p class="text-xs text-gray-500 mt-1">Add a Google Drive file ID to display a profile image</p>
                 </div>
                 
                 <p class="text-xs text-blue-600">
-                  Enter a Google Drive sharing URL for the profile photo
+                  Enter a Google Drive file ID for the profile photo
                 </p>
               </div>
             </div>
@@ -198,6 +198,8 @@
 
 <script>
 import firestoreService from '../services/firestoreService.js';
+import { ProfileField } from '../enums/db.js';
+import { convertGoogleDriveUrl } from '../utils/driveUtils.js';
 
 export default {
   name: 'EditModal',
@@ -224,7 +226,8 @@ export default {
       districts: firestoreService.getDistricts(),
       regIdPreview: null,
       originalDistrict: null,
-      originalNic: null
+      originalNic: null,
+      ProfileField
     }
   },
   computed: {
@@ -235,11 +238,11 @@ export default {
       }
     },
     displayRegId() {
-      return this.regIdPreview || this.formData.Reg_ID || '';
+      return this.regIdPreview || this.formData[ProfileField.REG_ID] || '';
     },
     isNicEditable() {
       // Allow editing if NIC is empty, null, or undefined
-      return !this.formData.NIC || this.formData.NIC.trim() === '';
+      return !this.formData[ProfileField.NIC] || this.formData[ProfileField.NIC].trim() === '';
     }
   },
   watch: {
@@ -248,8 +251,8 @@ export default {
         if (newDoc) {
           console.log('EditModal: Document received for editing:', newDoc);
           this.formData = { ...newDoc };
-          this.originalDistrict = newDoc.District;
-          this.originalNic = newDoc.NIC;
+          this.originalDistrict = newDoc[ProfileField.DISTRICT] || newDoc.district || newDoc.District;
+          this.originalNic = newDoc[ProfileField.NIC] || newDoc.nic || newDoc.NIC;
           this.regIdPreview = null;
           this.message = '';
         }
@@ -269,7 +272,7 @@ export default {
         
         // If district changed, use the preview Reg_ID
         if (this.regIdPreview) {
-          updateData.Reg_ID = this.regIdPreview;
+          updateData[ProfileField.REG_ID] = this.regIdPreview;
           console.log('EditModal: Using preview Reg_ID:', this.regIdPreview);
         }
         
@@ -281,7 +284,7 @@ export default {
         // Emit success event with updated data
         const updatedDocument = { ...this.formData, id };
         if (this.regIdPreview) {
-          updatedDocument.Reg_ID = this.regIdPreview;
+          updatedDocument[ProfileField.REG_ID] = this.regIdPreview;
           // If document ID changed, update it
           if (result.newDocumentId) {
             updatedDocument.id = result.newDocumentId;
@@ -311,12 +314,12 @@ export default {
       this.$emit('close');
     },
     async handleDistrictChange() {
-      console.log('EditModal: District changed to:', this.formData.District);
+      console.log('EditModal: District changed to:', this.formData[ProfileField.DISTRICT]);
       
       // Only generate preview if district actually changed
-      if (this.formData.District && this.formData.District !== this.originalDistrict) {
+      if (this.formData[ProfileField.DISTRICT] && this.formData[ProfileField.DISTRICT] !== this.originalDistrict) {
         try {
-          this.regIdPreview = await firestoreService.generateRegIdPreview(this.formData.District);
+          this.regIdPreview = await firestoreService.generateRegIdPreview(this.formData[ProfileField.DISTRICT]);
           console.log('EditModal: Generated Reg_ID preview:', this.regIdPreview);
         } catch (error) {
           console.error('EditModal: Error generating Reg_ID preview:', error);
@@ -330,6 +333,15 @@ export default {
       // Replace broken image with placeholder
       event.target.src = '/placeholder-profile.jpg';
       event.target.alt = 'Profile photo not available';
+    },
+    getImageUrl(driveId) {
+      if (!driveId) return '/placeholder-profile.jpg';
+      try {
+        return convertGoogleDriveUrl(driveId);
+      } catch (error) {
+        console.error('Error converting drive ID to URL:', error);
+        return '/placeholder-profile.jpg';
+      }
     }
   }
 }

@@ -12,77 +12,61 @@ body {
 }
 
 .container {
-  max-width: 800px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 40px;
-  padding: 40px 0;
+  margin-bottom: 32px;
+  padding: 24px 0;
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #2c3e50;
-  margin-bottom: 10px;
-}
-
-.subtitle {
-  font-size: 1.1rem;
-  color: #6c757d;
-  font-weight: 400;
 }
 
 .links-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .link-item {
   background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e9ecef;
-  transition: all 0.2s ease;
-}
-
-.link-item:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
-}
-
-.link-content {
-  margin-bottom: 20px;
 }
 
 .link-title {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #2c3e50;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .link-description {
   color: #6c757d;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: 12px;
 }
 
 .link-actions {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .btn {
-  padding: 10px 20px;
+  flex: 1;
+  padding: 12px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
@@ -91,7 +75,6 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;
 }
 
 .btn-copy {
@@ -102,7 +85,6 @@ body {
 
 .btn-copy:hover {
   background: #e9ecef;
-  border-color: #adb5bd;
 }
 
 .btn-open {
@@ -148,30 +130,30 @@ body {
 
 .modal-content {
   background: white;
-  border-radius: 12px;
-  padding: 32px;
-  max-width: 400px;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 300px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .modal-title {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   text-align: center;
   color: #2c3e50;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .form-control {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
   font-size: 16px;
   transition: border-color 0.2s ease;
   font-family: inherit;
@@ -182,97 +164,67 @@ body {
   border-color: #007bff;
 }
 
+.form-control.error {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: flex-end;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .loading {
   text-align: center;
-  padding: 60px 20px;
+  padding: 40px 20px;
   color: #6c757d;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .no-links {
   text-align: center;
-  padding: 60px 20px;
+  padding: 40px 20px;
   color: #6c757d;
-  font-size: 1.1rem;
-}
-
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border: 1px solid #f5c6cb;
-  font-size: 14px;
-}
-
-.success-message {
-  background: #d4edda;
-  color: #155724;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border: 1px solid #c3e6cb;
-  font-size: 14px;
+  font-size: 1rem;
 }
 
 /* Mobile Responsive */
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .container {
-    padding: 16px;
+    padding: 12px;
   }
   
   .header {
-    padding: 30px 0;
+    padding: 20px 0;
   }
   
-  .title {
-    font-size: 2rem;
-  }
-  
-  .subtitle {
-    font-size: 1rem;
-  }
-  
-  .link-item {
-    padding: 20px;
-  }
-  
-  .link-actions {
-    flex-direction: column;
-  }
-  
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-  
-  .modal-actions {
-    flex-direction: column;
-  }
-  
-  .modal-actions .btn {
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
   .title {
     font-size: 1.75rem;
   }
   
+  .link-item {
+    padding: 14px;
+  }
+  
   .link-title {
-    font-size: 1.1rem;
+    font-size: 1rem;
+  }
+  
+  .btn {
+    padding: 10px 12px;
+    font-size: 13px;
   }
   
   .modal-content {
-    padding: 24px;
+    padding: 20px;
+    margin: 0 16px;
   }
 } 
