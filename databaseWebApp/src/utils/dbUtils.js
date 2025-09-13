@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
-import { RootCollection, SearchElementDoc, ProfileField, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES, BANK_ACCOUNT_FIELDS } from '../enums/db.js'
+import { RootCollection, SearchElementDoc, ProfileField, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES } from '../enums/db.js'
 
 /**
  * Get profile by Registration ID
@@ -505,16 +505,16 @@ export const transferMoneyBetweenAccounts = async (fromAccount, toAccount, amoun
     // Update source account balance
     const fromAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, fromAccount)
     batch.update(fromAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: fromAccountBalance - amount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: fromAccountBalance - amount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Update destination account balance
     const toAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, toAccount)
     const toAccountBalance = toAccountResult.data.balance
     batch.update(toAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: toAccountBalance + amount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: toAccountBalance + amount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Add transaction to wereSL transaction history
@@ -574,16 +574,16 @@ export const getBankBalanceByName = async (name) => {
     }
     
     const data = bankAccountDoc.data()
-    const balance = data[BANK_ACCOUNT_FIELDS.currentBankBalance] || 0
+    const balance = data[BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE] || 0
     
     return { 
       success: true, 
       data: { 
         name: bankAccountDoc.id,
         balance: balance,
-        firstName: data[BANK_ACCOUNT_FIELDS.firstName],
-        lastName: data[BANK_ACCOUNT_FIELDS.lastName],
-        position: data[BANK_ACCOUNT_FIELDS.position]
+        firstName: data[BANK_ACCOUNT_FIELD.FIRST_NAME],
+        lastName: data[BANK_ACCOUNT_FIELD.LAST_NAME],
+        position: data[BANK_ACCOUNT_FIELD.POSITION]
       } 
     }
   } catch (error) {
@@ -609,13 +609,13 @@ export const updateBankBalance = async (name, newAmount) => {
       return { success: false, message: 'Bank account not found' }
     }
     
-    const currentBalance = bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.currentBankBalance] || 0
+    const currentBalance = bankAccountDoc.data()[BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE] || 0
     const balanceChange = newAmount - currentBalance
     
     // Update the bank balance
     await updateDoc(bankAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: newAmount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: newAmount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Add transaction to wereSL transaction history if it's the wereSL account
@@ -644,9 +644,9 @@ export const updateBankBalance = async (name, newAmount) => {
         newBalance: newAmount,
         previousBalance: currentBalance,
         balanceChange: balanceChange,
-        firstName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.firstName],
-        lastName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.lastName],
-        position: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.position]
+        firstName: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.FIRST_NAME],
+        lastName: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.LAST_NAME],
+        position: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.POSITION]
       }
     }
   } catch (error) {
@@ -675,5 +675,25 @@ export const getWereSLTransactionHistory = async (limit = 50) => {
   } catch (error) {
     console.error('Error getting transaction history:', error)
     return { success: false, message: 'Failed to get transaction history', error }
+  }
+}
+
+/**
+ * Get all coordinators from bank accounts collection
+ */
+export const getAllCoordinators = async () => {
+  try {
+    const bankAccountsRef = collection(db, RootCollection.BANK_ACCOUNTS)
+    const snapshot = await getDocs(bankAccountsRef)
+    
+    const coordinators = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+    
+    return { success: true, data: coordinators }
+  } catch (error) {
+    console.error('Error getting coordinators:', error)
+    return { success: false, message: 'Failed to get coordinators', error }
   }
 }

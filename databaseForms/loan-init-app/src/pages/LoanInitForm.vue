@@ -33,20 +33,49 @@
 
       <!-- RegID Lookup Section -->
       <div class="section" v-if="registrationStatus === 'existing'">
-        <h2>{{ t('form.searchExisting') }}</h2>
+        <div class="section-header">
+          <h2>{{ t('form.searchExisting') }}</h2>
+          <button @click="goToHome" class="btn btn-outline back-home-btn" :disabled="loading || imageUploading">
+            <span v-if="loading || imageUploading" class="loading-spinner"></span>
+            {{ t('form.backToHome') }}
+          </button>
+        </div>
         <div class="regid-lookup">
+          <!-- Search Type Toggle -->
           <div class="form-group">
-            <label for="regidSearch">{{ t('form.enterRegID') }}</label>
+            <label>{{ t('form.searchType') }}</label>
+            <div class="search-type-toggle">
+              <button 
+                @click="searchType = 'regid'" 
+                :class="['btn', searchType === 'regid' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="searching"
+              >
+                {{ t('form.searchByRegID') }}
+              </button>
+              <button 
+                @click="searchType = 'nic'" 
+                :class="['btn', searchType === 'nic' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="searching"
+              >
+                {{ t('form.searchByNIC') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label :for="searchType === 'regid' ? 'regidSearch' : 'nicSearch'">
+              {{ searchType === 'regid' ? t('form.enterRegID') : t('form.enterNIC') }}
+            </label>
             <div class="search-container">
               <input 
                 type="text" 
-                id="regidSearch" 
-                v-model="regidSearch" 
-                :placeholder="t('form.enterRegID')"
+                :id="searchType === 'regid' ? 'regidSearch' : 'nicSearch'"
+                v-model="searchValue" 
+                :placeholder="searchType === 'regid' ? t('form.enterRegID') : t('form.enterNIC')"
                 class="form-control"
                 :disabled="searching"
               />
-              <button @click="searchRegID" class="btn btn-primary" :disabled="searching || !regidSearch.trim()">
+              <button @click="searchProfile" class="btn btn-primary" :disabled="searching || !searchValue.trim()">
                 <span v-if="searching" class="loading-spinner"></span>
                 {{ searching ? t('form.searching') : t('form.search') }}
               </button>
@@ -103,7 +132,13 @@
 
       <!-- Personal Information Section -->
       <div class="section" v-if="registrationStatus === 'new'">
-        <h2>{{ t('form.personalInfo') }}</h2>
+        <div class="section-header">
+          <h2>{{ t('form.personalInfo') }}</h2>
+          <button @click="goToHome" class="btn btn-outline back-home-btn" :disabled="loading || imageUploading">
+            <span v-if="loading || imageUploading" class="loading-spinner"></span>
+            {{ t('form.backToHome') }}
+          </button>
+        </div>
         
         <!-- Profile Image Display and Upload for New Applicants -->
         <div class="profile-image-section">
@@ -186,22 +221,9 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="totalChildren">{{ t('form.totalChildren') }}</label>
-            <input 
-              type="number" 
-              id="totalChildren" 
-              v-model="formData.totalChildren" 
-              class="form-control" 
-              min="0" 
-              required 
-            />
-          </div>
-          <div class="form-group">
-            <label for="occupation">{{ t('form.occupation') }}</label>
-            <input type="text" id="occupation" v-model="formData.occupation" class="form-control" required />
-          </div>
+        <div class="form-group">
+          <label for="occupation">{{ t('form.occupation') }}</label>
+          <input type="text" id="occupation" v-model="formData.occupation" class="form-control" required />
         </div>
 
         <div class="form-group">
@@ -211,6 +233,7 @@
             v-model="formData.familyBackground" 
             class="form-control" 
             rows="3"
+            :placeholder="t('form.familyBackgroundPlaceholder')"
             required
           ></textarea>
         </div>
@@ -256,15 +279,6 @@
               required 
             />
           </div>
-          <div class="form-group">
-            <label for="source">{{ t('form.source') }}</label>
-            <select id="source" v-model="formData.source" class="form-control">
-              <option value="">{{ t('form.selectSource') }}</option>
-              <option v-for="account in bankAccounts" :key="account" :value="account">
-                {{ account }}
-              </option>
-            </select>
-          </div>
         </div>
 
         <div class="form-group">
@@ -279,16 +293,6 @@
           ></textarea>
         </div>
 
-        <div class="form-group">
-          <label for="projectDescription">{{ t('form.projectDescription') }}</label>
-          <textarea 
-            id="projectDescription" 
-            v-model="formData.projectDescription" 
-            class="form-control" 
-            rows="3"
-            :placeholder="t('form.projectDescriptionPlaceholder')"
-          ></textarea>
-        </div>
       </div>
 
       <!-- Submit Section -->
@@ -334,11 +338,12 @@ import {
   addLoan, 
   getPendingLoans,
   generateRFLoanId,
-  generateGrantLoanId
+  generateGrantLoanId,
+  searchProfilesByNIC
 } from '@/utils/dbUtils.js'
 import { generateRegIdFromDistrict } from '@/utils/regIdUtils.js'
 import { DISTRICT_MAPPING } from '@/enums/districts.js'
-import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '@/enums/db.js'
+import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD, ARMS } from '@/enums/db.js'
 
 const db = getFirestore();
 
@@ -357,7 +362,8 @@ const yearOfBirthError = ref('')
 const phoneError = ref('')
 const imageError = ref('')
 const receivers = ref([])
-const bankAccounts = ref([])
+const searchType = ref('regid') // 'regid' or 'nic'
+const searchValue = ref('')
 
 const districts = Object.values(DISTRICT_MAPPING)
 
@@ -367,7 +373,6 @@ const formData = reactive({
   address: '',
   NIC: '',
   contact: '',
-  totalChildren: '',
   familyBackground: '',
   occupation: '',
   district: '',
@@ -375,8 +380,7 @@ const formData = reactive({
   loanType: '',
   initialAmount: '',
   purpose: '',
-  projectDescription: '',
-  source: ''
+  source: 'wereSL' // Default source
 })
 
 // Load receivers from RF_receiver collection
@@ -390,21 +394,9 @@ const loadReceivers = async () => {
   }
 }
 
-// Load bank accounts from bank_accounts collection
-const loadBankAccounts = async () => {
-  try {
-    const bankAccountsQuery = query(collection(db, RootCollection.BANK_ACCOUNTS))
-    const bankAccountsSnapshot = await getDocs(bankAccountsQuery)
-    bankAccounts.value = bankAccountsSnapshot.docs.map(doc => doc.id)
-  } catch (error) {
-    console.error('Error loading bank accounts:', error)
-  }
-}
-
 // Load data on component mount
 onMounted(() => {
   loadReceivers()
-  loadBankAccounts()
 })
 
 // Computed property to convert Google Drive URL to displayable image URL
@@ -439,25 +431,35 @@ const generateRegID = async () => {
   }
 }
 
-const searchRegID = async () => {
-  if (!regidSearch.value.trim()) {
-    showMessage('Please enter a RegID to search', 'error')
+const searchProfile = async () => {
+  if (!searchValue.value.trim()) {
+    showMessage('Please enter a value to search', 'error')
     return
   }
 
   searching.value = true
   try {
+    let profileResult
     
-    // Use centralized utility to get profile
-    const profileResult = await getProfileByRegId(regidSearch.value)
+    if (searchType.value === 'regid') {
+      // Search by Reg_ID (case-insensitive)
+      profileResult = await getProfileByRegId(searchValue.value)
+    } else if (searchType.value === 'nic') {
+      // Search by NIC
+      profileResult = await searchProfilesByNIC(searchValue.value)
+    } else {
+      showMessage('Invalid search type', 'error')
+      return
+    }
     
     if (profileResult.success && profileResult.data) {
       const profileData = profileResult.data
       
-      // Check pending loan status
+      // Check pending loan status using the Reg_ID
+      const regId = profileData[ProfileField.REG_ID] || profileData.Reg_ID || profileData.id
       const pendingLoansResult = await getPendingLoans()
       const hasPendingLoan = pendingLoansResult.success && 
-        pendingLoansResult.data.includes(regidSearch.value)
+        pendingLoansResult.data.includes(regId)
       
       searchResult.value = {
         found: true,
@@ -486,7 +488,6 @@ const useExistingProfile = () => {
     formData.address = profile[ProfileField.ADDRESS] || profile.address || profile.Address || ''
     formData.NIC = profile[ProfileField.NIC] || profile.NIC || ''
     formData.contact = profile[ProfileField.PHONE_NUMBER] || profile.contact || ''
-    formData.totalChildren = profile[ProfileField.TOTAL_CHILDREN] || profile.totalChildren || profile.TotalChildren || 0
     formData.familyBackground = profile[ProfileField.DESCRIPTION] || profile.familyBackground || profile.FamilyBackground || ''
     formData.occupation = profile[ProfileField.OCCUPATION] || profile.occupation || profile.Occupation || ''
     formData.district = profile[ProfileField.DISTRICT] || profile.district || profile.District || ''
@@ -505,7 +506,8 @@ const useExistingProfile = () => {
 const setRegistrationStatus = (status) => {
   registrationStatus.value = status
   if (status === 'existing') {
-    regidSearch.value = '' // Clear search field when switching to existing
+    searchType.value = 'regid' // Reset search type to RegID
+    searchValue.value = '' // Clear search field when switching to existing
     searchResult.value = null
     useExisting.value = false
   }
@@ -513,7 +515,8 @@ const setRegistrationStatus = (status) => {
 
 const goBack = () => {
   registrationStatus.value = ''
-  regidSearch.value = ''
+  searchType.value = 'regid' // Reset search type to RegID
+  searchValue.value = ''
   searchResult.value = null
   useExisting.value = false
   imagePreview.value = null
@@ -601,7 +604,6 @@ const validateForm = () => {
     { key: 'address', label: 'Address' },
     { key: 'NIC', label: 'NIC' },
     { key: 'contact', label: 'Contact' },
-    { key: 'totalChildren', label: 'Total Children' },
     { key: 'familyBackground', label: 'Family Background' },
     { key: 'occupation', label: 'Occupation' },
     { key: 'district', label: 'District' }
@@ -639,12 +641,6 @@ const validateForm = () => {
     return false
   }
 
-  // Validate total children
-  const childrenCount = parseInt(formData.totalChildren)
-  if (childrenCount < 0) {
-    showMessage('Total number of children cannot be negative', 'error')
-    return false
-  }
 
   if (!formData.loanType || !formData.initialAmount || !formData.purpose) {
     showMessage('Please fill in all loan details', 'error')
@@ -690,7 +686,6 @@ const submitForm = async () => {
         [ProfileField.ADDRESS]: formData.address,
         [ProfileField.NIC]: formData.NIC,
         [ProfileField.PHONE_NUMBER]: formData.contact,
-        [ProfileField.TOTAL_CHILDREN]: parseInt(formData.totalChildren),
         [ProfileField.DESCRIPTION]: formData.familyBackground,
         [ProfileField.OCCUPATION]: formData.occupation,
         [ProfileField.DISTRICT]: formData.district,
@@ -724,7 +719,6 @@ const submitForm = async () => {
       [RF_LOAN_FIELD.TYPE]: formData.loanType,
       [RF_LOAN_FIELD.AMOUNT]: parseFloat(formData.initialAmount),
       [RF_LOAN_FIELD.PURPOSE]: formData.purpose,
-      [RF_LOAN_FIELD.PROJECT_DESCRIPTION]: formData.projectDescription,
       [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
       [RF_LOAN_FIELD.STATUS]: 'pending',
       [RF_LOAN_FIELD.CURRENT_BALANCE]: parseFloat(formData.initialAmount),
@@ -748,7 +742,7 @@ const submitForm = async () => {
       [RF_LOAN_FIELD.AMOUNT]: parseFloat(formData.initialAmount),
       [RF_LOAN_FIELD.PURPOSE]: formData.purpose,
       [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
-      [RF_LOAN_FIELD.STATUS]: 'pending'
+      [RF_LOAN_FIELD.STATUS]: 'pending',
     }
     
     await setDoc(pendingLoanRef, pendingLoans)
@@ -766,9 +760,14 @@ const submitForm = async () => {
 
 const resetForm = () => {
   Object.keys(formData).forEach(key => {
-    formData[key] = ''
+    if (key === 'source') {
+      formData[key] = 'wereSL' // Reset to default source
+    } else {
+      formData[key] = ''
+    }
   })
-  regidSearch.value = ''
+  searchType.value = 'regid' // Reset search type to RegID
+  searchValue.value = ''
   searchResult.value = null
   useExisting.value = false
   imagePreview.value = null
@@ -808,6 +807,27 @@ const goToHome = () => {
 .form-header {
   text-align: center;
   margin-bottom: 30px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.section-header h2 {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.back-home-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 36px;
+  flex-shrink: 0;
 }
 
 .form-header h2 {
@@ -920,6 +940,37 @@ h1 {
 
 .search-container .form-control {
   flex: 1;
+}
+
+.search-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.search-type-toggle .btn {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.search-type-toggle .btn-primary {
+  background-color: #1565c0;
+  color: white;
+  border: 2px solid #1565c0;
+}
+
+.search-type-toggle .btn-secondary {
+  background-color: #f5f5f5;
+  color: #333;
+  border: 2px solid #e0e0e0;
+}
+
+.search-type-toggle .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .search-result {
@@ -1190,9 +1241,20 @@ h1 {
     margin: 0 8px;
   }
   
-  .section {
-    padding: 20px;
-    margin-bottom: 20px;
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .section-header h2 {
+    width: 100%;
+    text-align: left;
+  }
+  
+  .back-home-btn {
+    width: 100%;
+    justify-content: center;
   }
   
   .form-row {

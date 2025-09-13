@@ -10,6 +10,14 @@
 export const extractFileId = (url) => {
   if (!url) return null;
   
+  // If it's just a file ID (no URL structure)
+  if (!url.includes('http') && !url.includes('drive.google.com')) {
+    const fileId = url.trim();
+    if (fileId && fileId.length > 10 && /^[-\w]{25,44}$/.test(fileId)) {
+      return fileId;
+    }
+  }
+  
   // New format: https://drive.google.com/file/d/FILE_ID/view?usp=drivesdk
   const newFormatMatch = url.match(/\/file\/d\/([-\w]{25,})\/view/);
   if (newFormatMatch) {
@@ -32,7 +40,13 @@ export const convertGoogleDriveUrl = (driveUrl, size = 'w300') => {
   const fileId = extractFileId(driveUrl);
   if (!fileId) return null;
   
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=${size}`;
+  // If size is just a number or simple format, convert to proper thumbnail format
+  let thumbnailSize = size;
+  if (typeof size === 'string' && !size.includes('w') && !size.includes('h')) {
+    thumbnailSize = `w${size}-h${size}`;
+  }
+  
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=${thumbnailSize}`;
 };
 
 /**

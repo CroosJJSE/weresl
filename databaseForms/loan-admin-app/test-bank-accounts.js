@@ -9,9 +9,9 @@ import { getFirestore } from 'firebase/firestore'
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBvVQvVQvVQvVQvVQvVQvVQvVQvVQvVQvVQ",
-  authDomain: "weresl-database.firebaseapp.com",
-  projectId: "weresl-database",
-  storageBucket: "weresl-database.appspot.com",
+  authDomain: "wereSL-database.firebaseapp.com",
+  projectId: "wereSL-database",
+  storageBucket: "wereSL-database.appspot.com",
   messagingSenderId: "123456789",
   appId: "1:123456789:web:abcdefghijklmnop"
 }

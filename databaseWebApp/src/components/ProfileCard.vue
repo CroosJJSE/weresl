@@ -63,7 +63,7 @@ export default {
     const loadProfileImage = async () => {
       try {
         // Check multiple possible image field names
-        const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
+        const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl || props.profile?.basicInfo?.profileImageDriveId;
         
         if (!props.profile || !imageUrl) {
           profileImageUrl.value = '/placeholder-profile.jpg'
@@ -75,8 +75,15 @@ export default {
           // It's likely just a file ID, convert to Google Drive URL
           const fileId = imageUrl.trim();
           if (fileId && fileId.length > 10) { // Basic validation for file ID
-            const driveUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
-            profileImageUrl.value = driveUrl;
+            // Try multiple thumbnail sizes for better reliability
+            const thumbnailUrls = [
+              `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`,
+              `https://drive.google.com/thumbnail?id=${fileId}&sz=w300-h300`,
+              `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`
+            ];
+            
+            // Set the first URL and let error handling try others if needed
+            profileImageUrl.value = thumbnailUrls[0];
             return;
           }
         }
@@ -95,7 +102,7 @@ export default {
       console.error(`[ProfileCard] Failed URL: ${profileImageUrl.value}`);
       
       // Try fallback URL if it's a Google Drive URL or file ID
-      const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl;
+      const imageUrl = props.profile?.Image || props.profile?.imageUrl || props.profile?.basicInfo?.imageUrl || props.profile?.basicInfo?.profileImageDriveId;
       
       if (imageUrl) {
         let fileId = null;
@@ -108,11 +115,12 @@ export default {
         }
         
         if (fileId) {
-          // Try multiple fallback formats in sequence
+          // Try multiple fallback formats in sequence with different thumbnail sizes
           const fallbackUrls = [
-            `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`,
-            `https://drive.google.com/file/d/${fileId}/preview`,
+            `https://drive.google.com/thumbnail?id=${fileId}&sz=w300-h300`,
             `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`,
+            `https://drive.google.com/thumbnail?id=${fileId}&sz=w150-h150`,
+            `https://drive.google.com/file/d/${fileId}/preview`,
             `https://drive.google.com/uc?export=view&id=${fileId}`
           ];
           
@@ -123,6 +131,7 @@ export default {
           
           if (nextIndex < fallbackUrls.length) {
             const nextUrl = fallbackUrls[nextIndex];
+            console.log(`[ProfileCard] Trying fallback URL: ${nextUrl}`);
             profileImageUrl.value = nextUrl;
             return;
           } else {

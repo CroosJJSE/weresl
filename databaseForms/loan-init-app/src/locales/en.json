@@ -6,7 +6,11 @@
   "form.registration.existing": "Yes, Search by RegID",
   "form.registration.new": "No, Register New Applicant",
   "form.searchExisting": "Search Existing Applicant",
+  "form.searchType": "Search Type",
+  "form.searchByRegID": "Search by RegID",
+  "form.searchByNIC": "Search by NIC",
   "form.enterRegID": "Enter RegID:",
+  "form.enterNIC": "Enter NIC:",
   "form.search": "Search",
   "form.searching": "Searching...",
   "form.foundApplicant": "Found existing applicant:",
@@ -165,7 +169,5 @@
   "paymentForm.errorRegIdRequired": "Registration ID is required",
   "paymentForm.errorTypeRequired": "Payment type is required",
   "paymentForm.errorAmountRequired": "Valid payment amount is required for RF payments",
-  "paymentForm.errorDetailsRequired": "Details are required for GRANT payments",
-  "form.source": "Source *",
-  "form.selectSource": "Select Source"
+  "paymentForm.errorDetailsRequired": "Details are required for GRANT payments"
 } 

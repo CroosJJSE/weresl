@@ -19,7 +19,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
-import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES, BANK_ACCOUNT_FIELDS } from '../enums/db.js'
+import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD, GRANT_FIELD, BANK_ACCOUNT_FIELD, BANK_ACCOUNT_FIELD_TYPES } from '../enums/db.js'
 
 /**
  * Get profile by Registration ID
@@ -158,10 +158,16 @@ export const addLoan = async (regId, loanData, loanType = 'RF') => {
     console.log('📁 Using collection name:', collectionName)
     console.log('📁 RootCollection.PROFILES:', RootCollection.PROFILES)
     
+    // Debug: Log the enum values
+    console.log('🔍 RF_LOAN_FIELD.LOAN_HISTORY:', RF_LOAN_FIELD.LOAN_HISTORY)
+    console.log('🔍 RF_LOAN_FIELD.PAYMENT_INTEGRITY:', RF_LOAN_FIELD.PAYMENT_INTEGRITY)
+    
     const loanToSave = {
       ...loanData,
       createdAt: serverTimestamp(),
-      lastUpdated: serverTimestamp()
+      lastUpdated: serverTimestamp(),
+      loanHistory: [], // Initialize empty loan history array
+      paymentIntegrity: true // Initialize payment integrity as true (no payments yet)
     }
     
     console.log('📝 Creating collection path:', [RootCollection.PROFILES, regId, collectionName])
@@ -505,16 +511,16 @@ export const transferMoneyBetweenAccounts = async (fromAccount, toAccount, amoun
     // Update source account balance
     const fromAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, fromAccount)
     batch.update(fromAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: fromAccountBalance - amount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: fromAccountBalance - amount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Update destination account balance
     const toAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, toAccount)
     const toAccountBalance = toAccountResult.data.balance
     batch.update(toAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: toAccountBalance + amount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: toAccountBalance + amount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Add transaction to wereSL transaction history
@@ -574,16 +580,16 @@ export const getBankBalanceByName = async (name) => {
     }
     
     const data = bankAccountDoc.data()
-    const balance = data[BANK_ACCOUNT_FIELDS.currentBankBalance] || 0
+    const balance = data[BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE] || 0
     
     return { 
       success: true, 
       data: { 
         name: bankAccountDoc.id,
         balance: balance,
-        firstName: data[BANK_ACCOUNT_FIELDS.firstName],
-        lastName: data[BANK_ACCOUNT_FIELDS.lastName],
-        position: data[BANK_ACCOUNT_FIELDS.position]
+        firstName: data[BANK_ACCOUNT_FIELD.FIRST_NAME],
+        lastName: data[BANK_ACCOUNT_FIELD.LAST_NAME],
+        position: data[BANK_ACCOUNT_FIELD.POSITION]
       } 
     }
   } catch (error) {
@@ -609,13 +615,13 @@ export const updateBankBalance = async (name, newAmount) => {
       return { success: false, message: 'Bank account not found' }
     }
     
-    const currentBalance = bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.currentBankBalance] || 0
+    const currentBalance = bankAccountDoc.data()[BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE] || 0
     const balanceChange = newAmount - currentBalance
     
     // Update the bank balance
     await updateDoc(bankAccountRef, {
-      [BANK_ACCOUNT_FIELDS.currentBankBalance]: newAmount,
-      [BANK_ACCOUNT_FIELDS.lastUpdated]: serverTimestamp()
+      [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: newAmount,
+      [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
     })
     
     // Add transaction to wereSL transaction history if it's the wereSL account
@@ -644,9 +650,9 @@ export const updateBankBalance = async (name, newAmount) => {
         newBalance: newAmount,
         previousBalance: currentBalance,
         balanceChange: balanceChange,
-        firstName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.firstName],
-        lastName: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.lastName],
-        position: bankAccountDoc.data()[BANK_ACCOUNT_FIELDS.position]
+        firstName: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.FIRST_NAME],
+        lastName: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.LAST_NAME],
+        position: bankAccountDoc.data()[BANK_ACCOUNT_FIELD.POSITION]
       }
     }
   } catch (error) {
@@ -747,7 +753,7 @@ export const convertProfileToMainTabFormat = async (profile) => {
                      loan.project_description ||
                      loan.description ||
                      'Unknown'
-            amount = loan[RF_LOAN_FIELD.AMOUNT] || 
+            amount = loan.amount || 
                     loan.amount || 
                     loan.loanAmount || 
                     loan.loan_amount ||

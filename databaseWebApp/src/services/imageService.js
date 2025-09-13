@@ -29,6 +29,15 @@ export const imageService = {
         return '/placeholder-profile.jpg';
       }
 
+      // Check if it's just a file ID (no URL structure)
+      if (url && !url.includes('http') && !url.includes('drive.google.com')) {
+        const fileId = url.trim();
+        if (fileId && fileId.length > 10) {
+          // It's likely just a file ID, convert to Google Drive thumbnail URL
+          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
+        }
+      }
+
       if (this.isGoogleDriveUrl(url)) {
         // Check if it's already a thumbnail URL with sz parameter
         if (url.includes('thumbnail') && url.includes('sz=')) {
@@ -38,7 +47,7 @@ export const imageService = {
         // For non-thumbnail URLs, convert to thumbnail format which is more reliable
         const fileId = this.extractDriveFileId(url);
         if (fileId) {
-          const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800-h600`;
+          const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
           return thumbnailUrl;
         }
         
@@ -94,8 +103,16 @@ export const imageService = {
       return null;
     }
 
+    // Check if it's just a file ID (no URL structure)
+    if (url && !url.includes('http') && !url.includes('drive.google.com')) {
+      const fileId = url.trim();
+      if (fileId && fileId.length > 10) {
+        // It's likely just a file ID, convert to Google Drive thumbnail URL
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
+      }
+    }
+
     if (this.isGoogleDriveUrl(url)) {
-      
       // Check if it's already a thumbnail URL with sz parameter
       if (url.includes('thumbnail') && url.includes('sz=')) {
         return url;
@@ -105,7 +122,7 @@ export const imageService = {
       
       if (fileId) {
         // Convert to thumbnail format which is more reliable
-        const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800-h600`;
+        const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`;
         return thumbnailUrl;
       } else {
         console.error('[ImageService] Failed to extract file ID from Drive URL');

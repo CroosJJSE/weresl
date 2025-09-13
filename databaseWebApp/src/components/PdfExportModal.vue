@@ -1,10 +1,10 @@
 <template>
   <div v-if="isVisible" class="pdf-export-modal-overlay" @click="closeModal">
-    <div class="pdf-export-modal" @click.stop>
+    <div class="pdf-export-modal" @click.stop @touchstart.stop @touchmove.stop>
       <div class="modal-header">
         <h2>
           <i class="fas fa-file-pdf" style="color: #dc3545; margin-right: 10px;"></i>
-          Export Profiles to PDF
+          PDF Export
         </h2>
         <button class="close-btn" @click="closeModal">
           <i class="fas fa-times"></i>
@@ -13,7 +13,7 @@
 
       <div class="modal-content">
         <!-- Selection Info -->
-        <div class="selection-info">
+        <div class="selection-info" v-if="selectedProfiles.length > 0">
           <div class="info-card">
             <i class="fas fa-info-circle" style="color: #1565c0; margin-right: 8px;"></i>
             <span>{{ selectedProfiles.length }} profile{{ selectedProfiles.length !== 1 ? 's' : '' }} selected</span>
@@ -23,42 +23,113 @@
         <!-- Profile Selection -->
         <div class="profile-selection">
           <div class="selection-header">
-            <h3>Select Profiles</h3>
             <div class="selection-controls">
               <button 
-                class="btn btn-secondary" 
+                class="btn btn-secondary mobile-btn icon-only" 
                 @click="selectAll"
                 :disabled="allProfiles.length === 0"
+                title="Select All"
               >
-                <i class="fas fa-check-double" style="margin-right: 5px;"></i>
-                Select All
+                <i class="fas fa-check-double"></i>
               </button>
               <button 
-                class="btn btn-secondary" 
+                class="btn btn-secondary mobile-btn icon-only" 
                 @click="deselectAll"
                 :disabled="selectedProfiles.length === 0"
+                title="Deselect All"
               >
-                <i class="fas fa-times" style="margin-right: 5px;"></i>
-                Deselect All
+                <i class="fas fa-times"></i>
               </button>
             </div>
           </div>
 
           <!-- Search and Filters -->
           <div class="search-filters">
-            <input 
-              v-model="searchQuery" 
-              @input="filterProfiles"
-              type="text" 
-              placeholder="Search profiles..."
-              class="search-input"
-            />
-            <select v-model="districtFilter" @change="filterProfiles" class="filter-select">
-              <option value="">All Districts</option>
-              <option v-for="district in districts" :key="district" :value="district">
-                {{ district }}
-              </option>
-            </select>
+            <div class="search-container">
+              <i class="fas fa-search search-icon"></i>
+              <input 
+                v-model="searchQuery" 
+                @input="filterProfiles"
+                type="text" 
+                placeholder="Search..."
+                class="search-input"
+              />
+            </div>
+            <div class="filter-container">
+              <i class="fas fa-filter filter-icon"></i>
+              <select v-model="districtFilter" @change="filterProfiles" class="filter-select">
+                <option value="">All</option>
+                <option v-for="district in districts" :key="district" :value="district">
+                  {{ district }}
+                </option>
+              </select>
+            </div>
+            <div class="export-options-toggle">
+              <button 
+                class="btn btn-secondary mobile-btn icon-only" 
+                @click="showExportOptions = !showExportOptions"
+                title="Export Options"
+              >
+                <i class="fas fa-ellipsis-v"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Export Options Dropdown -->
+          <div v-if="showExportOptions" class="export-options-dropdown">
+            <div class="options-grid">
+                              <div class="option-item">
+          <label class="option-label">
+            <input type="checkbox" v-model="exportOptions.includeImages" class="option-checkbox" />
+            <span class="option-text">Profile Images</span>
+          </label>
+          <small class="option-hint">May affect performance due to CORS restrictions</small>
+        </div>
+        <div class="option-item">
+          <label class="option-label">
+            <input type="checkbox" v-model="exportOptions.includeRFLoans" class="option-checkbox" />
+            <span class="option-text">RF Loans</span>
+          </label>
+        </div>
+        <div class="option-item">
+          <label class="option-label">
+            <input type="checkbox" v-model="exportOptions.includeRFHistory" class="option-checkbox" />
+            <span class="option-text">RF History</span>
+          </label>
+          <div v-if="exportOptions.includeRFHistory" class="year-range-selector">
+            <div class="date-input-group">
+              <label>From:</label>
+              <input 
+                type="month" 
+                v-model="exportOptions.rfHistoryFrom" 
+                class="date-input"
+                :max="exportOptions.rfHistoryTo"
+              />
+            </div>
+            <div class="date-input-group">
+              <label>To:</label>
+              <input 
+                type="month" 
+                v-model="exportOptions.rfHistoryTo" 
+                class="date-input"
+                :min="exportOptions.rfHistoryFrom"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="option-item">
+          <label class="option-label">
+            <input type="checkbox" v-model="exportOptions.includeGrantHistory" class="option-checkbox" />
+            <span class="option-text">Grant History</span>
+          </label>
+        </div>
+        <div class="option-item">
+          <label class="option-label">
+            <input type="checkbox" v-model="exportOptions.includeChildrenInfo" class="option-checkbox" />
+            <span class="option-text">Children Information</span>
+          </label>
+        </div>
+            </div>
           </div>
 
           <!-- Profiles List -->
@@ -78,8 +149,10 @@
                 v-for="profile in filteredProfiles" 
                 :key="profile.id"
                 class="profile-item"
-                :class="{ selected: isProfileSelected(profile.id) }"
+                :class="{ selected: isProfileSelected(profile.id), 'mobile-profile': isMobile }"
                 @click="toggleProfileSelection(profile.id)"
+                @touchstart="handleTouchStart"
+                @touchend="handleTouchEnd"
               >
                 <div class="profile-image">
                   <img 
@@ -91,7 +164,6 @@
                 <div class="profile-info">
                   <h4>{{ profile.basicInfo?.name || profile.Name || 'Unknown' }}</h4>
                   <p class="reg-id">{{ profile.id || profile.Reg_ID || 'No ID' }}</p>
-                  <p class="district">{{ profile.basicInfo?.District || profile.District || 'Unknown District' }}</p>
                   <div class="profile-tags">
                     <span v-if="hasRF(profile)" class="tag rf-tag">RF</span>
                     <span v-if="hasGrant(profile)" class="tag grant-tag">GRANT</span>
@@ -107,46 +179,23 @@
           </div>
         </div>
 
-        <!-- Export Options -->
-        <div class="export-options">
-          <h3>Export Options</h3>
-          <div class="options-grid">
-            <div class="option-item">
-              <label>
-                <input type="checkbox" v-model="exportOptions.includeImages" />
-                Include Profile Images
-              </label>
-            </div>
-            <div class="option-item">
-              <label>
-                <input type="checkbox" v-model="exportOptions.includeLoanHistory" />
-                Include Loan History
-              </label>
-            </div>
-            <div class="option-item">
-              <label>
-                <input type="checkbox" v-model="exportOptions.includeGrantHistory" />
-                Include Grant History
-              </label>
-            </div>
-          </div>
-        </div>
+        <!-- Export Options - Moved to top controls -->
       </div>
 
       <!-- Modal Footer -->
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeModal">
-          <i class="fas fa-times" style="margin-right: 5px;"></i>
-          Cancel
+        <button class="btn btn-secondary mobile-btn icon-only" @click="closeModal" title="Cancel">
+          <i class="fas fa-times"></i>
         </button>
         <button 
-          class="btn btn-primary" 
+          class="btn btn-primary mobile-btn" 
           @click="generatePDF"
           :disabled="selectedProfiles.length === 0 || generating"
+          :title="generating ? 'Generating PDF...' : `Generate PDF (${selectedProfiles.length})`"
         >
-          <i v-if="generating" class="fas fa-spinner fa-spin" style="margin-right: 5px;"></i>
-          <i v-else class="fas fa-file-pdf" style="margin-right: 5px;"></i>
-          {{ generating ? 'Generating PDF...' : `Generate PDF (${selectedProfiles.length})` }}
+          <i v-if="generating" class="fas fa-spinner fa-spin"></i>
+          <i v-else class="fas fa-file-pdf"></i>
+          <span class="btn-text" v-if="!generating">{{ selectedProfiles.length }}</span>
         </button>
       </div>
     </div>
@@ -177,11 +226,29 @@ export default {
     const searchQuery = ref('')
     const districtFilter = ref('')
     const districts = ref([])
+    const showExportOptions = ref(false)
+    
+    // Mobile detection
+    const isMobile = ref(false)
+    
+    onMounted(() => {
+      checkMobileDevice()
+      window.addEventListener('resize', checkMobileDevice)
+    })
+    
+    const checkMobileDevice = () => {
+      isMobile.value = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                       window.innerWidth <= 768
+    }
 
     const exportOptions = reactive({
       includeImages: true,
-      includeLoanHistory: true,
-      includeGrantHistory: true
+      includeRFLoans: false,
+      includeRFHistory: false,
+      rfHistoryFrom: '',
+      rfHistoryTo: '',
+      includeGrantHistory: true,
+      includeChildrenInfo: false
     })
 
     // Load profiles when modal opens
@@ -269,7 +336,20 @@ export default {
       if (imageUrl && !imageUrl.includes('http') && !imageUrl.includes('drive.google.com')) {
         const fileId = imageUrl.trim()
         if (fileId && fileId.length > 10) {
+          // Try multiple thumbnail sizes for better reliability
           return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`
+        }
+      }
+      
+      // If it's already a Google Drive URL, try to convert to thumbnail
+      if (imageUrl.includes('drive.google.com')) {
+        try {
+          const fileId = imageUrl.match(/[-\w]{25,}/)?.[0]
+          if (fileId) {
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200-h200`
+          }
+        } catch (error) {
+          console.warn('Could not extract file ID from Google Drive URL:', error)
         }
       }
       
@@ -300,7 +380,7 @@ export default {
 
       generating.value = true
       try {
-        const result = await pdfExportService.generateProfilesPDF(selectedProfiles.value)
+        const result = await pdfExportService.generateProfilesPDF(selectedProfiles.value, exportOptions)
         
         if (result.success) {
           // Download the PDF
@@ -328,31 +408,44 @@ export default {
       districtFilter.value = ''
       emit('close')
     }
-
-    return {
-      allProfiles,
-      filteredProfiles,
-      selectedProfiles,
-      loading,
-      generating,
-      searchQuery,
-      districtFilter,
-      districts,
-      exportOptions,
-      loadProfiles,
-      filterProfiles,
-      selectAll,
-      deselectAll,
-      toggleProfileSelection,
-      isProfileSelected,
-      getProfileImageUrl,
-      handleImageError,
-      hasRF,
-      hasGrant,
-      hasGIF,
-      generatePDF,
-      closeModal
+    
+    // Touch event handlers for mobile
+    const handleTouchStart = (event) => {
+      event.currentTarget.style.transform = 'scale(0.98)'
     }
+    
+    const handleTouchEnd = (event) => {
+      event.currentTarget.style.transform = 'scale(1)'
+    }
+
+          return {
+        allProfiles,
+        filteredProfiles,
+        selectedProfiles,
+        loading,
+        generating,
+        searchQuery,
+        districtFilter,
+        districts,
+        exportOptions,
+        showExportOptions,
+        isMobile,
+        loadProfiles,
+        filterProfiles,
+        selectAll,
+        deselectAll,
+        toggleProfileSelection,
+        isProfileSelected,
+        getProfileImageUrl,
+        handleImageError,
+        hasRF,
+        hasGrant,
+        hasGIF,
+        generatePDF,
+        closeModal,
+        handleTouchStart,
+        handleTouchEnd
+      }
   }
 }
 </script>
@@ -370,6 +463,9 @@ export default {
   align-items: center;
   z-index: 1000;
   padding: 20px;
+  /* Prevent body scroll on mobile */
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pdf-export-modal {
@@ -416,6 +512,23 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  /* Mobile scroll improvements */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
 }
 
 .selection-info {
@@ -456,24 +569,60 @@ export default {
 
 .search-filters {
   display: flex;
+  flex-direction: row;
   gap: 12px;
   margin-bottom: 16px;
+  align-items: center;
+}
+
+.search-container {
+  position: relative;
+  flex: 1;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 16px;
 }
 
 .search-input {
-  flex: 1;
-  padding: 10px 12px;
+  width: 100%;
+  padding: 10px 10px 10px 36px;
   border: 1px solid #ddd;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
+  box-sizing: border-box;
+}
+
+.filter-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filter-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 16px;
+  pointer-events: none;
 }
 
 .filter-select {
-  padding: 10px 12px;
+  width: 120px;
+  padding: 10px 10px 10px 36px;
   border: 1px solid #ddd;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
-  min-width: 150px;
+  background-color: white;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
 .profiles-list {
@@ -509,9 +658,11 @@ export default {
 
 .profiles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .profile-item {
@@ -523,6 +674,7 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
   background: white;
+  min-height: 80px;
 }
 
 .profile-item:hover {
@@ -535,6 +687,18 @@ export default {
   background: #e3f2fd;
 }
 
+.profile-item.mobile-profile {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.profile-item.mobile-profile:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
 .profile-image {
   width: 50px;
   height: 50px;
@@ -542,6 +706,7 @@ export default {
   overflow: hidden;
   margin-right: 12px;
   flex-shrink: 0;
+  background-color: #f5f5f5;
 }
 
 .profile-image img {
@@ -607,14 +772,29 @@ export default {
   font-size: 18px;
 }
 
-.export-options {
-  margin-bottom: 24px;
+.export-options-toggle {
+  flex-shrink: 0;
 }
 
-.export-options h3 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  color: #333;
+.export-options-dropdown {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-top: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .options-grid {
@@ -623,22 +803,88 @@ export default {
   gap: 12px;
 }
 
-.option-item label {
+.option-item {
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #f8f9fa;
+  transition: all 0.2s;
+}
+
+.option-item:hover {
+  background: #e9ecef;
+  border-color: #1565c0;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
+  min-height: 40px;
+}
+
+.option-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.option-text {
+  flex: 1;
+  font-weight: 500;
+  color: #333;
+}
+
+.option-hint {
+  display: block;
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+  font-weight: normal;
+}
+
+.year-range-selector {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.date-input-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
+  margin-bottom: 8px;
 }
 
-.option-item input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+.date-input-group:last-child {
+  margin-bottom: 0;
+}
+
+.date-input-group label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  min-width: 40px;
+}
+
+.date-input {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
 }
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 20px 24px;
   border-top: 1px solid #e0e0e0;
@@ -646,16 +892,38 @@ export default {
 }
 
 .btn {
-  padding: 10px 20px;
+  padding: 14px 20px;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px; /* Better touch target */
+  width: 100%;
+}
+
+.mobile-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-btn:active {
+  transform: scale(0.98);
+}
+
+.btn-text {
+  font-weight: 500;
+}
+
+.icon-only {
+  width: auto;
+  min-width: 48px;
+  padding: 12px;
 }
 
 .btn-primary {
@@ -682,17 +950,27 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .pdf-export-modal-overlay {
+    padding: 10px;
+  }
+  
   .pdf-export-modal {
-    margin: 10px;
+    margin: 0;
     max-height: 95vh;
+    width: 100%;
+    border-radius: 8px;
   }
   
   .modal-header {
     padding: 16px 20px;
   }
   
+  .modal-header h2 {
+    font-size: 18px;
+  }
+  
   .modal-content {
-    padding: 20px;
+    padding: 16px;
   }
   
   .selection-header {
@@ -701,21 +979,154 @@ export default {
     gap: 12px;
   }
   
+  .selection-header h3 {
+    font-size: 16px;
+  }
+  
   .search-filters {
     flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .search-input,
+  .filter-select {
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 12px 12px 12px 36px;
+  }
+  
+  .export-options-dropdown {
+    margin-top: 8px;
+    padding: 12px;
+  }
+  
+  .options-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .year-range-selector {
+    margin-top: 8px;
+    padding: 8px;
+  }
+  
+  .date-input-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .date-input-group label {
+    min-width: auto;
+  }
+  
+  .date-input {
+    width: 100%;
+    font-size: 16px; /* Prevent zoom on iOS */
   }
   
   .profiles-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 12px;
+    max-height: 350px;
+  }
+  
+  .profile-item {
+    padding: 16px;
+    min-height: 80px;
+  }
+  
+  .profile-image {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .profile-info h4 {
+    font-size: 16px;
+  }
+  
+  .profile-info p {
+    font-size: 14px;
   }
   
   .modal-footer {
     flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
   }
   
   .btn {
     width: 100%;
     justify-content: center;
+    min-height: 52px; /* Even better touch target on mobile */
+  }
+  
+  .options-grid {
+    gap: 12px;
+  }
+  
+  .option-item {
+    padding: 16px;
+  }
+  
+  .option-label {
+    min-height: 48px;
+    font-size: 16px;
+  }
+  
+  .option-checkbox {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pdf-export-modal {
+    max-height: 98vh;
+    border-radius: 6px;
+  }
+  
+  .modal-header {
+    padding: 14px 16px;
+  }
+  
+  .modal-content {
+    padding: 14px;
+  }
+  
+  .search-filters {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .filter-select {
+    width: 100%;
+  }
+  
+  .profiles-grid {
+    grid-template-columns: 1fr;
+    padding: 8px;
+    max-height: 300px;
+  }
+  
+  .profile-item {
+    padding: 12px;
+  }
+  
+  .profile-image {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .btn {
+    min-height: 56px;
+    font-size: 16px;
+  }
+  
+  .modal-footer {
+    flex-direction: row;
+    gap: 8px;
   }
 }
 </style>

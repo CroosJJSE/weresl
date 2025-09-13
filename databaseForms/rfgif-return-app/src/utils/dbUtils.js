@@ -19,7 +19,8 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
-import { RootCollection, SearchElementDoc, ProfileField, LoanType, RF_LOAN_FIELD, LoanStatus } from '../enums/db.js'
+import { RootCollection, SearchElementDoc, ProfileField, RF_LOAN_FIELD } from '../enums/db.js'
+import { LoanType, LoanStatus } from '../enums/loans.js'
 
 /**
  * Get profile by Registration ID

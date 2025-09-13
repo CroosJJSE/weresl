@@ -154,25 +154,6 @@
           
           <div class="form-row">
             <div class="form-group">
-              <label for="receiverSelect">{{ t('form.receiver') }} *</label>
-              <select 
-                id="receiverSelect" 
-                v-model="rfData.receiver" 
-                class="form-control"
-                :class="{ 'error': showRFReceiverError && !rfData.receiver }"
-                required
-                @blur="validateRFReceiver"
-              >
-                <option value="">{{ t('form.selectReceiver') }}</option>
-                <option v-for="receiver in receivers" :key="receiver" :value="receiver">
-                  {{ receiver }}
-                </option>
-              </select>
-              <span v-if="showRFReceiverError && !rfData.receiver" class="error-message">
-                {{ t('form.pleaseSelectReceiver') }}
-              </span>
-            </div>
-            <div class="form-group">
               <label for="repaymentAmount">{{ t('form.repaymentAmount') }} *</label>
               <input 
                 type="number" 
@@ -281,10 +262,9 @@ import {
   ProfileField, 
   RF_LOAN_FIELD, 
   RF_RETURN_RECORD_FIELD,
-  GIF_RETURN_RECORD_FIELD,
-  LoanStatus,
-  ReturnRecordStatus
+  GIF_RETURN_RECORD_FIELD
 } from '../enums/db.js'
+import { LoanStatus, ReturnRecordStatus } from '../enums/loans.js'
 import { getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
 import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
 import { createTimestamp } from '../utils/regIdUtils.js'
@@ -313,9 +293,6 @@ export default {
     const showRFBillError = ref(false)
     const showRFReceiverError = ref(false)
 
-    // Receivers Data
-    const receivers = ref([])
-
     // GIF Return Data
     const gifData = reactive({
       description: ''
@@ -336,11 +313,18 @@ export default {
 
     // Computed properties
     const totalBalance = computed(() => {
-      return activeRFLoans.value.reduce((sum, loan) => sum + (loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0), 0)
+      console.log('[TOTAL BALANCE DEBUG] Active RF loans:', activeRFLoans.value)
+      const balance = activeRFLoans.value.reduce((sum, loan) => {
+        const currentBalance = loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0
+        console.log('[TOTAL BALANCE DEBUG] Loan:', loan.id, 'Current Balance:', currentBalance)
+        return sum + currentBalance
+      }, 0)
+      console.log('[TOTAL BALANCE DEBUG] Total balance:', balance)
+      return balance
     })
 
     const canSubmitRF = computed(() => {
-      return rfData.amount > 0 && rfData.receiver && rfData.billFile && !loading.value
+      return rfData.amount > 0 && rfData.billFile && !loading.value
     })
 
     const hasGrantLoans = computed(() => {
@@ -437,6 +421,7 @@ export default {
               const dateB = b[RF_LOAN_FIELD.INITIATION_DATE]?.toDate?.() || new Date(b[RF_LOAN_FIELD.INITIATION_DATE])
               return dateA - dateB
             })
+          console.log('[LOAD LOANS DEBUG] Loaded RF loans:', activeRFLoans.value)
         } else {
           activeRFLoans.value = []
         }
@@ -764,21 +749,9 @@ export default {
       showRFReceiverError.value = true
     }
 
-    const loadReceivers = async () => {
-      try {
-        const receiversQuery = query(collection(db, RootCollection.BANK_ACCOUNTS))
-        const receiversSnapshot = await getDocs(receiversQuery)
-        receivers.value = receiversSnapshot.docs.map(doc => doc.id)
-        console.log('[RECEIVERS] Loaded bank accounts:', receivers.value.length, 'accounts')
-      } catch (error) {
-        console.error('Error loading receivers:', error)
-        errorMessage.value = t('form.errorLoadingReceivers')
-      }
-    }
-
     // Load receivers on component mount
     onMounted(() => {
-      loadReceivers()
+      // Receivers loading removed - using empty string
     })
 
     return {
@@ -789,7 +762,6 @@ export default {
       gifData,
       rfData,
       activeRFLoans,
-      receivers,
       billPreview,
       billError,
       successMessage,

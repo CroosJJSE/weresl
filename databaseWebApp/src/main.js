@@ -5,6 +5,7 @@ import App from './App.vue'
 
 // Import pages
 import HomePage from './pages/main/HomePage.vue'
+import PdfExportPage from './pages/PdfExportPage.vue'
 
 // Create router
 const routes = [
@@ -12,6 +13,11 @@ const routes = [
     path: '/',
     name: 'Home',
     component: HomePage
+  },
+  {
+    path: '/pdf-export',
+    name: 'PdfExport',
+    component: PdfExportPage
   }
 ]
 

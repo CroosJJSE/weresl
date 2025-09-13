@@ -21,6 +21,8 @@
       <button @click="clearSuccessMessage" class="close-message">&times;</button>
     </div>
 
+
+
     <!-- Statistics Cards -->
     <div class="stats-grid">
       <div class="stat-card" @click="activeTab = 'loans'" :class="{ active: activeTab === 'loans' }">
@@ -33,7 +35,12 @@
           <div class="stat-label">Payment</div>
         </div>
       </div>
-      <div class="stat-card" @click="showBankAccountModal = true">
+      <div class="stat-card" @click="activeTab = 'coordinator'" :class="{ active: activeTab === 'coordinator' }">
+        <div class="stat-content">
+          <div class="stat-label">Coordinator</div>
+        </div>
+      </div>
+      <div class="stat-card" @click="navigateToBankAccounts">
         <div class="stat-content">
           <div class="stat-label">Bank Account</div>
         </div>
@@ -88,47 +95,27 @@
               </div>
               <div class="loan-actions">
                 <button 
-                  @click="approveLoan(loan.regId, loan.loanId)" 
-                  class="btn btn-success"
-                  :disabled="approvingLoans.includes(`${loan.regId}_${loan.loanId}`)"
-                >
-                  <span v-if="approvingLoans.includes(`${loan.regId}_${loan.loanId}`)" class="loader"></span>
-                  {{ approvingLoans.includes(`${loan.regId}_${loan.loanId}`) ? 'Approving...' : 'Approve' }}
-                </button>
-                <button 
                   @click="editLoan(loan)" 
-                  class="btn btn-secondary"
-                  :disabled="approvingLoans.includes(`${loan.regId}_${loan.loanId}`)"
+                  class="btn btn-primary"
                 >
-                  Edit
+                  Edit & Approve
                 </button>
               </div>
             </div>
             
-            <div class="loan-details">
-              <div class="detail-row">
-                <span class="label">Loan ID:</span>
-                <span class="value">{{ loan.loanId }}</span>
+            <!-- Compact loan info -->
+            <div class="loan-compact-info">
+              <div class="compact-row">
+                <span class="compact-label">Amount:</span>
+                <span class="compact-value">{{ formatAmount(loan.amount) }}</span>
               </div>
-              <div class="detail-row">
-                <span class="label">Loan Type:</span>
-                <span class="value">{{ loan.loanType }}</span>
+              <div class="compact-row">
+                <span class="compact-label">Type:</span>
+                <span class="compact-value">{{ loan.loanType }}</span>
               </div>
-              <div class="detail-row">
-                <span class="label">Amount:</span>
-                <span class="value">Rs. {{ formatAmount(loan.amount) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Purpose:</span>
-                <span class="value">{{ loan.purpose }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Source:</span>
-                <span class="value">{{ loan.source || 'Not specified' }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Request Date:</span>
-                <span class="value">{{ formatDate(loan.createdAt) }}</span>
+              <div class="compact-row">
+                <span class="compact-label">Date:</span>
+                <span class="compact-value">{{ formatDate(loan.createdAt) }}</span>
               </div>
             </div>
           </div>
@@ -144,92 +131,66 @@
         <!-- Payment Requests -->
         <div v-if="pendingPayments.length > 0" class="subsection">
           <h3>Payment Requests ({{ pendingPayments.length }})</h3>
-        <div class="payment-grid">
-          <div v-for="payment in pendingPayments" :key="payment.id" class="payment-card">
-            <div class="payment-header">
-              <div class="profile-info">
-                <div class="profile-picture">
-                  <img 
-                    v-if="payment.profilePicture" 
-                    :src="payment.profilePicture" 
-                    :alt="payment.name"
-                    @error="handleImageError"
-                    @load="handleImageLoad"
-                  />
-                  <div v-else class="profile-placeholder">
-                    {{ getInitials(payment.name) }}
+          <div class="payment-grid">
+            <div v-for="payment in pendingPayments" :key="payment.id" class="payment-card">
+              <div class="payment-header">
+                <div class="profile-info">
+                  <div class="profile-picture">
+                    <img 
+                      v-if="payment.profilePicture" 
+                      :src="payment.profilePicture" 
+                      :alt="payment.name"
+                      @error="handleImageError"
+                      @load="handleImageLoad"
+                    />
+                    <div v-else class="profile-placeholder">
+                      {{ getInitials(payment.name) }}
+                    </div>
+                  </div>
+                  <div class="profile-details">
+                    <h3>{{ payment.name }}</h3>
+                    <p class="reg-id">Reg ID: {{ payment.regId }}</p>
+                    <p class="district">District: {{ payment.district }}</p>
+                    <p class="contact" v-if="payment.contact">Contact: {{ payment.contact }}</p>
+                    <p class="age" v-if="payment.age">Age: {{ payment.age }} years</p>
                   </div>
                 </div>
-                <div class="profile-details">
-                  <h3>{{ payment.name }}</h3>
-                  <p class="reg-id">Reg ID: {{ payment.regId }}</p>
-                  <p class="district">District: {{ payment.district }}</p>
-                  <p class="contact" v-if="payment.contact">Contact: {{ payment.contact }}</p>
-                  <p class="age" v-if="payment.age">Age: {{ payment.age }} years</p>
+                <div class="payment-actions">
+                  <button 
+                    @click="editPaymentForApproval(payment)" 
+                    class="btn btn-primary"
+                    :disabled="approvingPayments.includes(payment.id)"
+                  >
+                    <span v-if="approvingPayments.includes(payment.id)" class="loader"></span>
+                    {{ approvingPayments.includes(payment.id) ? 'Processing...' : 'Edit & Approve' }}
+                  </button>
                 </div>
               </div>
-              <div class="payment-actions">
-                <button 
-                  @click="approvePayment(payment.id)" 
-                  class="btn btn-success"
-                  :disabled="approvingPayments.includes(payment.id)"
-                >
-                  <span v-if="approvingPayments.includes(payment.id)" class="loader"></span>
-                  {{ approvingPayments.includes(payment.id) ? 'Approving...' : 'Approve' }}
-                </button>
-                <button 
-                  @click="editPayment(payment)" 
-                  class="btn btn-secondary"
-                  :disabled="approvingPayments.includes(payment.id)"
-                >
-                  Edit
-                </button>
+              
+              <!-- Compact payment info -->
+              <div class="payment-compact-info">
+                <div class="compact-row">
+                  <span class="compact-label">Amount:</span>
+                  <span class="compact-value">{{ formatAmount(payment.paidAmount) }}</span>
+                </div>
+                <div class="compact-row">
+                  <span class="compact-label">Balance:</span>
+                  <span class="compact-value">{{ formatAmount(payment.totalBalance) }}</span>
+                </div>
+                <div class="compact-row">
+                  <span class="compact-label">Date:</span>
+                  <span class="compact-value">{{ formatDate(payment.createdAt) }}</span>
+                </div>
               </div>
-            </div>
-            
-            <div class="payment-details">
-              <div class="detail-row">
-                <span class="label">Payment Amount:</span>
-                <span class="value">Rs. {{ formatAmount(payment.amount) }}</span>
-              </div>
-              <div class="detail-row" v-if="payment.paidAmount">
-                <span class="label">Paid Amount:</span>
-                <span class="value">Rs. {{ formatAmount(payment.paidAmount) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Receiver:</span>
-                <span class="value">{{ payment.receiver }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Total Balance:</span>
-                <span class="value">Rs. {{ formatAmount(payment.totalBalance) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Active Loans:</span>
-                <span class="value">{{ payment.activeLoans?.length || 0 }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Request Date:</span>
-                <span class="value">{{ formatDate(payment.createdAt) }}</span>
-              </div>
-              <div class="detail-row" v-if="payment.driveLink">
-                <span class="label">Receipt:</span>
-                <span class="value">
-                  <a :href="payment.driveLink" target="_blank" class="receipt-link">
-                    View Receipt
-                  </a>
-                </span>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
         <!-- GIF Returns -->
         <div v-if="pendingGIFReturns.length > 0" class="subsection">
           <h3>GIF Returns ({{ pendingGIFReturns.length }})</h3>
-        <div class="gif-return-grid">
-          <div v-for="gifReturn in pendingGIFReturns" :key="gifReturn.id" class="gif-return-card">
+          <div class="gif-return-grid">
+            <div v-for="gifReturn in pendingGIFReturns" :key="gifReturn.id" class="gif-return-card">
             <div class="gif-return-header">
               <div class="profile-info">
                 <div class="profile-picture">
@@ -300,6 +261,82 @@
       </div>
     </div>
 
+    <!-- Coordinator Tab -->
+    <div v-if="activeTab === 'coordinator'" class="tab-content">
+      <div class="section">
+        <h2>Coordinator View</h2>
+        
+        <!-- Bank Account Filter -->
+        <div class="coordinator-filters">
+          <div class="filter-group">
+            <label for="bankAccountFilter">Select Bank Account:</label>
+            <select 
+              id="bankAccountFilter" 
+              v-model="selectedBankAccount" 
+              @change="loadCoordinatorData"
+              class="form-control"
+            >
+              <option value="">Select a Bank Account</option>
+              <option v-for="account in bankAccounts" :key="account.name" :value="account.name">
+                {{ account.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="loadingCoordinatorData" class="loading-message">
+          <div class="loader"></div>
+          <p>Loading coordinator data...</p>
+        </div>
+        <div v-else-if="!selectedBankAccount" class="no-coordinator-data">
+          <p>Please select a bank account to view coordinator data.</p>
+        </div>
+        <div v-else-if="coordinatorLoans.length === 0" class="no-coordinator-data">
+          <p>No RF loans found for the selected coordinator.</p>
+        </div>
+        <div v-else class="coordinator-list">
+          <div v-for="loan in coordinatorLoans" :key="loan.regId" class="coordinator-row">
+            <div class="loan-id">{{ loan.regId }}</div>
+            <div class="loan-name">{{ loan.name }}</div>
+            <div class="current-month-payment" 
+                 :class="{ 'paid': getCurrentMonthPayment(loan).paid, 'unpaid': !getCurrentMonthPayment(loan).paid }"
+                 @click="showReturnHistory(loan.regId)">
+              <span class="month">{{ getCurrentMonthName() }}</span>
+              <span class="amount" v-if="getCurrentMonthPayment(loan).paid">
+                {{ formatAmount(getCurrentMonthPayment(loan).amount) }}
+              </span>
+              <span class="status" v-else>Unpaid</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Return History Modal -->
+    <div v-if="showReturnHistoryModal" class="modal-overlay" @click="closeReturnHistoryModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>RF Return History</h3>
+          <button @click="closeReturnHistoryModal" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="loadingReturnHistory" class="loading-message">
+            <div class="loader"></div>
+            <p>Loading return history...</p>
+          </div>
+          <div v-else-if="returnHistory.length === 0" class="no-return-history">
+            <p>No return history found for this profile.</p>
+          </div>
+          <div v-else class="return-history-list">
+            <div v-for="(returnRecord, index) in returnHistory" :key="index" class="return-record">
+              <div class="return-date">{{ formatDateTime(returnRecord.date) }}</div>
+              <div class="return-amount">{{ formatAmount(returnRecord.amount) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Edit Loan Modal -->
     <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
       <div class="modal-content" @click.stop>
@@ -320,53 +357,81 @@
           </div>
           <div class="form-group">
             <label>Loan Type:</label>
-            <select v-model="editingLoan.loanType" class="form-control">
+            <select v-model="editingLoan.loanType" class="form-control" disabled>
               <option value="RF">RF Loan</option>
               <option value="GRANT">Grant</option>
             </select>
+            <small class="form-help">Loan type cannot be changed during approval</small>
           </div>
           <div class="form-group">
-            <label>Amount:</label>
+            <label>Amount: <span class="required">*</span></label>
             <input 
               type="number" 
               v-model="editingLoan.amount" 
               class="form-control"
+              :class="{ 'error': !editingLoan.amount || editingLoan.amount <= 0 }"
               min="0"
+              required
             />
+            <small class="form-help" v-if="!editingLoan.amount || editingLoan.amount <= 0">
+              Amount is required and must be greater than 0
+            </small>
           </div>
           <div class="form-group">
-            <label>Purpose:</label>
+            <label>Purpose: <span class="required">*</span></label>
             <textarea 
               v-model="editingLoan.purpose" 
               class="form-control"
+              :class="{ 'error': !editingLoan.purpose || editingLoan.purpose.trim() === '' }"
               rows="3"
+              required
             ></textarea>
+            <small class="form-help" v-if="!editingLoan.purpose || editingLoan.purpose.trim() === ''">
+              Purpose is required
+            </small>
           </div>
           <div class="form-group">
-            <label>Source:</label>
-            <select v-model="editingLoan.source" class="form-control">
+            <label>Source: <span class="required">*</span></label>
+            <select v-model="editingLoan.source" class="form-control" :class="{ 'error': !editingLoan.source || editingLoan.source.trim() === '' }" required>
               <option value="">Select Source</option>
               <option v-for="source in availableSources" :key="source" :value="source">
                 {{ source }}
               </option>
             </select>
+            <small class="form-help" v-if="!editingLoan.source || editingLoan.source.trim() === ''">
+              Source is required
+            </small>
           </div>
           <div class="form-group">
-            <label>Request Date:</label>
+            <label>ARMS (Optional):</label>
+            <select v-model="editingLoan.arms" class="form-control">
+              <option value="">Select ARMS (Optional)</option>
+              <option v-for="(value, key) in armsOptions" :key="key" :value="value">
+                {{ value }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Request Date: <span class="required">*</span></label>
             <input 
               type="date" 
               v-model="editingLoan.requestDate" 
               class="form-control"
+              :class="{ 'error': !editingLoan.requestDate }"
+              required
             />
+            <small class="form-help" v-if="!editingLoan.requestDate">
+              Request date is required
+            </small>
           </div>
           <div class="form-actions">
             <button 
               type="submit" 
-              class="btn btn-primary"
-              :disabled="savingLoan"
+              class="btn btn-success"
+              :disabled="savingLoan || !isFormValid"
             >
               <span v-if="savingLoan" class="loader"></span>
-              {{ savingLoan ? 'Saving...' : 'Save Changes' }}
+              {{ savingLoan ? 'Approving...' : 'Approve Loan' }}
             </button>
             <button type="button" @click="closeEditModal" class="btn btn-secondary">Cancel</button>
           </div>
@@ -381,7 +446,7 @@
           <h3>Edit Payment Request</h3>
           <button @click="closeEditPaymentModal" class="close-btn">&times;</button>
         </div>
-        <form @submit.prevent="savePaymentEdit" class="edit-form">
+        <form class="edit-form">
           <div class="form-group">
             <label>Payment ID:</label>
             <input 
@@ -423,6 +488,21 @@
             </select>
           </div>
           <div class="form-group">
+            <label>Target Loan: <span style="color: red;">*</span></label>
+            <select v-model="editingPayment.targetLoanId" class="form-control" required>
+              <option value="">Select Target Loan</option>
+              <option 
+                v-for="loan in editingPayment.availableLoans" 
+                :key="loan.id" 
+                :value="loan.id"
+              >
+                {{ loan.id }} - Balance: {{ formatAmount(loan.currentBalance) }} 
+                ({{ loan.purpose || 'No purpose' }})
+              </option>
+            </select>
+            <small class="form-help">Choose which loan this payment will be applied to</small>
+          </div>
+          <div class="form-group">
             <label>Date:</label>
             <input 
               type="date" 
@@ -441,14 +521,33 @@
             <small class="form-help">Total balance is read-only</small>
           </div>
 
+          <div class="form-group" v-if="editingPayment.receiptDriveLinkId">
+            <label>Receipt:</label>
+            <div class="receipt-link-container">
+              <a 
+                :href="convertGoogleDriveUrl(editingPayment.receiptDriveLinkId)" 
+                target="_blank" 
+                class="receipt-link-btn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14,2 14,8 20,8"></polyline>
+                </svg>
+                View Receipt
+              </a>
+            </div>
+            <small class="form-help">Click to view the payment receipt</small>
+          </div>
+
           <div class="form-actions">
             <button 
-              type="submit" 
-              class="btn btn-primary"
+              type="button"
+              @click="approveEditedPayment" 
+              class="btn btn-success"
               :disabled="savingPayment"
             >
               <span v-if="savingPayment" class="loader"></span>
-              {{ savingPayment ? 'Saving...' : 'Save Changes' }}
+              {{ savingPayment ? 'Processing...' : 'Approve Payment' }}
             </button>
             <button type="button" @click="closeEditPaymentModal" class="btn btn-secondary">Cancel</button>
           </div>
@@ -518,144 +617,59 @@
       </div>
     </div>
 
-    <!-- Bank Account Management Modal -->
-    <div v-if="showBankAccountModal" class="modal-overlay" @click="closeBankAccountModal">
-      <div class="modal-content bank-account-modal" @click.stop>
+    <!-- Loan Selection Modal for Payment Approval -->
+    <div v-if="showLoanSelectionModal" class="modal-overlay" @click="closeLoanSelectionModal">
+      <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>Bank Account Management</h3>
-          <button @click="closeBankAccountModal" class="close-btn">&times;</button>
+          <h3>Select Loan for Payment</h3>
+          <button @click="closeLoanSelectionModal" class="close-btn">&times;</button>
         </div>
-        
-        <div class="bank-account-content">
-          <!-- wereSL Account Balance Update -->
-          <div class="section">
-            <h4>Update Budget Balance</h4>
-            <div class="wereSL-balance-form">
-              <div class="balance-edit-container">
-                <div v-if="!editingWereSL" class="balance-display" @click="startEditWereSL">
-                  <span class="balance-amount">Rs. {{ formatAmountWithCommas(wereSLBalance) }}</span>
-                  <span class="edit-tag">edit</span>
-                </div>
-                <div v-else class="balance-edit-form">
-                  <input
-                    v-model="newWereSLBalance"
-                    type="number"
-                    class="form-control"
-                    min="0"
-                    step="0.01"
-                    placeholder="Enter new balance"
-                    @keyup.enter="updateWereSLBalance"
-                  />
-                  <button @click="updateWereSLBalance" class="btn btn-primary" :disabled="updatingWereSL">
-                    <span v-if="updatingWereSL" class="loader"></span>
-                    {{ updatingWereSL ? 'Saving...' : 'Save' }}
-                  </button>
-                  <button @click="cancelEditWereSL" class="btn btn-secondary">Cancel</button>
-                </div>
-                <div v-if="editingWereSL" class="balance-change">
-                  {{ formatAmountWithCommas(wereSLBalance) }} → {{ formatAmountWithCommas(newWereSLBalance) }}
-                </div>
-              </div>
-            </div>
+        <div class="modal-body">
+          <div class="loan-selection-info">
+            <p><strong>Reg ID:</strong> {{ selectedPaymentForLoan?.regId }}</p>
+            <p><strong>Payment Amount:</strong> {{ formatAmount(selectedPaymentForLoan?.paidAmount || 0) }}</p>
+            <p><strong>Available Loans:</strong> {{ availableLoansForPayment?.length || 0 }}</p>
           </div>
-
-          <!-- Money Transfer Section -->
-          <div class="section">
-            <h4>Transfer Money</h4>
-            <div class="transfer-form">
-              <select v-model="transferFromAccount" class="form-control" @change="updateTransferValidation">
-                <option value="">Source</option>
-                <option v-for="account in bankAccounts" :key="account.name" :value="account.name">
-                  {{ account.name }}
-                </option>
-              </select>
-              <select v-model="transferToAccount" class="form-control" @change="updateTransferValidation">
-                <option value="">Destination</option>
-                <option v-for="account in bankAccounts" :key="account.name" :value="account.name">
-                  {{ account.name }}
-                </option>
-              </select>
-              <input
-                type="number"
-                v-model="transferAmount"
-                class="form-control"
-                min="0"
-                step="0.01"
-                placeholder="Amount"
-                @input="updateTransferValidation"
-              />
-              <button
-                @click="transferMoney"
-                class="btn btn-success"
-                :disabled="transferring || !canTransfer"
+          
+          <div class="loan-selection-form">
+            <label for="loanSelect">Choose Loan to Apply Payment:</label>
+            <select 
+              id="loanSelect" 
+              v-model="selectedLoanForPayment" 
+              class="form-control"
+              @change="onLoanSelectionChange"
+            >
+              <option value="">Select a loan...</option>
+              <option 
+                v-for="loan in availableLoansForPayment" 
+                :key="loan.id" 
+                :value="loan.id"
               >
-                <span v-if="transferring" class="loader"></span>
-                {{ transferring ? 'Transferring...' : 'Transfer' }}
+                {{ loan.id }} - Balance: {{ formatAmount(loan.currentBalance) }} 
+                ({{ loan.purpose || 'No purpose' }})
+              </option>
+            </select>
+            
+            <div v-if="selectedLoanForPayment" class="loan-details">
+              <h4>Selected Loan Details:</h4>
+              <div class="loan-info">
+                <p><strong>Loan ID:</strong> {{ selectedLoanForPayment }}</p>
+                <p><strong>Current Balance:</strong> {{ formatAmount(getSelectedLoanDetails()?.currentBalance || 0) }}</p>
+                <p><strong>Purpose:</strong> {{ getSelectedLoanDetails()?.purpose || 'No purpose' }}</p>
+                <p><strong>Source:</strong> {{ getSelectedLoanDetails()?.source || 'Unknown' }}</p>
+              </div>
+            </div>
+            
+            <div class="modal-actions">
+              <button 
+                @click="confirmLoanSelection" 
+                class="btn btn-primary"
+                :disabled="!selectedLoanForPayment || processingLoanSelection"
+              >
+                <span v-if="processingLoanSelection" class="loader"></span>
+                {{ processingLoanSelection ? 'Processing...' : 'Apply Payment to Selected Loan' }}
               </button>
-              <small class="form-help" v-if="transferValidationMessage" :class="{ 'error': transferValidationError }">
-                {{ transferValidationMessage }}
-              </small>
-            </div>
-          </div>
-
-          <!-- Account Balances Overview -->
-          <div class="section">
-            <div class="section-header" @click="toggleAccountBalances">
-              <h4>Account Balances</h4>
-              <div class="expand-icon" :class="{ expanded: showAccountBalances }">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6,9 12,15 18,9"></polyline>
-                </svg>
-              </div>
-            </div>
-            <div v-if="showAccountBalances" class="section-content">
-              <div class="account-balances-grid">
-                <div v-for="account in bankAccounts" :key="account.name" class="account-balance-tile">
-                  <div class="account-name">{{ getAccountFirstName(account.name) }}</div>
-                  <div class="account-balance">Rs. {{ formatAmountInMillions(account.currentBankBalance || 0) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Transaction History -->
-          <div class="section">
-            <div class="section-header" @click="toggleTransactionHistory">
-              <h4>Transaction History</h4>
-              <span class="toggle-icon">{{ showTransactionHistory ? '−' : '+' }}</span>
-            </div>
-            <div v-if="showTransactionHistory" class="section-content">
-              <div class="transaction-filters">
-                <select v-model="transactionFilter.account" class="form-control">
-                  <option value="">All Accounts</option>
-                  <option v-for="account in bankAccounts" :key="account.name" :value="account.name">
-                    {{ account.name }}
-                  </option>
-                </select>
-                <select v-model="transactionFilter.type" class="form-control">
-                  <option value="">All Types</option>
-                  <option value="transfer">Internal</option>
-                  <option value="loan_approval">Loan</option>
-                  <option value="payment_approval">Payment</option>
-                </select>
-              </div>
-              <div class="transaction-history">
-                <div v-for="transaction in filteredTransactions" :key="transaction.id" class="transaction-item">
-                  <div class="transaction-simple">
-                    <div class="transaction-main">
-                      <span class="transaction-type-tag" :class="getTransactionTypeClass(transaction.type)">
-                        {{ getTransactionTypeLabel(transaction.type) === 'Internal Transaction' ? 'INT' : (transaction.type === 'loan_approval' ? 'LOAN' : 'PAY') }}
-                      </span>
-                      <span class="transaction-accounts">
-                        {{ getTransactionSender(transaction) }} → {{ getTransactionReceiver(transaction) }}
-                      </span>
-                      <span class="transaction-amount">Rs. {{ formatAmountWithCommas(transaction.amount) }}</span>
-                      <span class="transaction-date">{{ formatDate(transaction.timestamp) }}</span>
-                      <span v-if="transaction.loanId" class="transaction-regid">{{ transaction.loanId }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <button @click="closeLoanSelectionModal" class="btn btn-secondary">Cancel</button>
             </div>
           </div>
         </div>
@@ -666,12 +680,14 @@
 
 <script>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { adminDbService } from '../services/dbService.js'
 import { convertGoogleDriveUrl } from '../utils/driveUtils.js'
-import { RF_RETURN_RECORD_FIELD, GIF_RETURN_RECORD_FIELD, ProfileField, RootCollection } from '../enums/db.js'
+import { RF_RETURN_RECORD_FIELD, GIF_RETURN_RECORD_FIELD, ProfileField, RootCollection, BANK_ACCOUNT_FIELD } from '../enums/db.js'
 import { updateMainTabRow } from '../utils/gasUtils.js'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/index.js'
+import { getProfileByRegId } from '../utils/dbUtils.js'
 
 export default {
   name: 'AdminDashboard',
@@ -696,6 +712,12 @@ export default {
     const savingPayment = ref(false)
     const savingGIFReturn = ref(false)
     const availableSources = ref([])
+    const armsOptions = {
+      EDEN: 'EDEN',
+      ARK: 'ARK',
+      METAMORPHOSIS: 'Metamorphosis',
+      KEYSTONE: 'Keystone'
+    }
 
     // Sheets Update
     const isUpdatingSheets = ref(false)
@@ -705,53 +727,36 @@ export default {
       status: 'Ready'
     })
 
-    // Bank Account Management
-    const showBankAccountModal = ref(false)
+    // Bank accounts for coordinator functionality only
     const bankAccounts = ref([])
-    const wereSLBalance = ref(0)
-    const editingWereSL = ref(false)
-    const newWereSLBalance = ref('')
-    const updatingWereSL = ref(false)
-    const transferFromAccount = ref('')
-    const transferToAccount = ref('')
-    const transferAmount = ref('')
-    const transferring = ref(false)
-    const transferValidationMessage = ref('')
-    const transferValidationError = ref(false)
-    const canTransfer = ref(false)
-
-    // Expandable sections
-    const showAccountBalances = ref(false)
-    const showTransactionHistory = ref(false)
-    
-    // Transaction history
-    const transactionHistory = ref([])
-    const loadingTransactions = ref(false)
-    
-    // Transaction filters
-    const transactionFilter = ref({
-      account: '',
-      type: ''
-    })
 
     const pendingLoanCount = computed(() => pendingLoans.value.length)
     const pendingPaymentCount = computed(() => pendingPayments.value.length)
     const pendingGIFReturnCount = computed(() => pendingGIFReturns.value.length)
 
-    // Bank Account Computed Properties
-    const totalBankBalance = computed(() => {
-      return bankAccounts.value.reduce((sum, account) => sum + (account.currentBankBalance || 0), 0)
-    })
+    // Load bank accounts for coordinator functionality
+    const loadBankAccounts = async () => {
+      try {
+        const result = await adminDbService.getAllBankAccounts()
+        if (result.success) {
+          bankAccounts.value = result.data
+        } else {
+          console.error('Failed to load bank accounts:', result.message)
+          bankAccounts.value = []
+        }
+      } catch (error) {
+        console.error('Error loading bank accounts:', error)
+        bankAccounts.value = []
+      }
+    }
 
     // Load pending loans from SearchElements/pending-loan
     const loadPendingLoans = async () => {
       try {
-        console.log('🔄 Loading pending loans...')
         loading.value = true
         pendingLoans.value = await adminDbService.getPendingLoans()
-        console.log('✅ Loaded pending loans:', pendingLoans.value.length)
       } catch (error) {
-        console.error('❌ Error loading pending loans:', error)
+        // Handle error silently
       } finally {
         loading.value = false
       }
@@ -760,33 +765,27 @@ export default {
     // Load pending payments
     const loadPendingPayments = async () => {
       try {
-        console.log('🔄 Loading pending payments...')
         pendingPayments.value = await adminDbService.getPendingPayments()
-        console.log('✅ Loaded pending payments:', pendingPayments.value.length)
       } catch (error) {
-        console.error('❌ Error loading pending payments:', error)
+        // Handle error silently
       }
     }
 
     // Load pending GIF returns
     const loadPendingGIFReturns = async () => {
       try {
-        console.log('🔄 Loading pending GIF returns...')
         pendingGIFReturns.value = await adminDbService.getPendingGIFReturns()
-        console.log('✅ Loaded pending GIF returns:', pendingGIFReturns.value.length)
       } catch (error) {
-        console.error('❌ Error loading pending GIF returns:', error)
+        // Handle error silently
       }
     }
 
     // Load available sources
     const loadAvailableSources = async () => {
       try {
-        console.log('🔄 Loading available sources...')
         availableSources.value = await adminDbService.getAvailableSources()
-        console.log('✅ Loaded sources:', availableSources.value)
       } catch (error) {
-        console.error('❌ Error loading sources:', error)
+        // Handle error silently
       }
     }
 
@@ -805,8 +804,6 @@ export default {
           status: '🔄 Loading profiles...'
         }
 
-        console.log('🔄 Starting Sheets update...')
-        
         // Get all profiles
         const profilesResult = await adminDbService.getAllProfiles()
         if (!profilesResult.success) {
@@ -835,252 +832,53 @@ export default {
           sheetsProgress.value.status = `⚡ Processing batch ${batchNumber}/${totalBatches} (${totalCompleted + totalFailed}/${profiles.length} completed)...`
 
           // Process batch in parallel
-          const batchPromises = batch.map(async (profile, index) => {
-            const currentIndex = startIndex + index + 1
-            const profileId = profile[ProfileField.REG_ID] || profile.regId || profile.id
-
-            sheetsProgress.value.status = `📝 Processing ${profileId} (${currentIndex}/${profiles.length})...`
-
+          const batchPromises = batch.map(async (profile) => {
             try {
-              // Update Sheets using the existing updateMainTabRow function
-              await updateMainTabRow(profile)
-              totalCompleted++
-              console.log(`✅ Updated Sheets for profile ${profileId}`)
+              const profileId = profile.id || profile.Reg_ID
+              if (!profileId) return
+
+              const result = await updateMainTabRow(profile)
+              if (result.success) {
+                totalCompleted++
+              } else {
+                totalFailed++
+              }
             } catch (error) {
               totalFailed++
-              console.error(`❌ Failed to update Sheets for profile ${profileId}:`, error)
             }
           })
 
-          await Promise.all(batchPromises)
+          await Promise.allSettled(batchPromises)
+
+          // Update progress
+          sheetsProgress.value.current = totalCompleted + totalFailed
+          sheetsProgress.value.status = `📊 Progress: ${totalCompleted + totalFailed}/${profiles.length} profiles processed`
         }
 
-        // Update final status
-        sheetsProgress.value.current = totalCompleted
-        sheetsProgress.value.status = `✅ Completed ${totalCompleted}/${profiles.length} profiles (${totalFailed} failed)`
-
-        // Show final result
-        if (totalFailed === 0) {
-          sheetsProgress.value.status = `🎉 Successfully updated ${totalCompleted} profiles!`
-          showSuccessMessage(`✅ Successfully updated Sheets with ${totalCompleted} profiles!`)
-        } else {
-          sheetsProgress.value.status = `⚠️ Updated ${totalCompleted} profiles, ${totalFailed} failed`
-          showSuccessMessage(`⚠️ Updated ${totalCompleted} profiles, ${totalFailed} failed. Check console for details.`, 'warning')
-        }
-
-        console.log(`🎉 Sheets update completed: ${totalCompleted}/${profiles.length} profiles updated`)
+        sheetsProgress.value.status = `🎉 Completed: ${totalCompleted} updated, ${totalFailed} failed`
+        showSuccessMessage(`Sheets update completed: ${totalCompleted} profiles updated, ${totalFailed} failed`)
 
       } catch (error) {
-        console.error('❌ Error during Sheets update:', error)
-        sheetsProgress.value.status = `❌ Update failed: ${error.message}`
-        showSuccessMessage(`❌ Sheets update failed: ${error.message}`, 'error')
+        showSuccessMessage('Error during Sheets update. Please try again.', 'error')
       } finally {
         isUpdatingSheets.value = false
-        sheetsProgress.value.status = 'Ready'
-      }
-    }
-
-    // Bank Account Management Methods
-    
-    // Load bank accounts
-    const loadBankAccounts = async () => {
-      try {
-        console.log('🔄 Loading bank accounts...')
-        bankAccounts.value = await adminDbService.getAllBankAccounts()
-        console.log('✅ Loaded bank accounts:', bankAccounts.value.length)
-        
-        // Find wereSL account and set its balance
-        const wereSLAccount = bankAccounts.value.find(account => account.name === 'wereSL')
-        if (wereSLAccount) {
-          wereSLBalance.value = wereSLAccount.currentBankBalance || 0
-          console.log('💰 wereSL balance:', wereSLBalance.value)
+        sheetsProgress.value = {
+          current: 0,
+          total: 0,
+          status: 'Ready'
         }
-      } catch (error) {
-        console.error('❌ Error loading bank accounts:', error)
       }
     }
 
-    // Update wereSL balance
-    const updateWereSLBalance = async () => {
-      try {
-        const newBalance = parseFloat(newWereSLBalance.value)
-        if (isNaN(newBalance) || newBalance < 0) {
-          showSuccessMessage('Please enter a valid positive amount', 'error')
-          return
-        }
 
-        updatingWereSL.value = true
-        console.log('🔄 Updating wereSL balance to:', newBalance)
-        
-        await adminDbService.updateBankBalance('wereSL', newBalance)
-        
-        // Update local state
-        wereSLBalance.value = newBalance
-        newWereSLBalance.value = ''
-        
-        // Refresh bank accounts
-        await loadBankAccounts()
-        
-        // Refresh transaction history if it's currently shown
-        if (showTransactionHistory.value) {
-          await loadTransactionHistory()
-        }
-        
-        showSuccessMessage('wereSL balance updated successfully!')
-        console.log('✅ wereSL balance updated')
-      } catch (error) {
-        console.error('❌ Error updating wereSL balance:', error)
-        showSuccessMessage('Error updating wereSL balance. Please try again.', 'error')
-      } finally {
-        updatingWereSL.value = false
-      }
-    }
-
-    // Update transfer validation
-    const updateTransferValidation = () => {
-      const fromAccount = transferFromAccount.value
-      const toAccount = transferToAccount.value
-      const amount = parseFloat(transferAmount.value)
-      
-      // Reset validation
-      transferValidationMessage.value = ''
-      transferValidationError.value = false
-      canTransfer.value = false
-      
-      // Check if all fields are filled
-      if (!fromAccount || !toAccount || !amount) {
-        return
-      }
-      
-      // Check if same account
-      if (fromAccount === toAccount) {
-        transferValidationMessage.value = 'Cannot transfer to the same account'
-        transferValidationError.value = true
-        return
-      }
-      
-      // Check if amount is valid
-      if (isNaN(amount) || amount <= 0) {
-        transferValidationMessage.value = 'Amount must be a positive number'
-        transferValidationError.value = true
-        return
-      }
-      
-      // Check if source account has sufficient balance
-      const sourceAccount = bankAccounts.value.find(account => account.name === fromAccount)
-      if (!sourceAccount) {
-        transferValidationMessage.value = 'Source account not found'
-        transferValidationError.value = true
-        return
-      }
-      
-      const sourceBalance = sourceAccount.currentBankBalance || 0
-      if (sourceBalance < amount) {
-        transferValidationMessage.value = `Insufficient balance. Available: Rs. ${sourceBalance.toLocaleString()}, Required: Rs. ${amount.toLocaleString()}`
-        transferValidationError.value = true
-        return
-      }
-      
-      // All validations passed
-      transferValidationMessage.value = `Transfer Rs. ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`
-      canTransfer.value = true
-    }
-
-    // Transfer money between accounts
-    const transferMoney = async () => {
-      try {
-        const fromAccount = transferFromAccount.value
-        const toAccount = transferToAccount.value
-        const amount = parseFloat(transferAmount.value)
-        
-        if (!canTransfer.value) {
-          showSuccessMessage('Please fix validation errors before transferring', 'error')
-          return
-        }
-
-        transferring.value = true
-        console.log('🔄 Transferring money:', amount, 'from', fromAccount, 'to', toAccount)
-        
-        const result = await adminDbService.transferMoneyBetweenAccounts(fromAccount, toAccount, amount)
-        
-        // Reset form
-        transferFromAccount.value = ''
-        transferToAccount.value = ''
-        transferAmount.value = ''
-        transferValidationMessage.value = ''
-        canTransfer.value = false
-        
-        // Refresh bank accounts
-        await loadBankAccounts()
-        
-        // Refresh transaction history if it's currently shown
-        if (showTransactionHistory.value) {
-          await loadTransactionHistory()
-        }
-        
-        showSuccessMessage(`Successfully transferred Rs. ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`)
-        console.log('✅ Money transferred successfully')
-      } catch (error) {
-        console.error('❌ Error transferring money:', error)
-        showSuccessMessage(error.message || 'Error transferring money. Please try again.', 'error')
-      } finally {
-        transferring.value = false
-      }
-    }
-
-    // Close bank account modal
-    const closeBankAccountModal = () => {
-      console.log('🔄 Closing bank account modal')
-      showBankAccountModal.value = false
-      // Reset form values
-      newWereSLBalance.value = ''
-      transferFromAccount.value = ''
-      transferToAccount.value = ''
-      transferAmount.value = ''
-      transferValidationMessage.value = ''
-      canTransfer.value = false
-      // Reset expandable sections
-      showAccountBalances.value = false
-      showTransactionHistory.value = false
-    }
-
-    // Load transaction history
-    const loadTransactionHistory = async () => {
-      try {
-        loadingTransactions.value = true
-        console.log('🔄 Loading transaction history...')
-        transactionHistory.value = await adminDbService.getWereSLTransactionHistory()
-        console.log('✅ Loaded transaction history:', transactionHistory.value.length, 'transactions')
-      } catch (error) {
-        console.error('❌ Error loading transaction history:', error)
-        transactionHistory.value = []
-      } finally {
-        loadingTransactions.value = false
-      }
-    }
-
-    // Toggle account balances section
-    const toggleAccountBalances = () => {
-      showAccountBalances.value = !showAccountBalances.value
-    }
-
-    // Toggle transaction history section
-    const toggleTransactionHistory = async () => {
-      showTransactionHistory.value = !showTransactionHistory.value
-      if (showTransactionHistory.value && transactionHistory.value.length === 0) {
-        await loadTransactionHistory()
-      }
-    }
 
     // Approve loan (removed Sheets integration)
     const approveLoan = async (regId, loanId) => {
       try {
         const uniqueId = `${regId}_${loanId}`
-        console.log('🔄 Approving loan for RegID:', regId, 'LoanID:', loanId)
         approvingLoans.value.push(uniqueId)
         
         const loan = pendingLoans.value.find(l => l.regId === regId && l.loanId === loanId)
-        console.log('🔍 DEBUG: Found loan object:', loan)
         if (loan) {
           await adminDbService.approveLoan(regId, loan.loanType, loan.loanId)
           
@@ -1093,10 +891,8 @@ export default {
           }
           
           showSuccessMessage('Loan approved successfully!')
-          console.log('✅ Loan approved for RegID:', regId, 'LoanID:', loanId)
         }
       } catch (error) {
-        console.error('❌ Error approving loan:', error)
         // Show specific error message for insufficient balance
         if (error.message && error.message.includes('Insufficient balance')) {
           showSuccessMessage(error.message, 'error')
@@ -1111,8 +907,6 @@ export default {
 
     // Edit loan
     const editLoan = (loan) => {
-      console.log('🔄 Opening edit modal for loan:', loan)
-      
       editingLoan.value = { 
         ...loan,
         requestDate: loan.createdAt ? new Date(loan.createdAt.toDate()).toISOString().split('T')[0] : ''
@@ -1120,34 +914,55 @@ export default {
       showEditModal.value = true
     }
 
-    // Save loan edit
+    // Form validation computed property
+    const isFormValid = computed(() => {
+      const loan = editingLoan.value
+      return loan.amount && 
+             loan.amount > 0 && 
+             loan.purpose && 
+             loan.purpose.trim() !== '' && 
+             loan.source && 
+             loan.source.trim() !== '' &&
+             loan.requestDate
+    })
+
+    // Approve loan (updated from save loan edit)
     const saveLoanEdit = async () => {
-      const currentRegId = editingLoan.value.regId // Store regId at the beginning
-      console.log('🔄 Saving loan edit for regId:', currentRegId)
+      const currentRegId = editingLoan.value.regId
       
       try {
+        // Validate form
+        if (!isFormValid.value) {
+          showSuccessMessage('Please fill in all required fields before approving', 'error')
+          return
+        }
+        
         savingLoan.value = true
         
         const loan = editingLoan.value
+        
+        // First update the loan with the edited values
         await adminDbService.updateLoan(loan.regId, loan.loanType, loan.loanId, {
           amount: parseFloat(loan.amount),
           purpose: loan.purpose,
-          source: loan.source
+          source: loan.source,
+          arms: loan.arms
         })
+        
+        // Then approve the loan
+        await adminDbService.approveLoan(loan.regId, loan.loanType, loan.loanId)
         
         closeEditModal()
         await loadPendingLoans()
-        showSuccessMessage('Loan updated successfully!')
-        console.log('✅ Loan updated successfully')
-        
-        // Small delay to ensure UI updates properly
-        setTimeout(() => {
-          console.log('🔄 UI state updated after edit')
-        }, 100)
+        showSuccessMessage('Loan approved successfully!')
         
       } catch (error) {
-        console.error('❌ Error updating loan:', error)
-        showSuccessMessage('Error updating loan. Please try again.', 'error')
+        // Show specific error message for insufficient balance
+        if (error.message && error.message.includes('Insufficient balance')) {
+          showSuccessMessage(error.message, 'error')
+        } else {
+          showSuccessMessage('Error approving loan. Please try again.', 'error')
+        }
       } finally {
         savingLoan.value = false
       }
@@ -1156,7 +971,6 @@ export default {
     // Approve payment (removed Sheets integration)
     const approvePayment = async (paymentId) => {
       try {
-        console.log('🔄 Approving payment:', paymentId)
         approvingPayments.value.push(paymentId)
         
         await adminDbService.approvePayment(paymentId)
@@ -1170,35 +984,135 @@ export default {
         }
         
         showSuccessMessage('Payment approved successfully!')
-        console.log('✅ Payment approved:', paymentId)
       } catch (error) {
-        console.error('❌ Error approving payment:', error)
         showSuccessMessage('Error approving payment. Please try again.', 'error')
       } finally {
         approvingPayments.value = approvingPayments.value.filter(id => id !== paymentId)
       }
     }
 
-    // Edit payment
-    const editPayment = (payment) => {
-      console.log('🔄 Opening edit payment modal for:', payment)
-      
-      // Prepare the payment data for editing
-      editingPayment.value = { 
-        ...payment,
-        paidAmount: payment.paidAmount || payment.amount || 0,
-        date: payment.timestamp ? new Date(payment.timestamp.toDate()).toISOString().split('T')[0] : ''
+    // New payment approval with loan selection
+    const approvePaymentWithLoanSelection = async (paymentId) => {
+      try {
+        // Get the payment data
+        const payment = pendingPayments.value.find(p => p.id === paymentId)
+        if (!payment) {
+          showSuccessMessage('Payment not found', 'error')
+          return
+        }
+
+        // Get available loans for this profile
+        const rfLoansResult = await adminDbService.getProfileRFLoans(payment.regId)
+        if (!rfLoansResult.success) {
+          showSuccessMessage('Failed to get loans for this profile', 'error')
+          return
+        }
+
+        const activeLoans = rfLoansResult.data.filter(loan => loan.status === 'active')
+        
+        if (activeLoans.length === 0) {
+          showSuccessMessage('No active loans found for this profile', 'error')
+          return
+        }
+
+        if (activeLoans.length === 1) {
+          // Only one loan, proceed directly
+          await approvePaymentToSpecificLoan(paymentId, activeLoans[0].id)
+        } else {
+          // Multiple loans, show selection modal
+          selectedPaymentForLoan.value = payment
+          availableLoansForPayment.value = activeLoans
+          selectedLoanForPayment.value = ''
+          
+          showLoanSelectionModal.value = true
+        }
+      } catch (error) {
+        showSuccessMessage('Error preparing payment approval', 'error')
       }
-      
-      showEditPaymentModal.value = true
     }
 
-    // Save payment edit
-    const savePaymentEdit = async () => {
+    // Approve payment to a specific loan
+    const approvePaymentToSpecificLoan = async (paymentId, loanId) => {
+      try {
+        approvingPayments.value.push(paymentId)
+        
+        await adminDbService.approvePaymentToSpecificLoan(paymentId, loanId)
+        
+        await loadPendingPayments()
+        
+        // Refresh bank accounts and transaction history if shown
+        await loadBankAccounts()
+        if (showTransactionHistory.value) {
+          await loadTransactionHistory()
+        }
+        
+        showSuccessMessage('Payment approved successfully!')
+      } catch (error) {
+        showSuccessMessage('Error approving payment. Please try again.', 'error')
+      } finally {
+        approvingPayments.value = approvingPayments.value.filter(id => id !== paymentId)
+      }
+    }
+
+    // Edit payment for approval (new streamlined flow)
+    const editPaymentForApproval = async (payment) => {
+      try {
+        // Load available loans for this profile
+        const rfLoansResult = await adminDbService.getProfileRFLoans(payment.regId)
+        let availableLoans = []
+        
+        if (rfLoansResult.success) {
+          availableLoans = rfLoansResult.data.filter(loan => loan.status === 'active')
+        }
+        
+        // Prepare the payment data for editing
+        editingPayment.value = { 
+          ...payment,
+          paidAmount: payment.paidAmount || payment.amount || 0,
+          date: payment.timestamp ? new Date(payment.timestamp.toDate()).toISOString().split('T')[0] : '',
+          availableLoans: availableLoans,
+          targetLoanId: payment.targetLoanId || '' // Add target loan ID field
+        }
+        
+        showEditPaymentModal.value = true
+      } catch (error) {
+        showSuccessMessage('Error loading loans for this profile', 'error')
+      }
+    }
+
+    // Edit payment
+    const editPayment = async (payment) => {
+      try {
+        // Load available loans for this profile
+        const rfLoansResult = await adminDbService.getProfileRFLoans(payment.regId)
+        let availableLoans = []
+        
+        if (rfLoansResult.success) {
+          availableLoans = rfLoansResult.data.filter(loan => loan.status === 'active')
+        }
+        
+        // Prepare the payment data for editing
+        editingPayment.value = { 
+          ...payment,
+          paidAmount: payment.paidAmount || payment.amount || 0,
+          date: payment.timestamp ? new Date(payment.timestamp.toDate()).toISOString().split('T')[0] : '',
+          availableLoans: availableLoans,
+          targetLoanId: payment.targetLoanId || '' // Add target loan ID field
+        }
+        
+        showEditPaymentModal.value = true
+      } catch (error) {
+        showSuccessMessage('Error loading loans for this profile', 'error')
+      }
+    }
+
+    // Approve edited payment (new streamlined flow)
+    const approveEditedPayment = async () => {
       try {
         // Validation
         const paidAmount = parseFloat(editingPayment.value.paidAmount)
         const totalBalance = parseFloat(editingPayment.value.totalBalance)
+        const targetLoanId = editingPayment.value.targetLoanId
         
         // Check if paid amount is empty or invalid
         if (!paidAmount || paidAmount <= 0) {
@@ -1212,12 +1126,19 @@ export default {
           return
         }
         
-        savingPayment.value = true
-        console.log('🔄 Saving payment edit:', editingPayment.value)
+        // Check if target loan is selected
+        if (!targetLoanId) {
+          showSuccessMessage('Please select a target loan', 'error')
+          return
+        }
         
+        savingPayment.value = true
+        
+        // First, update the payment record
         const updateData = {
           [RF_RETURN_RECORD_FIELD.PAID_AMOUNT]: paidAmount,
-          [RF_RETURN_RECORD_FIELD.RECEIVER]: editingPayment.value.receiver
+          [RF_RETURN_RECORD_FIELD.RECEIVER]: editingPayment.value.receiver,
+          targetLoanId: targetLoanId
         }
         
         // Add date if it was changed
@@ -1225,15 +1146,79 @@ export default {
           updateData[RF_RETURN_RECORD_FIELD.TIMESTAMP] = new Date(editingPayment.value.date)
         }
         
+        // Update the payment record
         await adminDbService.updatePayment(editingPayment.value.id, updateData)
+        
+        // Now approve the payment using the existing approval logic
+        await approvePaymentToSpecificLoan(editingPayment.value.id, targetLoanId)
+        
+        closeEditPaymentModal()
+        showSuccessMessage('Payment updated and approved successfully!')
+        
+      } catch (error) {
+        showSuccessMessage('Error updating and approving payment. Please try again.', 'error')
+      } finally {
+        savingPayment.value = false
+      }
+    }
+
+    // Save payment edit
+    const savePaymentEdit = async () => {
+      try {
+        console.log('🔍 savePaymentEdit called')
+        
+        // Validation
+        const paidAmount = parseFloat(editingPayment.value.paidAmount)
+        const totalBalance = parseFloat(editingPayment.value.totalBalance)
+        const targetLoanId = editingPayment.value.targetLoanId
+        
+        console.log('📊 Validation data:', { paidAmount, totalBalance, targetLoanId })
+        
+        // Check if paid amount is empty or invalid
+        if (!paidAmount || paidAmount <= 0) {
+          showSuccessMessage('Paid amount must be greater than 0', 'error')
+          return
+        }
+        
+        // Check if paid amount is greater than total balance
+        if (paidAmount > totalBalance) {
+          showSuccessMessage('Paid amount cannot be greater than total balance', 'error')
+          return
+        }
+        
+        // Check if target loan is selected
+        if (!targetLoanId) {
+          showSuccessMessage('Please select a target loan', 'error')
+          return
+        }
+        
+        console.log('✅ Validation passed, proceeding with save')
+        
+        savingPayment.value = true
+        
+        const updateData = {
+          [RF_RETURN_RECORD_FIELD.PAID_AMOUNT]: paidAmount,
+          [RF_RETURN_RECORD_FIELD.RECEIVER]: editingPayment.value.receiver,
+          targetLoanId: targetLoanId // Add target loan ID to update data
+        }
+        
+        // Add date if it was changed
+        if (editingPayment.value.date) {
+          updateData[RF_RETURN_RECORD_FIELD.TIMESTAMP] = new Date(editingPayment.value.date)
+        }
+        
+        console.log('📝 Update data:', updateData)
+        
+        await adminDbService.updatePayment(editingPayment.value.id, updateData)
+        
+        console.log('✅ Payment updated successfully, closing modal')
         
         closeEditPaymentModal()
         await loadPendingPayments()
         showSuccessMessage('Payment updated successfully!')
-        console.log('✅ Payment updated successfully')
         
       } catch (error) {
-        console.error('❌ Error updating payment:', error)
+        console.error('❌ Error in savePaymentEdit:', error)
         showSuccessMessage('Error updating payment. Please try again.', 'error')
       } finally {
         savingPayment.value = false
@@ -1242,7 +1227,6 @@ export default {
 
     // Close edit payment modal
     const closeEditPaymentModal = () => {
-      console.log('🔄 Closing edit payment modal')
       showEditPaymentModal.value = false
       editingPayment.value = {}
     }
@@ -1250,15 +1234,13 @@ export default {
     // Approve GIF return
     const approveGIFReturn = async (gifReturnId) => {
       try {
-        console.log('🔄 Approving GIF return:', gifReturnId)
         approvingGIFReturns.value.push(gifReturnId)
         
         await adminDbService.approveGIFReturn(gifReturnId)
+        
         await loadPendingGIFReturns()
         showSuccessMessage('GIF return approved successfully!')
-        console.log('✅ GIF return approved:', gifReturnId)
       } catch (error) {
-        console.error('❌ Error approving GIF return:', error)
         showSuccessMessage('Error approving GIF return. Please try again.', 'error')
       } finally {
         approvingGIFReturns.value = approvingGIFReturns.value.filter(id => id !== gifReturnId)
@@ -1267,14 +1249,10 @@ export default {
 
     // Edit GIF return
     const editGIFReturn = (gifReturn) => {
-      console.log('🔄 Opening edit GIF return modal for:', gifReturn)
-      
-      // Prepare the GIF return data for editing
       editingGIFReturn.value = { 
         ...gifReturn,
-        date: gifReturn.createdAt ? new Date(gifReturn.createdAt.toDate()).toISOString().split('T')[0] : ''
+        date: gifReturn.timestamp ? new Date(gifReturn.timestamp.toDate()).toISOString().split('T')[0] : ''
       }
-      
       showEditGIFReturnModal.value = true
     }
 
@@ -1282,10 +1260,10 @@ export default {
     const saveGIFReturnEdit = async () => {
       try {
         savingGIFReturn.value = true
-        console.log('🔄 Saving GIF return edit:', editingGIFReturn.value)
         
         const updateData = {
-          [GIF_RETURN_RECORD_FIELD.DESCRIPTION]: editingGIFReturn.value.description
+          [GIF_RETURN_RECORD_FIELD.DESCRIPTION]: editingGIFReturn.value.description,
+          [GIF_RETURN_RECORD_FIELD.STATUS]: editingGIFReturn.value.status
         }
         
         // Add date if it was changed
@@ -1298,10 +1276,8 @@ export default {
         closeEditGIFReturnModal()
         await loadPendingGIFReturns()
         showSuccessMessage('GIF return updated successfully!')
-        console.log('✅ GIF return updated successfully')
         
       } catch (error) {
-        console.error('❌ Error updating GIF return:', error)
         showSuccessMessage('Error updating GIF return. Please try again.', 'error')
       } finally {
         savingGIFReturn.value = false
@@ -1310,7 +1286,6 @@ export default {
 
     // Close edit GIF return modal
     const closeEditGIFReturnModal = () => {
-      console.log('🔄 Closing edit GIF return modal')
       showEditGIFReturnModal.value = false
       editingGIFReturn.value = {}
     }
@@ -1330,23 +1305,29 @@ export default {
 
     // Utility functions
     const formatAmount = (amount) => {
-      return new Intl.NumberFormat('en-IN').format(amount)
+      return new Intl.NumberFormat('en-US').format(amount)
     }
 
     const formatAmountInMillions = (amount) => {
-      if (amount >= 1000000) {
-        return (amount / 1000000).toFixed(1) + 'M'
-      } else if (amount >= 1000) {
-        return (amount / 1000).toFixed(1) + 'K'
-      } else {
-        return formatAmount(amount)
-      }
+      return new Intl.NumberFormat('en-US').format(amount)
     }
 
     const formatDate = (date) => {
       if (!date) return 'N/A'
       const d = date.toDate ? date.toDate() : new Date(date)
       return d.toLocaleDateString('en-IN')
+    }
+
+    const formatDateTime = (date) => {
+      if (!date) return 'N/A'
+      const d = date.toDate ? date.toDate() : new Date(date)
+      return d.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
     }
 
     const getInitials = (name) => {
@@ -1356,9 +1337,6 @@ export default {
 
     // Use the centralized convertGoogleDriveUrl function
     const handleImageError = (event) => {
-      console.log('❌ Image failed to load:', event.target.src)
-      console.log('🔄 Attempting to convert Google Drive URL...')
-      
       // Try to convert Google Drive URL to direct image URL
       const originalSrc = event.target.src
       if (originalSrc.includes('drive.google.com/file/d/')) {
@@ -1367,13 +1345,11 @@ export default {
           // Try thumbnail first, then fallback to uc format
           if (!event.target.dataset.retryAttempt || event.target.dataset.retryAttempt === '1') {
             const directUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`
-            console.log('🔄 Trying thumbnail URL:', directUrl)
             event.target.dataset.retryAttempt = '1'
             event.target.src = directUrl
             return
           } else if (event.target.dataset.retryAttempt === '1') {
             const fallbackUrl = `https://drive.google.com/uc?export=view&id=${fileId}`
-            console.log('🔄 Trying fallback URL:', fallbackUrl)
             event.target.dataset.retryAttempt = '2'
             event.target.src = fallbackUrl
             return
@@ -1382,7 +1358,6 @@ export default {
       }
       
       // If all attempts fail, hide image and show placeholder
-      console.log('❌ All image loading attempts failed, showing placeholder')
       event.target.style.display = 'none'
       const placeholder = event.target.nextElementSibling
       if (placeholder) {
@@ -1391,7 +1366,6 @@ export default {
     }
 
     const handleImageLoad = (event) => {
-      console.log('✅ Image loaded successfully:', event.target.src)
       // Hide placeholder if image loads successfully
       const placeholder = event.target.nextElementSibling
       if (placeholder) {
@@ -1400,32 +1374,26 @@ export default {
     }
 
     const closeEditModal = () => {
-      console.log('🔄 Closing edit modal')
       showEditModal.value = false
       editingLoan.value = {}
     }
 
     onMounted(async () => {
-      console.log('🚀 Admin Dashboard mounted')
       try {
         initialLoading.value = true
-        console.log('🔄 Starting initial data load...')
         
         // Load all data in parallel
         await Promise.all([
           loadPendingLoans(),
           loadPendingPayments(),
-          loadPendingGIFReturns(), // Added loadPendingGIFReturns
-          loadAvailableSources(),
-          loadBankAccounts() // Added loadBankAccounts
+          loadPendingGIFReturns(),
+          loadAvailableSources()
         ])
         
-        console.log('✅ Initial data load completed')
       } catch (error) {
-        console.error('❌ Error during initial load:', error)
+        // Handle error silently
       } finally {
         initialLoading.value = false
-        console.log('🎉 Admin Dashboard ready')
       }
     })
 
@@ -1500,119 +1468,366 @@ export default {
     // Format amount with commas (1,900,000)
     const formatAmountWithCommas = (amount) => {
       if (!amount || isNaN(amount)) return '0'
-      return parseFloat(amount).toLocaleString('en-IN')
+      return parseFloat(amount).toLocaleString('en-US')
     }
 
-    return {
-      pendingLoans,
-      pendingPayments,
-      pendingLoanCount,
-      pendingPaymentCount,
-      pendingGIFReturnCount,
-      pendingGIFReturns, // Added pendingGIFReturns to return
-      showEditModal,
-      showEditPaymentModal,
-      showEditGIFReturnModal, // Added showEditGIFReturnModal to return
-      editingLoan,
-      editingPayment,
-      editingGIFReturn, // Added editingGIFReturn to return
-      loading,
-      initialLoading,
-      activeTab,
-      approvingLoans,
-      approvingPayments,
-      approvingGIFReturns, // Added approvingGIFReturns to return
-      successMessage,
-      savingLoan,
-      savingPayment,
-      savingGIFReturn, // Added savingGIFReturn to return
-      availableSources,
-      approveLoan,
-      editLoan,
-      saveLoanEdit,
-      approvePayment,
-      editPayment,
-      savePaymentEdit,
-      closeEditPaymentModal,
-      showSuccessMessage,
-      clearSuccessMessage,
-      formatAmount,
-      formatAmountInMillions,
-      formatDate,
-      getInitials,
-      convertGoogleDriveUrl,
-      handleImageError,
-      handleImageLoad,
-      closeEditModal,
-      approveGIFReturn, // Added approveGIFReturn to return
-      editGIFReturn, // Added editGIFReturn to return
-      saveGIFReturnEdit, // Added saveGIFReturnEdit to return
-      closeEditGIFReturnModal, // Added closeEditGIFReturnModal to return
-      showBankAccountModal, // Added showBankAccountModal to return
-      bankAccounts, // Added bankAccounts to return
-      wereSLBalance, // Added wereSLBalance to return
-      editingWereSL, // Added editingWereSL to return
-      newWereSLBalance, // Added newWereSLBalance to return
-      updatingWereSL, // Added updatingWereSL to return
-      transferFromAccount, // Added transferFromAccount to return
-      transferToAccount, // Added transferToAccount to return
-      transferAmount, // Added transferAmount to return
-      transferring, // Added transferring to return
-      transferValidationMessage, // Added transferValidationMessage to return
-      transferValidationError, // Added transferValidationError to return
-      canTransfer, // Added canTransfer to return
-      updateTransferValidation, // Added updateTransferValidation to return
-      updateWereSLBalance, // Added updateWereSLBalance to return
-      transferMoney, // Added transferMoney to return
-      closeBankAccountModal, // Added closeBankAccountModal to return
-      totalBankBalance, // Added totalBankBalance to return
-      showAccountBalances, // Added showAccountBalances to return
-      showTransactionHistory, // Added showTransactionHistory to return
-      transactionHistory, // Added transactionHistory to return
-      loadingTransactions, // Added loadingTransactions to return
-      loadTransactionHistory, // Added loadTransactionHistory to return
-      toggleAccountBalances, // Added toggleAccountBalances to return
-      toggleTransactionHistory, // Added toggleTransactionHistory to return
-      getTransactionTypeLabel, // Added getTransactionTypeLabel to return
-      getAccountFirstName, // Added getAccountFirstName to return
-      getTransactionSender, // Added getTransactionSender to return
-      getTransactionReceiver, // Added getTransactionReceiver to return
-      getTransactionTypeClass, // Added getTransactionTypeClass to return
-      transactionFilter, // Added transactionFilter to return
-      filteredTransactions: computed(() => {
-        let filtered = transactionHistory.value;
-        if (transactionFilter.value.account) {
-          filtered = filtered.filter(t => 
-            t.fromAccount === transactionFilter.value.account || 
-            t.toAccount === transactionFilter.value.account ||
-            t.sourceAccount === transactionFilter.value.account ||
-            t.receiverAccount === transactionFilter.value.account
-          );
+    // Coordinator functionality
+    const coordinatorLoans = ref([])
+    const loadingCoordinatorData = ref(false)
+    const showReturnHistoryModal = ref(false)
+    const returnHistory = ref([])
+    const loadingReturnHistory = ref(false)
+    const selectedRegId = ref('')
+    const selectedBankAccount = ref('')
+
+    // Load coordinator data
+    const loadCoordinatorData = async () => {
+      try {
+        loadingCoordinatorData.value = true
+        
+        // Check if a bank account is selected
+        if (!selectedBankAccount.value) {
+          coordinatorLoans.value = []
+          return
         }
-        if (transactionFilter.value.type) {
-          filtered = filtered.filter(t => t.type === transactionFilter.value.type);
+        
+        // Get only the selected bank account
+        const bankAccountsResult = await adminDbService.getAllBankAccounts()
+        
+        if (!bankAccountsResult.success) {
+          throw new Error('Failed to get bank accounts')
         }
-        // Only show transactions with valid sender/receiver and amount > 0
-        filtered = filtered.filter(t => {
-          const sender = getTransactionSender(t);
-          const receiver = getTransactionReceiver(t);
-          return sender !== '-' && receiver !== '-' && t.amount && t.amount > 0;
-        });
-        return filtered;
-      }),
-      editingWereSL, // Added editingWereSL to return
-      startEditWereSL, // Added startEditWereSL to return
-      cancelEditWereSL, // Added cancelEditWereSL to return
-      formatAmountWithCommas, // Added formatAmountWithCommas to return
-      getTransactionSender, // Added getTransactionSender to return
-      getTransactionReceiver, // Added getTransactionReceiver to return
-      getTransactionTypeClass, // Added getTransactionTypeClass to return
-      transactionFilter, // Added transactionFilter to return
-      // Sheets Update
-      isUpdatingSheets,
-      sheetsProgress,
-      startGoogleSheetsUpdate
+        
+        // Find the selected bank account
+        const selectedAccount = bankAccountsResult.data.find(account => account.name === selectedBankAccount.value)
+        
+        if (!selectedAccount) {
+          coordinatorLoans.value = []
+          return
+        }
+        
+        const allLoans = []
+        const rfLoans = selectedAccount[BANK_ACCOUNT_FIELD.RF_LOANS] || {}
+        
+        // Define current month and year at the top level
+        const currentMonth = new Date().toLocaleString('en-US', { month: 'long' })
+        const currentYear = new Date().getFullYear()
+        
+        for (const [regId, regData] of Object.entries(rfLoans)) {
+          if (regId) {
+            // Get profile data
+            const profileResult = await getProfileByRegId(regId)
+            if (profileResult.success && profileResult.data) {
+              const profile = profileResult.data
+              
+              // Process payment data from BANK_ACCOUNT.RF_LOANS
+              const payments = {}
+              
+              // Check BANK_ACCOUNT.RF_LOANS for current month payments
+              if (typeof regData === 'object' && regData !== null) {
+                let totalCurrentMonthAmount = 0
+                
+                for (const [dateKey, isPaid] of Object.entries(regData)) {
+                  if (dateKey && isPaid) {
+                    // Parse DDMMYYYY:amount format
+                    const parts = dateKey.split(':')
+                    if (parts.length === 2) {
+                      const dateStr = parts[0]
+                      const amount = parseInt(parts[1]) || 0
+                      
+                      // Convert DDMMYYYY to month name
+                      const month = getMonthFromDateKey(dateStr)
+                      
+                      // Parse the year from the dateStr
+                      const paymentYear = parseInt(dateStr.substring(4, 8))
+                      
+                      // Only process current month and year payments for coordinator view
+                      if (month === currentMonth && paymentYear === currentYear) {
+                        totalCurrentMonthAmount += amount
+                      }
+                    }
+                  }
+                }
+                
+                if (totalCurrentMonthAmount > 0) {
+                  payments[currentMonth] = {
+                    paid: true,
+                    amount: totalCurrentMonthAmount
+                  }
+                }
+              }
+              
+              // Add current month if not paid
+              if (!payments[currentMonth]) {
+                payments[currentMonth] = {
+                  paid: false,
+                  amount: 0
+                }
+              }
+              
+              allLoans.push({
+                regId,
+                name: profile.fullName || profile.Name || 'Unknown',
+                payments,
+                bankAccount: selectedAccount.name
+              })
+            } else {
+              // Add regId even if profile not found, with unknown name
+              allLoans.push({
+                regId,
+                name: 'Unknown',
+                payments: {
+                  [currentMonth]: {
+                    paid: false,
+                    amount: 0
+                  }
+                },
+                bankAccount: selectedAccount.name
+              })
+            }
+          }
+        }
+        
+        coordinatorLoans.value = allLoans
+      } catch (error) {
+        console.error('❌ Error loading coordinator data:', error)
+        coordinatorLoans.value = []
+      } finally {
+        loadingCoordinatorData.value = false
+      }
     }
+
+    // Get month name from DDMMYYYY format
+    const getMonthFromDateKey = (dateKey) => {
+      try {
+        if (dateKey.length === 8) {
+          const day = dateKey.substring(0, 2)
+          const month = dateKey.substring(2, 4)
+          const year = dateKey.substring(4, 8)
+          
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+          return date.toLocaleString('en-US', { month: 'long' })
+        }
+        return dateKey
+      } catch (error) {
+        return dateKey
+      }
+    }
+
+    // Show return history for a profile
+    const showReturnHistory = async (regId) => {
+      try {
+        selectedRegId.value = regId
+        showReturnHistoryModal.value = true
+        loadingReturnHistory.value = true
+        
+        // Get profile data
+        const profileResult = await getProfileByRegId(regId)
+        if (profileResult.success && profileResult.data) {
+          const profile = profileResult.data
+          const rfReturnHistory = profile[ProfileField.RF_RETURN_HISTORY] || {}
+          
+          // Convert to array format - show separate entries for each payment
+          const historyArray = []
+          for (const [timestampKey, amount] of Object.entries(rfReturnHistory)) {
+            if (timestampKey && amount) {
+              // Parse the timestamp (YYYY-MM-DD-HH-MIN format)
+              const parts = timestampKey.split('-')
+              if (parts.length >= 5) {
+                const year = parseInt(parts[0])
+                const month = parseInt(parts[1]) - 1 // Month is 0-indexed
+                const day = parseInt(parts[2])
+                const hours = parseInt(parts[3])
+                const minutes = parseInt(parts[4])
+                
+                const date = new Date(year, month, day, hours, minutes)
+                historyArray.push({
+                  date: date,
+                  amount: amount,
+                  timestamp: timestampKey
+                })
+              }
+            }
+          }
+          
+          // Sort by date (newest first)
+          historyArray.sort((a, b) => b.date - a.date)
+          returnHistory.value = historyArray
+        } else {
+          returnHistory.value = []
+        }
+      } catch (error) {
+        console.error('Error loading return history:', error)
+        returnHistory.value = []
+      } finally {
+        loadingReturnHistory.value = false
+      }
+    }
+
+    // Close return history modal
+    const closeReturnHistoryModal = () => {
+      showReturnHistoryModal.value = false
+      returnHistory.value = []
+      selectedRegId.value = ''
+    }
+
+    // Watch for coordinator tab activation
+    watch(activeTab, (newTab) => {
+      if (newTab === 'coordinator') {
+        // Load bank accounts list for dropdown (but not the data)
+        if (bankAccounts.value.length === 0) {
+          loadBankAccounts()
+        }
+      }
+    })
+
+    // Get current month name
+    const getCurrentMonthName = () => {
+      return new Date().toLocaleString('en-US', { month: 'long' })
+    }
+
+    // Get current month payment for a loan
+    const getCurrentMonthPayment = (loan) => {
+      const currentMonth = getCurrentMonthName()
+      return loan.payments[currentMonth] || { paid: false, amount: 0 }
+    }
+
+    // Navigate to bank accounts page
+    const router = useRouter()
+    const navigateToBankAccounts = () => {
+      router.push('/bank-accounts')
+    }
+
+    // Loan selection for payment approval
+    const showLoanSelectionModal = ref(false)
+    const selectedPaymentForLoan = ref(null)
+    const availableLoansForPayment = ref([])
+    const selectedLoanForPayment = ref('')
+    const processingLoanSelection = ref(false)
+
+    // Handle loan selection change
+    const onLoanSelectionChange = () => {
+      // This function can be used for additional logic when loan selection changes
+    }
+
+    // Get selected loan details
+    const getSelectedLoanDetails = () => {
+      if (!selectedLoanForPayment.value) return null
+      return availableLoansForPayment.value.find(loan => loan.id === selectedLoanForPayment.value)
+    }
+
+    // Confirm loan selection and proceed with payment
+    const confirmLoanSelection = async () => {
+      if (!selectedLoanForPayment.value) {
+        showSuccessMessage('Please select a loan', 'error')
+        return
+      }
+
+      try {
+        processingLoanSelection.value = true
+        
+        await approvePaymentToSpecificLoan(selectedPaymentForLoan.value.id, selectedLoanForPayment.value)
+        
+        closeLoanSelectionModal()
+      } catch (error) {
+        showSuccessMessage('Error processing payment', 'error')
+      } finally {
+        processingLoanSelection.value = false
+      }
+    }
+
+    // Close loan selection modal
+    const closeLoanSelectionModal = () => {
+      showLoanSelectionModal.value = false
+      selectedPaymentForLoan.value = null
+      availableLoansForPayment.value = []
+      selectedLoanForPayment.value = ''
+    }
+
+          return {
+        pendingLoans,
+        pendingPayments,
+        pendingLoanCount,
+        pendingPaymentCount,
+        pendingGIFReturnCount,
+        pendingGIFReturns, // Added pendingGIFReturns to return
+        showEditModal,
+        showEditPaymentModal,
+        showEditGIFReturnModal, // Added showEditGIFReturnModal to return
+        editingLoan,
+        editingPayment,
+        editingGIFReturn, // Added editingGIFReturn to return
+        loading,
+        initialLoading,
+        activeTab,
+        approvingLoans,
+        approvingPayments,
+        approvingGIFReturns, // Added approvingGIFReturns to return
+        successMessage,
+        savingLoan,
+        savingPayment,
+        savingGIFReturn, // Added savingGIFReturn to return
+        availableSources,
+        approveLoan,
+        editLoan,
+        saveLoanEdit,
+        approvePayment,
+        editPayment,
+        editPaymentForApproval,
+        approveEditedPayment,
+        savePaymentEdit,
+        closeEditPaymentModal,
+        showSuccessMessage,
+        clearSuccessMessage,
+        formatAmount,
+        formatAmountInMillions,
+        formatDate,
+        formatDateTime,
+        getInitials,
+        convertGoogleDriveUrl,
+        handleImageError,
+        handleImageLoad,
+        closeEditModal,
+        approveGIFReturn, // Added approveGIFReturn to return
+        editGIFReturn, // Added editGIFReturn to return
+        saveGIFReturnEdit, // Added saveGIFReturnEdit to return
+        closeEditGIFReturnModal, // Added closeEditGIFReturnModal to return
+        // Form validation
+        isFormValid,
+        // Sheets Update
+        isUpdatingSheets,
+        sheetsProgress,
+        startGoogleSheetsUpdate,
+        coordinatorLoans,
+        loadingCoordinatorData,
+        showReturnHistoryModal,
+        returnHistory,
+        loadingReturnHistory,
+        selectedRegId,
+        selectedBankAccount,
+        loadCoordinatorData,
+        getMonthFromDateKey,
+        showReturnHistory,
+        closeReturnHistoryModal,
+        getCurrentMonthName,
+        getCurrentMonthPayment,
+        navigateToBankAccounts,
+        // Bank accounts for coordinator functionality
+        bankAccounts,
+        loadBankAccounts,
+        armsOptions,
+        showLoanSelectionModal,
+        selectedPaymentForLoan,
+        availableLoansForPayment,
+        selectedLoanForPayment,
+        processingLoanSelection,
+        approvePaymentWithLoanSelection,
+        approvePaymentToSpecificLoan,
+        onLoanSelectionChange,
+        getSelectedLoanDetails,
+        confirmLoanSelection,
+        closeLoanSelectionModal
+      }
   }
 }
 </script>
@@ -2233,224 +2448,7 @@ export default {
   }
 }
 
-/* Bank Account Management Styles */
-.bank-account-modal {
-  max-width: 600px;
-  max-height: 90vh;
-}
 
-.bank-account-content {
-  display: grid;
-  gap: 20px;
-}
-
-.bank-account-content .section {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 15px;
-  margin: 0;
-}
-
-.bank-account-content .section h4 {
-  color: #1565c0;
-  margin-bottom: 10px;
-  border-bottom: 1px solid #e3f2fd;
-  padding-bottom: 5px;
-}
-
-.wereSL-balance-form {
-  display: grid;
-  gap: 15px;
-}
-
-.balance-edit-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background: #e3f2fd;
-  border-radius: 5px;
-  border: 1px solid #bbdefb;
-}
-
-.balance-display {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #1565c0;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.edit-tag {
-  background-color: #1565c0;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  white-space: nowrap;
-}
-
-.balance-edit-form {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.balance-edit-form input {
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-family: inherit;
-  width: 120px;
-}
-
-.balance-edit-form input:focus {
-  outline: none;
-  border-color: #1565c0;
-  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
-}
-
-.balance-change {
-  font-size: 0.8rem;
-  color: #666;
-  margin-top: 5px;
-}
-
-.transfer-form {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.transfer-form .form-control {
-  flex: 1;
-  min-width: 120px;
-}
-
-.transfer-form .btn {
-  flex-shrink: 0;
-}
-
-.transfer-form .form-help {
-  width: 100%;
-  margin-top: 5px;
-}
-
-.form-help.error {
-  color: #dc3545;
-}
-
-.account-balances-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-}
-
-.account-balance-tile {
-  background: white;
-  border-radius: 8px;
-  padding: 15px;
-  text-align: center;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.account-balance-tile .account-name {
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-}
-
-.account-balance-tile .account-balance {
-  color: #1565c0;
-  font-weight: bold;
-  font-size: 0.8rem;
-}
-
-.transaction-filters {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.transaction-filters .form-control {
-  flex: 1;
-  min-width: 120px;
-}
-
-.transaction-simple {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-}
-
-.transaction-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.transaction-type-tag {
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 8px;
-  text-align: center;
-  min-width: 30px;
-}
-
-.transfer-tag {
-  background-color: #2196f3;
-}
-.loan-tag {
-  background-color: #4caf50;
-}
-.payment-tag {
-  background-color: #f44336;
-}
-
-.transaction-accounts {
-  font-size: 0.9rem;
-  color: #555;
-  flex: 1;
-}
-
-.transaction-amount {
-  font-weight: bold;
-  color: #1565c0;
-  font-size: 0.9rem;
-  min-width: 80px;
-  text-align: right;
-}
-
-.transaction-date {
-  font-size: 0.8rem;
-  color: #666;
-  min-width: 70px;
-  text-align: right;
-}
-
-.transaction-regid {
-  font-size: 0.7rem;
-  color: #666;
-  background: #f8f9fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  min-width: 60px;
-  text-align: center;
-}
 
 .subsection {
   margin-bottom: 30px;
@@ -2568,5 +2566,408 @@ select.form-control option {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Coordinator Styles */
+.coordinator-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.coordinator-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.coordinator-row:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
+}
+
+.loan-id {
+  flex: 1;
+  min-width: 120px;
+  font-weight: bold;
+  color: #1565c0;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.loan-name {
+  flex: 1;
+  font-weight: 600;
+  color: #333;
+  margin: 0 8px;
+  min-width: 80px;
+  word-break: break-word;
+}
+
+.current-month-payment {
+  flex: 0 0 auto;
+  min-width: 120px;
+  max-width: 200px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.current-month-payment.paid {
+  background-color: #e8f5e9;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.current-month-payment.unpaid {
+  background-color: #ffebee;
+  border-color: #f44336;
+  color: #c62828;
+}
+
+.current-month-payment:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.current-month-payment .month {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.current-month-payment .amount {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.current-month-payment .status {
+  font-weight: 600;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .coordinator-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .loan-id {
+    min-width: auto;
+    width: 100%;
+    font-size: 0.8rem;
+  }
+  
+  .loan-name {
+    min-width: auto;
+    width: 100%;
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  
+  .current-month-payment {
+    min-width: auto;
+    width: 100%;
+    max-width: none;
+    justify-content: space-between;
+    font-size: 0.8rem;
+  }
+  
+  .current-month-payment .month {
+    margin-right: 8px;
+  }
+  
+  .current-month-payment .amount {
+    text-align: right;
+  }
+}
+
+@media (max-width: 480px) {
+  .coordinator-row {
+    padding: 10px;
+  }
+  
+  .loan-id {
+    font-size: 0.75rem;
+  }
+  
+  .loan-name {
+    font-size: 0.85rem;
+  }
+  
+  .current-month-payment {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+}
+
+.loading-coordinator-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: #666;
+}
+
+.no-coordinator-data {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+/* Return History Modal Styles */
+.return-history-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.return-record {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s ease;
+}
+
+.return-record:hover {
+  background-color: #f5f5f5;
+}
+
+.return-record:last-child {
+  border-bottom: none;
+}
+
+.return-date {
+  font-weight: 600;
+  color: #333;
+}
+
+.return-amount {
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.no-return-history {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.loading-return-history {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: #666;
+}
+
+.coordinator-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-group label {
+  font-weight: 500;
+  color: #333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #1565c0;
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
+}
+
+/* Loan Selection Modal */
+.loan-selection-info {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.loan-selection-info p {
+  margin: 8px 0;
+  color: #333;
+}
+
+.loan-selection-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.loan-details {
+  background: #e3f2fd;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 20px 0;
+  border-left: 4px solid #1565c0;
+}
+
+.loan-details h4 {
+  margin: 0 0 12px 0;
+  color: #1565c0;
+  font-size: 16px;
+}
+
+.loan-info p {
+  margin: 8px 0;
+  color: #333;
+}
+
+.loan-info strong {
+  color: #1565c0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* Target Loan Selection in Edit Modal */
+.form-group select option {
+  padding: 8px;
+}
+
+.form-group select option:first-child {
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Receipt Link Styles */
+.receipt-link-container {
+  margin-top: 8px;
+}
+
+.receipt-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: #28a745;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid #28a745;
+}
+
+.receipt-link-btn:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.receipt-link-btn svg {
+  flex-shrink: 0;
+}
+
+/* Compact Payment Info Styles */
+.payment-compact-info {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.compact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.9rem;
+}
+
+.compact-row:not(:last-child) {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.compact-label {
+  font-weight: 500;
+  color: #6c757d;
+}
+
+.compact-value {
+  font-weight: 600;
+  color: #495057;
+}
+
+/* Required field indicator */
+.required {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+/* Form validation error states */
+.form-control.error {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.form-control.error:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+/* Error help text */
+.form-help {
+  color: #dc3545;
+  font-size: 0.8rem;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* Loan Compact Info Styles */
+.loan-compact-info {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
 }
 </style> 

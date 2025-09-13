@@ -18,13 +18,11 @@
     </header>
     
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <router-view />
+      <Dashboard />
     </main>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'App'
-}
+<script setup>
+import Dashboard from './pages/Dashboard.vue'
 </script> 

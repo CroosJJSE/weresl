@@ -84,25 +84,26 @@ onMounted(() => {
   }
   
   .lang-btn {
-    padding: 10px 14px;
-    font-size: 13px;
-    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
     flex: 1;
-    min-width: 80px;
+    min-width: 70px;
   }
 }
 
 @media (max-width: 480px) {
   .language-toggle {
-    flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+    margin-bottom: 10px;
   }
   
   .lang-btn {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 14px;
-    min-height: 48px;
+    padding: 6px 8px;
+    font-size: 11px;
+    min-height: 36px;
+    flex: 1;
+    min-width: 60px;
   }
 }
 

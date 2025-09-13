@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f9fafb;
+      margin: 0;
+      padding: 0;
+      padding-top: 150px; /* Increased space for fixed header */
+    }
+    
+    #app {
+      max-width: 100%;
+      padding: 0;
+    }
+    
+    .header {
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+    }
+    
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+    }
+    
+    .logo {
+      max-width: 200px;
+      height: auto;
+    }
+    
+    h1 {
+      font-size: 1.7rem; /* Larger title */
+      color: #1a73e8;
+      text-align: center;
+      margin: 5px 0;
+      font-weight: 600;
+    }
+    
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+    }
+    
+    #downloadBtn {
+      background: #1a73e8;
+      color: white;
+      padding: 12px 24px; /* Larger button */
+      border: none;
+      border-radius: 24px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px; /* Larger text */
+      font-weight: 500;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: background 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    #downloadBtn:disabled {
+      background: #9aa0a6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    #downloadBtn:hover:not(:disabled) {
+      background: #1669d6;
+    }
+    
+    #refreshBtn {
+      background: #34A853;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 24px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: background 0.3s, transform 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    #refreshBtn:disabled {
+      background: #9aa0a6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    #refreshBtn:hover:not(:disabled) {
+      background: #2E9547;
+    }
+    
+    #refreshBtn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+    
+    .content {
+      padding: 10px 15px 30px;
+    }
+    
+    .info-bar {
+      background: #e8f0fe;
+      color: #1a73e8;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+      text-align: center;
+      font-size: 16px; /* Larger text */
+    }
+    
+    .success-bar {
+      background: #e6f4ea;
+      color: #34A853;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+      text-align: center;
+      font-size: 16px;
+      display: none;
+    }
+    
+    .district {
+      background: white;
+      margin: 20px 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .district-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: #f0f4ff;
+      border-bottom: 1px solid #e6e6e6;
+      cursor: pointer;
+    }
+    
+    .district-name {
+      font-weight: 600;
+      font-size: 18px; /* Larger text */
+      color: #1a73e8;
+      display: flex;
+      align-items: center;
+    }
+    
+    .district-toggle {
+      margin-right: 10px;
+      color: #1a73e8;
+      transition: transform 0.3s;
+    }
+    
+    .district-toggle.collapsed {
+      transform: rotate(-90deg);
+    }
+    
+    .select-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .select-all-btn {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    
+    .select-all-btn:hover {
+      background: #1669d6;
+    }
+    
+    .select-all-btn.selected {
+      background: #34A853;
+    }
+    
+    .profile-list {
+      padding: 10px;
+    }
+    
+    .profile-list.collapsed {
+      display: none;
+    }
+    
+    .profile-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px 15px; /* More vertical space */
+      margin: 12px 0;
+      display: flex;
+      align-items: center;
+      border: 1px solid #f0f0f0;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .profile-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .profile-image {
+      width: 100px; /* Larger image */
+      height: 100px; /* Larger image */
+      border-radius: 10px; /* Square with slightly rounded corners */
+      object-fit: cover;
+      margin-right: 15px;
+      border: 2px solid #f0f0f0;
+    }
+    
+    .profile-info {
+      flex: 1;
+    }
+    
+    .profile-name {
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #202124;
+      font-size: 18px; /* Larger text */
+    }
+    
+    .profile-details {
+      font-size: 16px; /* Larger text */
+      color: #5f6368;
+      margin-bottom: 8px;
+    }
+    
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      gap: 8px;
+    }
+    
+    .tag {
+      display: inline-flex;
+      padding: 4px 12px; /* Larger tag */
+      border-radius: 16px;
+      font-size: 14px; /* Larger text */
+      color: white;
+      align-items: center;
+      font-weight: 500;
+    }
+    
+    .rf-tag {
+      background: #4285F4;
+    }
+    
+    .grant-tag {
+      background: #34A853;
+    }
+    
+    .gif-tag {
+      background: #EA4335;
+    }
+    
+    .select-btn {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+      min-width: 90px;
+      text-align: center;
+    }
+    
+    .select-btn:hover {
+      transform: translateY(-2px);
+    }
+    
+    .select-btn.selected {
+      background: #34A853;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: #5f6368;
+      font-size: 16px; /* Larger text */
+    }
+    
+    .spinner {
+      border: 4px solid rgba(0,0,0,0.1);
+      border-top: 4px solid #1a73e8;
+      border-radius: 50%;
+      width: 40px; /* Larger spinner */
+      height: 40px; /* Larger spinner */
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .error {
+      color: #d93025;
+      padding: 15px;
+      background: #fce8e6;
+      border-radius: 8px;
+      margin: 15px 0;
+      font-size: 16px; /* Larger text */
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .error i {
+      font-size: 20px; /* Larger icon */
+    }
+    
+    /* PDF Generation overlay */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    .overlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    .generation-box {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+    }
+    
+    .generation-box h3 {
+      font-size: 20px; /* Larger text */
+      margin-bottom: 10px;
+    }
+    
+    .generation-box p {
+      font-size: 16px; /* Larger text */
+      margin-bottom: 20px;
+    }
+    
+    .progress-container {
+      margin: 20px 0;
+      background: #f1f3f4;
+      border-radius: 10px;
+      height: 8px; /* Thicker progress bar */
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #1a73e8;
+      border-radius: 10px;
+      transition: width 0.5s;
+    }
+    
+    .count-info {
+      color: #5f6368;
+      font-size: 16px; /* Larger text */
+      margin-top: 15px;
+    }
+    
+    .download-tip {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #5f6368;
+      font-style: italic;
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    
+    .selection-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px; /* Larger text */
+      color: #5f6368;
+      padding: 5px 0;
+    }
+    
+    /* Back to top button */
+    #backToTopBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    #backToTopBtn.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* Database refresh overlay */
+    #refreshOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    #refreshOverlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    .refresh-box {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+    }
+    
+    .refresh-box h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: #34A853;
+    }
+    
+    .refresh-spinner {
+      border: 4px solid rgba(0,0,0,0.1);
+      border-top: 4px solid #34A853;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      body {
+        padding-top: 150px; /* Adjusted for larger header */
+      }
+      
+      .district-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      
+      .select-control {
+        width: 100%;
+        justify-content: flex-end;
+        padding: 5px 0;
+      }
+      
+      .action-buttons {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .action-bar {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .selection-info {
+        margin-bottom: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="logo-container">
+        <!-- Placeholder for your logo -->
+        <img src="https://drive.google.com/thumbnail?id=1AEEWccjf_sMoXJgAaYIPZZm5rM-OCFe2" alt="We'RE SL Logo" class="logo">
+      </div>
+      <h1>Profile Selector</h1>
+      
+      <div class="action-bar">
+        <div class="selection-info">
+          <i class="fas fa-info-circle" style="margin-right: 8px; color: #1a73e8; font-size: 18px;"></i> 
+          <span id="selectionCounter">Select profiles to generate PDF</span>
+        </div>
+        <div class="action-buttons">
+          <button id="refreshBtn" onclick="refreshDatabase()">
+            <i class="fas fa-sync-alt" style="font-size: 18px;"></i> Refresh Database
+          </button>
+          <button id="downloadBtn" onclick="downloadSelectedProfiles()" disabled>
+            <i class="fas fa-file-pdf" style="font-size: 18px;"></i> Generate PDF
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="content">
+      <div id="successNotification" class="success-bar">
+        <i class="fas fa-check-circle" style="margin-right: 8px; font-size: 18px;"></i>
+        <span id="successMessage">Database refreshed successfully!</span>
+      </div>
+      
+      <div id="profileContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>Loading profiles...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back to Top Button -->
+  <button id="backToTopBtn" onclick="scrollToTop()">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <!-- PDF Generation Overlay -->
+  <div id="generationOverlay" class="overlay">
+    <div class="generation-box">
+      <i class="fas fa-file-pdf" style="font-size: 40px; color: #1a73e8; margin-bottom: 15px;"></i>
+      <h3>Generating PDF</h3>
+      <p id="generationMessage">Processing selected profiles...</p>
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div id="countInfo" class="count-info"></div>
+      <div class="download-tip">
+        <i class="fas fa-lightbulb" style="color: #fbbc04; margin-right: 5px;"></i>
+        Tip: For faster downloads, select fewer profiles.
+      </div>
+    </div>
+  </div>
+  
+  <!-- Database Refresh Overlay -->
+  <div id="refreshOverlay" class="overlay">
+    <div class="refresh-box">
+      <i class="fas fa-database" style="font-size: 40px; color: #34A853; margin-bottom: 15px;"></i>
+      <h3>Refreshing Database</h3>
+      <p id="refreshMessage">Syncing data from the main database...</p>
+      <div class="refresh-spinner"></div>
+      <div class="download-tip">
+        <i class="fas fa-info-circle" style="color: #4285F4; margin-right: 5px;"></i>
+        This may take a moment. Please don't close this window.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allProfiles = [];
+    let selectedProfiles = new Set();
+    let collapsedDistricts = new Set();
+    let districtSelectionState = {};
+    let isRefreshing = false;
+
+    function initialize() {
+      document.getElementById('profileContainer').innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>Loading profiles...</div>
+        </div>`;
+      
+      google.script.run
+        .withSuccessHandler(handleProfiles)
+        .withFailureHandler(showError)
+        .getAllProfiles();
+        
+      // Setup scroll listener for back to top button
+      window.addEventListener('scroll', function() {
+        const backToTopBtn = document.getElementById('backToTopBtn');
+        if (window.scrollY > 300) {
+          backToTopBtn.classList.add('visible');
+        } else {
+          backToTopBtn.classList.remove('visible');
+        }
+      });
+    }
+
+    function scrollToTop() {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+    function handleProfiles(profiles) {
+      if (!profiles || !Array.isArray(profiles)) {
+        showError("No profiles data received");
+        return;
+      }
+      
+      allProfiles = profiles.filter(p => p && p.Reg_ID && p.Name);
+      if (allProfiles.length === 0) {
+        showError("No valid profiles found");
+        return;
+      }
+      
+      renderProfiles();
+      updateSelectionInfo();
+    }
+
+    function showError(error) {
+      console.error("Error:", error);
+      const container = document.getElementById('profileContainer');
+      container.innerHTML = `
+        <div class="error">
+          <i class="fas fa-exclamation-circle"></i>
+          Error loading profiles: ${error.message || error}
+        </div>
+      `;
+    }
+
+    function renderProfiles() {
+      const container = document.getElementById('profileContainer');
+      
+      if (allProfiles.length === 0) {
+        container.innerHTML = `
+          <div class="error">
+            <i class="fas fa-exclamation-circle"></i>
+            No profiles found
+          </div>`;
+        return;
+      }
+      
+      // Add info bar
+      container.innerHTML = `
+        <div class="info-bar">
+          <i class="fas fa-info-circle" style="font-size: 18px; margin-right: 8px;"></i> 
+          Found a total of ${allProfiles.length} profiles
+        </div>`;
+      
+      // Group by district
+      const districts = {};
+      allProfiles.forEach(profile => {
+        const district = profile.District || 'Unknown District';
+        if (!districts[district]) {
+          districts[district] = [];
+        }
+        districts[district].push(profile);
+      });
+      
+      // Render each district
+      Object.entries(districts).forEach(([district, profiles]) => {
+        const districtElement = document.createElement('div');
+        districtElement.className = 'district';
+        
+        const districtId = district.replace(/\s+/g, '-');
+        const isCollapsed = collapsedDistricts.has(districtId);
+        
+        // Initialize district selection state if not already
+        if (!districtSelectionState[districtId]) {
+          districtSelectionState[districtId] = false;
+        }
+        
+        // Check if all profiles in this district are selected
+        const allDistrictSelected = profiles.every(profile => selectedProfiles.has(profile.Reg_ID));
+        districtSelectionState[districtId] = allDistrictSelected;
+        
+        districtElement.innerHTML = `
+          <div class="district-header" onclick="toggleDistrictCollapse('${districtId}')">
+            <div class="district-name">
+              <i class="fas fa-chevron-down district-toggle ${isCollapsed ? 'collapsed' : ''}"></i>
+              <i class="fas fa-map-marker-alt" style="margin-right: 8px; font-size: 18px;"></i>
+              ${district} (${profiles.length})
+            </div>
+            <div class="select-control" onclick="event.stopPropagation();">
+              <button id="select-all-btn-${districtId}" class="select-all-btn ${allDistrictSelected ? 'selected' : ''}" onclick="selectAllInDistrict('${districtId}')">
+                ${allDistrictSelected ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+          </div>
+          <div class="profile-list ${isCollapsed ? 'collapsed' : ''}" id="district-list-${districtId}"></div>
+        `;
+        
+        container.appendChild(districtElement);
+        
+        // Render profiles for this district
+        const profilesContainer = document.getElementById(`district-list-${districtId}`);
+        
+        profiles.forEach(profile => {
+          const hasRF = profile.RF_Loan && String(profile.RF_Loan).trim() !== '';
+          const hasGrant = profile.GRANT && String(profile.GRANT).trim() !== '';
+          const hasGIF = profile.GIFor && String(profile.GIFor).trim() !== '';
+          const isSelected = selectedProfiles.has(profile.Reg_ID);
+          
+          const profileElement = document.createElement('div');
+          profileElement.className = 'profile-card';
+          profileElement.innerHTML = `
+            <img src="https://drive.google.com/thumbnail?id=${getImageId(profile.Image)}" 
+                 class="profile-image"
+                 onerror="this.src='/api/placeholder/100/100'">
+            <div class="profile-info">
+              <div class="profile-name">
+                ${profile.Name} <span style="color: #5f6368; font-weight: normal; font-size: 14px;">${profile.Reg_ID}</span>
+              </div>
+              <div class="profile-details">
+                ${profile.Age ? `${profile.Age} years` : ''}
+                ${profile.Occupation ? ` • ${profile.Occupation}` : ''}
+                ${profile.Address ? `<div>${profile.Address}</div>` : ''}
+              </div>
+              <div class="tags">
+                ${hasRF ? '<span class="tag rf-tag"><i class="fas fa-coins" style="margin-right: 5px;"></i> RF</span>' : ''}
+                ${hasGrant ? '<span class="tag grant-tag"><i class="fas fa-gift" style="margin-right: 5px;"></i> GRANT</span>' : ''}
+                ${hasGIF ? '<span class="tag gif-tag"><i class="fas fa-hand-holding-heart" style="margin-right: 5px;"></i> GIF</span>' : ''}
+              </div>
+            </div>
+            <button 
+              id="select-btn-${profile.Reg_ID}" 
+              class="select-btn ${isSelected ? 'selected' : ''}" 
+              onclick="toggleProfileSelection('${profile.Reg_ID}', '${districtId}')">
+              ${isSelected ? 'Selected' : 'Select'}
+            </button>
+          `;
+          
+          profilesContainer.appendChild(profileElement);
+        });
+      });
+    }
+
+    function toggleDistrictCollapse(districtId) {
+      const listElement = document.getElementById(`district-list-${districtId}`);
+      const toggleIcon = document.querySelector(`.district-header[onclick*="${districtId}"] .district-toggle`);
+      
+      if (listElement && listElement.classList.contains('collapsed')) {
+        listElement.classList.remove('collapsed');
+        if (toggleIcon) toggleIcon.classList.remove('collapsed');
+        collapsedDistricts.delete(districtId);
+      } else if (listElement) {
+        listElement.classList.add('collapsed');
+        if (toggleIcon) toggleIcon.classList.add('collapsed');
+        collapsedDistricts.add(districtId);
+      }
+    }
+
+    function toggleProfileSelection(regId, districtId) {
+      const isCurrentlySelected = selectedProfiles.has(regId);
+      const selectBtn = document.getElementById(`select-btn-${regId}`);
+      
+      if (isCurrentlySelected) {
+        selectedProfiles.delete(regId);
+        if (selectBtn) {
+          selectBtn.textContent = 'Select';
+          selectBtn.classList.remove('selected');
+        }
+      } else {
+        selectedProfiles.add(regId);
+        if (selectBtn) {
+          selectBtn.textContent = 'Selected';
+          selectBtn.classList.add('selected');
+        }
+      }
+      
+      updateSelectionInfo();
+      updateDistrictSelectionButton(districtId);
+    }
+
+    function selectAllInDistrict(districtId) {
+      const district = districtId.replace(/-/g, ' ');
+      const districtProfiles = allProfiles.filter(p => 
+        (p.District || 'Unknown District') === district
+      );
+      
+      // Check current state to toggle
+      const currentState = districtSelectionState[districtId];
+      const newState = !currentState;
+      
+      // Update the district button
+      const selectAllBtn = document.getElementById(`select-all-btn-${districtId}`);
+      if (selectAllBtn) {
+        selectAllBtn.textContent = newState ? 'Deselect All' : 'Select All';
+        if (newState) {
+          selectAllBtn.classList.add('selected');
+        } else {
+          selectAllBtn.classList.remove('selected');
+        }
+      }
+      
+      // Update each profile selection
+      districtProfiles.forEach(profile => {
+        const selectBtn = document.getElementById(`select-btn-${profile.Reg_ID}`);
+        
+        if (newState) {
+          selectedProfiles.add(profile.Reg_ID);
+          if (selectBtn) {
+            selectBtn.textContent = 'Selected';
+            selectBtn.classList.add('selected');
+          }
+        } else {
+          selectedProfiles.delete(profile.Reg_ID);
+          if (selectBtn) {
+            selectBtn.textContent = 'Select';
+            selectBtn.classList.remove('selected');
+          }
+        }
+      });
+      
+      // Update district state
+      districtSelectionState[districtId] = newState;
+      
+      updateSelectionInfo();
+    }
+
+    function updateDistrictSelectionButton(districtId) {
+      // Find all profiles in the district
+      const district = districtId.replace(/-/g, ' ');
+      const districtProfiles = allProfiles.filter(p => 
+        (p.District || 'Unknown District') === district
+      );
+      
+      // Check if all are selected
+      const allSelected = districtProfiles.every(profile => 
+        selectedProfiles.has(profile.Reg_ID)
+      );
+      
+      // Update district button state
+      const selectAllBtn = document.getElementById(`select-all-btn-${districtId}`);
+      if (selectAllBtn) {
+        selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+        if (allSelected) {
+          selectAllBtn.classList.add('selected');
+        } else {selectAllBtn.classList.remove('selected');
+        }
+      }
+      
+      // Update district state
+      districtSelectionState[districtId] = allSelected;
+    }
+
+    function updateSelectionInfo() {
+      const btn = document.getElementById('downloadBtn');
+      const counter = document.getElementById('selectionCounter');
+      
+      btn.disabled = selectedProfiles.size === 0;
+      
+      if (selectedProfiles.size === 0) {
+        counter.textContent = 'Select profiles to generate PDF';
+      } else {
+        counter.textContent = `${selectedProfiles.size} profile${selectedProfiles.size > 1 ? 's' : ''} selected`;
+      }
+    }
+
+    function downloadSelectedProfiles() {
+      if (selectedProfiles.size === 0) {
+        alert('Please select at least one profile');
+        return;
+      }
+      
+      // Show generation overlay with animation
+      const overlay = document.getElementById('generationOverlay');
+      const progressBar = document.getElementById('progressBar');
+      const countInfo = document.getElementById('countInfo');
+      const generationMessage = document.getElementById('generationMessage');
+      
+      overlay.classList.add('active');
+      countInfo.textContent = `Processing ${selectedProfiles.size} profile${selectedProfiles.size > 1 ? 's' : ''}...`;
+      
+      // Simulate progress animation (actual processing time is unknown)
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 5;
+        if (progress > 90) {
+          clearInterval(interval);
+        }
+        progressBar.style.width = progress + '%';
+      }, 300);
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          clearInterval(interval);
+          progressBar.style.width = '100%';
+          generationMessage.textContent = 'PDF successfully generated!';
+          countInfo.textContent = `${result.count} profile${result.count > 1 ? 's' : ''} included in PDF`;
+          
+          setTimeout(() => {
+            overlay.classList.remove('active');
+            handlePdfSuccess(result);
+          }, 1000);
+        })
+        .withFailureHandler(error => {
+          clearInterval(interval);
+          overlay.classList.remove('active');
+          handlePdfError(error);
+        })
+        .generateProfilesPDF(Array.from(selectedProfiles));
+    }
+
+    function handlePdfSuccess(result) {
+      // Convert base64 to blob and download
+      const byteArray = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
+      const blob = new Blob([byteArray], {type: 'application/pdf'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = result.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function handlePdfError(error) {
+      console.error('PDF error:', error);
+      alert('Error generating PDF: ' + (error.message || error));
+    }
+    
+    function refreshDatabase() {
+      if (isRefreshing) return; // Prevent multiple clicks
+      isRefreshing = true;
+      
+      // Disable the refresh button and change its appearance
+      const refreshBtn = document.getElementById('refreshBtn');
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin" style="font-size: 18px;"></i> Refreshing...';
+      
+      // Show refresh overlay
+      const refreshOverlay = document.getElementById('refreshOverlay');
+      refreshOverlay.classList.add('active');
+      
+      // Call the Google Script function to refresh the database
+      google.script.run
+        .withSuccessHandler(function(result) {
+          // Handle success
+          console.log("Database refreshed successfully");
+          
+          // Hide the overlay
+          refreshOverlay.classList.remove('active');
+          
+          // Show success notification
+          const successNotification = document.getElementById('successNotification');
+          const successMessage = document.getElementById('successMessage');
+          successMessage.textContent = 'Database refreshed successfully! Reloading profiles...';
+          successNotification.style.display = 'block';
+          
+          // Reset the button
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = '<i class="fas fa-sync-alt" style="font-size: 18px;"></i> Refresh Database';
+          
+          // Reset state for next refresh
+          isRefreshing = false;
+          
+          // Reload profiles after a short delay
+          setTimeout(function() {
+            // Clear selected profiles
+            selectedProfiles.clear();
+            
+            // Show loading spinner while reloading profiles
+            document.getElementById('profileContainer').innerHTML = `
+              <div class="loading">
+                <div class="spinner"></div>
+                <div>Reloading profiles...</div>
+              </div>`;
+            
+            // Reload profiles from the updated database
+            google.script.run
+              .withSuccessHandler(function(profiles) {
+                handleProfiles(profiles);
+                
+                // Auto-hide success message after profiles load
+                setTimeout(function() {
+                  successNotification.style.display = 'none';
+                }, 3000);
+              })
+              .withFailureHandler(function(error) {
+                showError(error);
+                successNotification.style.display = 'none';
+              })
+              .getAllProfiles();
+          }, 1500);
+        })
+        .withFailureHandler(function(error) {
+          // Handle error
+          console.error("Error refreshing database:", error);
+          
+          // Hide the overlay
+          refreshOverlay.classList.remove('active');
+          
+          // Show error notification
+          const container = document.getElementById('profileContainer');
+          container.innerHTML = `
+            <div class="error">
+              <i class="fas fa-exclamation-circle"></i>
+              Error refreshing database: ${error.message || error}
+            </div>
+            ${container.innerHTML}
+          `;
+          
+          // Scroll to top to show the error
+          window.scrollTo({top: 0, behavior: 'smooth'});
+          
+          // Reset the button
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = '<i class="fas fa-sync-alt" style="font-size: 18px;"></i> Refresh Database';
+          
+          // Reset state for next refresh
+          isRefreshing = false;
+        })
+        .copyEntireTab(); // This calls your function in the Google Script
+    }
+
+    function getImageId(url) {
+      if (!url) return '';
+      const match = url.match(/[-\w]{25,}/);
+      return match ? match[0] : '';
+    }
+
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', initialize);
+  </script>
+</body>
+</html>

@@ -14,7 +14,7 @@ admin.initializeApp({
 async function addAuthorizedDomain() {
   try {
     // Add the new domain to authorized domains
-    const domain = 'loan-admin-weresl.web.app';
+    const domain = 'loan-admin-wereSL.web.app';
     
     // Note: This is a simplified example
     // In practice, you would need to use the Firebase Admin SDK
@@ -22,7 +22,7 @@ async function addAuthorizedDomain() {
     
     console.log(`Domain ${domain} should be added to Firebase Console manually`);
     console.log('Go to: Firebase Console > Authentication > Settings > Authorized domains');
-    console.log('Add: loan-admin-weresl.web.app');
+    console.log('Add: loan-admin-wereSL.web.app');
     
   } catch (error) {
     console.error('Error:', error);

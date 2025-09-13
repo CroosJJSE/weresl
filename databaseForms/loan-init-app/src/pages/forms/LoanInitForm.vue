@@ -182,14 +182,6 @@
           ></textarea>
         </div>
 
-        <div class="form-group">
-          <label for="projectDescription">Project Description (Optional)</label>
-          <textarea 
-            id="projectDescription" 
-            v-model="formData.projectDescription" 
-            placeholder="Enter additional project details (optional)"
-          ></textarea>
-        </div>
       </div>
 
       <div class="form-section">
@@ -273,7 +265,7 @@ export default {
       loanType: '',
       amount: '',
       purpose: '',
-      projectDescription: '',
+      // projectDescription: '', // Removed - no longer using project description
       imageFile: null
     })
 

@@ -11,7 +11,8 @@ export const RootCollection = {
   GIF_RETURN_RECORD : 'GIF_return_record', //{will have the documents of GIF return record in timestamp format}
   TOPVIEW_LINKS : 'topview-links', //{will have the documents of topview links}
   CONFIG : 'config',
-  UPLOADED_IMAGES : 'uploadedImages'
+  UPLOADED_IMAGES : 'uploadedImages',
+  LOANS : 'loans' //{will have the documents as loanId for all approved loans}
 }
 
 export const SearchElementDoc = {
@@ -28,46 +29,47 @@ export const DistrictMappingField = {
 }
 // fields in all profile documents
 export const ProfileField = {
-  REG_ID : 'Reg_ID',
-  FULL_NAME : 'fullName',
-  DISTRICT : 'district',
-  YEAR_OF_BIRTH : 'yearOfBirth',
-  ADDRESS : 'address',
-  NIC : 'nic',
-  PHONE_NUMBER : 'phoneNumber',
-  TOTAL_CHILDREN : 'totalChildren',
-  SCHOOL_GOING_CHILDREN : 'schoolGoingChildren',
-  OTHER_DEPENDENTS : 'otherDependents',
-  DESCRIPTION : 'description',
-  OCCUPATION : 'occupation',
-  PROFILE_IMAGE_DRIVE_ID : 'profileImageDriveId',
-  CREATED_AT : 'createdAt',
-  LAST_UPDATED : 'lastUpdated',
-  GIF : 'GIF', // Give It Forward
-  RF_RETURN_HISTORY : 'RF_return_history',
-  RF_LOANS : 'RF_Loans',
-  GRANT : 'Grant'
+  REG_ID: 'Reg_ID',
+  FULL_NAME: 'fullName',
+  DISTRICT: 'district',
+  YEAR_OF_BIRTH: 'yearOfBirth',
+  ADDRESS: 'address',
+  NIC: 'nic',
+  PHONE_NUMBER: 'phoneNumber',
+  TOTAL_CHILDREN: 'totalChildren',
+  SCHOOL_GOING_CHILDREN: 'schoolGoingChildren',
+  OTHER_DEPENDENTS: 'otherDependents',
+  DESCRIPTION: 'description',
+  OCCUPATION: 'occupation',
+  PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
+  CREATED_AT: 'createdAt',
+  LAST_UPDATED: 'lastUpdated',
+  GIF: 'GIF', // Give It Forward
+  RF_RETURN_HISTORY: 'RF_return_history',
+  RF_LOANS: 'RF_Loans',
+  GRANT: 'Grant'
 }
+
 export const ProfileFieldTypes = {
-  REG_ID : 'string',
-  FULL_NAME : 'string',
-  DISTRICT : 'string',
-  YEAR_OF_BIRTH : 'number',
-  ADDRESS : 'string',
-  NIC : 'string',
-  PHONE_NUMBER : 'string',
-  TOTAL_CHILDREN : 'number',
-  SCHOOL_GOING_CHILDREN : 'number',
-  OTHER_DEPENDENTS : 'number',
-  DESCRIPTION : 'string',
-  OCCUPATION : 'string',
-  PROFILE_IMAGE_DRIVE_ID : 'string',
-  CREATED_AT : 'date',
-  LAST_UPDATED : 'date',
-  GIF : 'array', //{timestamp : description}
-  RF_RETURN_HISTORY : 'array', //{timestamp : returned amount}
-  RF_LOANS : 'collection', //{will have the documents as the name of the loan}
-  GRANT : 'collection' //{will have the documents as the name of the grant}
+  REG_ID: 'string',
+  FULL_NAME: 'string',
+  DISTRICT: 'string',
+  YEAR_OF_BIRTH: 'number',
+  ADDRESS: 'string',
+  NIC: 'string',
+  PHONE_NUMBER: 'string',
+  TOTAL_CHILDREN: 'number',
+  SCHOOL_GOING_CHILDREN: 'number',
+  OTHER_DEPENDENTS: 'number',
+  DESCRIPTION: 'string',
+  OCCUPATION: 'string',
+  PROFILE_IMAGE_DRIVE_ID: 'string',
+  CREATED_AT: 'date',
+  LAST_UPDATED: 'date',
+  GIF: 'array', //{timestamp : description}
+  RF_RETURN_HISTORY: 'array', //{timestamp : returned amount}
+  RF_LOANS: 'collection', //{will have the documents as the name of the loan}
+  GRANT: 'collection' //{will have the documents as the name of the grant}
 }
 
 // Collection constants for backward compatibility
@@ -79,28 +81,8 @@ export const ROOT_COLLECTIONS = {
   [RootCollection.GIF_RETURN_RECORD]: 'GIF_return_record',
   [RootCollection.TOPVIEW_LINKS]: 'topview-links',
   [RootCollection.CONFIG]: 'config',
-  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages'
-}
-export const PROFILE_FIELDS = {
-  [ProfileField.REG_ID]: 'Reg_ID',
-  [ProfileField.FULL_NAME]: 'fullName',
-  [ProfileField.DISTRICT]: 'district',
-  [ProfileField.YEAR_OF_BIRTH]: 'yearOfBirth',
-  [ProfileField.ADDRESS]: 'address',
-  [ProfileField.NIC]: 'nic',
-  [ProfileField.PHONE_NUMBER]: 'phoneNumber',
-  [ProfileField.TOTAL_CHILDREN]: 'totalChildren',
-  [ProfileField.SCHOOL_GOING_CHILDREN]: 'schoolGoingChildren',
-  [ProfileField.OTHER_DEPENDENTS]: 'otherDependents',
-  [ProfileField.DESCRIPTION]: 'description',
-  [ProfileField.OCCUPATION]: 'occupation',
-  [ProfileField.PROFILE_IMAGE_DRIVE_ID]: 'profileImageDriveId',
-  [ProfileField.CREATED_AT]: 'createdAt',
-  [ProfileField.LAST_UPDATED]: 'lastUpdated',
-  [ProfileField.GIF]: 'GIF',
-  [ProfileField.RF_RETURN_HISTORY]: 'RF_return_history',
-  [ProfileField.RF_LOANS]: 'RF_Loans',
-  [ProfileField.GRANT]: 'Grant'
+  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages',
+  [RootCollection.LOANS]: 'loans'
 }
 
 // Search element document constants for backward compatibility
@@ -123,7 +105,9 @@ export const RF_LOAN_FIELD = {
   REG_ID : 'Reg_ID',
   SOURCE : 'source',
   STATUS : 'status',
-  TYPE : 'type'  
+  TYPE : 'type',
+  ARMS : 'arms',
+  PAYMENT_INTEGRITY : 'paymentIntegrity'
 }
 export const RF_LOAN_FIELD_TYPES = {
   AMOUNT : 'number',
@@ -137,11 +121,12 @@ export const RF_LOAN_FIELD_TYPES = {
   REG_ID : 'string',
   SOURCE : 'string',
   STATUS : 'string',
-  TYPE : 'string'  
+  TYPE : 'string',
+  ARMS : 'string',
+  PAYMENT_INTEGRITY : 'boolean'
 }
 export const GRANT_FIELD = { 
   APPROVED_AMOUNT : 'approvedAmount',
-  AMOUNT : 'amount',
   APPROVED_AT : 'approvedAt',
   CREATED_AT : 'createdAt',
   REQUESTED_DATE : 'requestedDate',
@@ -151,11 +136,12 @@ export const GRANT_FIELD = {
   REG_ID : 'Reg_ID',
   SOURCE : 'source',
   STATUS : 'status',
-  TYPE : 'type'
+  TYPE : 'type',
+  ARMS : 'arms',
+  PAYMENT_INTEGRITY : 'paymentIntegrity'
 }
 export const GRANT_FIELD_TYPES = {
   APPROVED_AMOUNT : 'number',
-  AMOUNT : 'number',
   APPROVED_AT : 'date',
   CREATED_AT : 'date',
   REQUESTED_DATE : 'date',
@@ -165,7 +151,9 @@ export const GRANT_FIELD_TYPES = {
   REG_ID : 'string',
   SOURCE : 'string',
   STATUS : 'string',
-  TYPE : 'string'
+  TYPE : 'string',
+  ARMS : 'string',
+  PAYMENT_INTEGRITY : 'boolean'
 }
 export const SystemLogField = {
   LOG_ACTION : 'logAction',
@@ -197,6 +185,38 @@ export const RF_RETURN_RECORD_FIELD_TYPES = {
   PAID_AMOUNT : 'number'
 }
 
+// Loan fields for root/loans collection
+export const LOAN_FIELD = {
+  REG_ID : 'regId',
+  AMOUNT : 'amount',
+  APPROVED_AT : 'approvedAt',
+  ARMS : 'arms',
+  CREATED_AT : 'createdAt',
+  INITIATION_DATE : 'initiationDate',
+  LOAN_ID : 'loanId',
+  PROJECT_DESCRIPTION : 'projectDescription',
+  PURPOSE : 'purpose',
+  SOURCE : 'source',
+  STATUS : 'status',
+  TYPE : 'type',
+  PAYMENT_INTEGRITY : 'paymentIntegrity'
+}
+
+export const LOAN_FIELD_TYPES = {
+  REG_ID : 'string',
+  AMOUNT : 'number',
+  APPROVED_AT : 'date',
+  ARMS : 'string',
+  CREATED_AT : 'date',
+  INITIATION_DATE : 'date',
+  LOAN_ID : 'string',
+  PROJECT_DESCRIPTION : 'string',
+  PURPOSE : 'string',
+  SOURCE : 'string',
+  STATUS : 'string',
+  TYPE : 'string',
+  PAYMENT_INTEGRITY : 'boolean'
+}
 export const GIF_RETURN_RECORD_FIELD = {
   REG_ID : 'regId',
   TIMESTAMP : 'timestamp',
@@ -223,8 +243,10 @@ export const BANK_ACCOUNT_FIELD = {
   POSITION: 'position',
   CURRENT_BANK_BALANCE: 'currentBankBalance',
   CREATED_AT: 'createdAt',
-  LAST_UPDATED: 'lastUpdated'
+  LAST_UPDATED: 'lastUpdated',
+  RF_LOANS: 'RF_LOANS'
 }
+//RF_LOANS is a map where Field is regId, Value is a map of field(DDMMYYYY:amount) and value is boolean
 
 // Bank Account Field Types Enum
 export const BANK_ACCOUNT_FIELD_TYPES = {
@@ -240,19 +262,13 @@ export const BANK_ACCOUNT_FIELD_TYPES = {
 }
 
 
-// Bank Account field constants for backward compatibility
-export const BANK_ACCOUNT_FIELDS = {
-  [BANK_ACCOUNT_FIELD.FIRST_NAME]: 'firstName',
-  [BANK_ACCOUNT_FIELD.LAST_NAME]: 'lastName',
-  [BANK_ACCOUNT_FIELD.PHONE_NUMBER]: 'phoneNumber',
-  [BANK_ACCOUNT_FIELD.NIC]: 'nic',
-  [BANK_ACCOUNT_FIELD.SIGNATURE_DRIVE_ID]: 'signatureDriveId',
-  [BANK_ACCOUNT_FIELD.POSITION]: 'position',
-  [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: 'currentBankBalance',
-  [BANK_ACCOUNT_FIELD.CREATED_AT]: 'createdAt',
-  [BANK_ACCOUNT_FIELD.LAST_UPDATED]: 'lastUpdated'
-}
 
+export const ARMS = {
+  Eden : 'EDEN',
+  Ark : 'ARK',
+  Metamorphosis : 'Metamorphosis',
+  Keystone : 'Keystone'
+}
 // Helper functions
 export const getCollectionName = (collection) => {
   return ROOT_COLLECTIONS[collection]

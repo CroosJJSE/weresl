@@ -14,7 +14,8 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from './index.js'
-import { RootCollection, ProfileField, RF_LOAN_FIELD, GRANT_FIELD, LoanStatus } from '../enums/db.js'
+import { RootCollection, ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '../enums/db.js'
+import { LoanStatus } from '../enums/loans.js'
 import { getRFLoans } from '../utils/dbUtils.js'
 import { DISTRICT_MAPPING, DISTRICT_CODES } from '../enums/districts.js'
 

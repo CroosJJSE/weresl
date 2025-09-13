@@ -2,29 +2,29 @@
 
 ## Database Structure (Firebase Firestore)
 
-**IMPORTANT**: For complete database structure, field names, and collection details, refer to `enums/db.ts` file.
+**IMPORTANT**: For complete database structure, field names, and collection details, refer to `src/enums/db.js` file.
 
 ### Main Collections
 
 #### 1. `profiles` Collection
 - **Document ID**: Reg_ID (Registration ID)
 - **Purpose**: Main profile data for each person
-- **Key Fields**: See `ProfileField` enum in `enums/db.ts`
-- **Subcollections**: See `ProfileFieldTypes` enum in `enums/db.ts`
+- **Key Fields**: See `ProfileField` enum in `src/enums/db.js`
+- **Subcollections**: See `ProfileFieldTypes` enum in `src/enums/db.js`
 
 #### 2. Subcollections under `profiles/{regId}`
 
 ##### `RF_Loans` Subcollection
 - **Purpose**: RF (Revolving Fund) loan records
-- **Key Fields**: See `RF_LOAN_FIELD` enum in `enums/db.ts`
+- **Key Fields**: See `RF_LOAN_FIELD` enum in `src/enums/db.js`
 
 ##### `GRANT` Subcollection
 - **Purpose**: Grant loan records
-- **Key Fields**: See `GRANT_FIELD` enum in `enums/db.ts`
+- **Key Fields**: See `GRANT_FIELD` enum in `src/enums/db.js`
 
 #### 3. `SearchElements` Collection
 - **Purpose**: System-wide search and status tracking
-- **Documents**: See `SearchElementDoc` enum in `enums/db.ts`
+- **Documents**: See `SearchElementDoc` enum in `src/enums/db.js`
 
 ### Centralized Utils and Enums Structure
 
@@ -42,25 +42,21 @@
   └── README.md         # Documentation
   ```
 
-#### Root-level `enums/` folder
-- **Purpose**: TypeScript enums for type safety and consistency
+#### Project-level `src/enums/` folder
+- **Purpose**: JavaScript enums for type safety and consistency
 - **Structure**:
   ```
-  enums/
-  ├── index.ts          # Main export file
-  ├── districts.ts      # District enums and mappings
-  ├── loans.ts          # Loan statuses and types
-  ├── db.ts            # Firestore collection enums
-  ├── ui.ts            # UI configuration and constants
-  ├── validation.ts    # Validation rules and types
-  ├── messages.ts      # Error and success messages
+  src/enums/
+  ├── db.js            # Firestore collection enums (MAIN REFERENCE)
+  ├── districts.js     # District enums and mappings
+  ├── loans.js         # Loan statuses and types
   └── README.md        # Documentation
   ```
 
 ## Important Coding Guidelines
 
 ### 1. Database Operations
-- **ALWAYS** use enums from `enums/db.ts` for collection and field names
+- **ALWAYS** use enums from `src/enums/db.js` for collection and field names
 - **NEVER** hardcode collection or field names
 - Always use `Reg_ID` as the document ID for profiles
 - Use subcollections for loans: `profiles/{regId}/RF_Loans` and `profiles/{regId}/GRANT`
@@ -79,18 +75,18 @@
 - **RF**: Rural Finance loans (stored in `RF_Loans` subcollection)
 - **GRANT**: Grant loans (stored in `GRANT` subcollection)
 - Always specify loan type when querying loans
-- Use `LoanType` enum from `enums/loans.ts`
+- Use `LoanType` enum from `src/enums/loans.js`
 
 ### 4. Status Tracking
 - Use `SearchElements` collection for system-wide status tracking
 - `pending-loan` document tracks pending loan approvals
-- Use `SearchElementDoc` enum from `enums/db.ts`
+- Use `SearchElementDoc` enum from `src/enums/db.js`
 
 ### 5. Error Handling
 - Always wrap database operations in try-catch blocks
 - Log errors with descriptive messages
 - Handle cases where documents don't exist
-- Use `ErrorMessage` enum from `enums/messages.ts` for consistent error messages
+- Use consistent error messages across all applications
 
 ### 6. Data Validation
 - Validate `Reg_ID` format before database operations
@@ -105,7 +101,7 @@
 ```javascript
 // Import utilities and enums
 import { getProfileByRegId, getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
-import { ROOT_COLLECTIONS, PROFILE_FIELDS } from '../enums/db.js'
+import { RootCollection, ProfileField } from '../enums/db.js'
 import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
 
 // Get profile by Reg_ID
@@ -125,14 +121,14 @@ const grantLoansResult = await getGrantLoans(regId)
 - Components in `src/components/` directory
 - Pages in `src/pages/` directory
 - **ALWAYS** import utilities from root-level `utils/` folder
-- **ALWAYS** import enums from root-level `enums/` folder
+- **ALWAYS** import enums from project-level `src/enums/` folder
 
 ### 9. Naming Conventions
 - Use `camelCase` for JavaScript variables and functions
 - Use `PascalCase` for Vue components
 - Use `kebab-case` for file names
 - Use `UPPER_SNAKE_CASE` for constants
-- Use `PascalCase` for TypeScript enums
+- Use `PascalCase` for JavaScript enums (STANDARDIZED)
 
 ### 10. Vue.js Guidelines
 - Use Composition API for new components
@@ -228,9 +224,9 @@ When migrating from old field names to new descriptive names:
 ## Critical Rules for All Future Actions
 
 ### 1. **NEVER Hardcode Collection or Field Names**
-- Always use enums from `enums/db.ts`
-- Example: Use `ROOT_COLLECTIONS.PROFILES` instead of `'profiles'`
-- Example: Use `PROFILE_FIELDS.RF_LOANS` instead of `'RF_Loans'`
+- Always use enums from `src/enums/db.js`
+- Example: Use `RootCollection.PROFILES` instead of `'profiles'`
+- Example: Use `ProfileField.RF_LOANS` instead of `'RF_Loans'`
 
 ### 2. **ALWAYS Import from Centralized Utils**
 - Import database functions from `utils/dbUtils.js`
@@ -239,13 +235,11 @@ When migrating from old field names to new descriptive names:
 - Import formatting functions from `utils/formatUtils.ts`
 - Import registration ID utilities from `utils/regIdUtils.js`
 
-### 3. **ALWAYS Import from Centralized Enums**
-- Import district mappings from `enums/districts.ts`
-- Import loan enums from `enums/loans.ts`
-- Import collection enums from `enums/db.ts`
-- Import message enums from `enums/messages.ts`
-- Import UI enums from `enums/ui.ts`
-- Import validation enums from `enums/validation.ts`
+### 3. **ALWAYS Import from Project-Level Enums**
+- Import district mappings from `src/enums/districts.js`
+- Import loan enums from `src/enums/loans.js`
+- Import collection enums from `src/enums/db.js`
+- **NEVER** import from root-level enums folder (doesn't exist)
 
 ### 4. **NO Payment-Related Functions**
 - Payment functionality has been completely removed
@@ -253,12 +247,12 @@ When migrating from old field names to new descriptive names:
 - Focus only on RF loans and Grant loans
 
 ### 5. **Type Safety First**
-- Use TypeScript enums for all constants
-- Leverage type checking for database operations
+- Use JavaScript enums for all constants
+- Leverage consistent naming for database operations
 - Use proper interfaces for data structures
 
 ### 6. **Use Centralized Functions for Common Operations**
-- **District Operations**: Use `getDistrictCode()`, `getDistrictName()` from `enums/districts.ts`
+- **District Operations**: Use `getDistrictCode()`, `getDistrictName()` from `src/enums/districts.js`
 - **Registration ID Generation**: Use `generateNextRegId()`, `generateRegIdFromDistrict()` from `utils/regIdUtils.js`
 - **Database Operations**: Use `getProfileByRegId()`, `saveProfile()`, `addLoan()` from `utils/dbUtils.js`
 - **Validation**: Use `validateRegId()`, `validateDistrict()`, `validateNIC()` from `utils/validationUtils.js`
@@ -282,11 +276,50 @@ import { formatAmount, formatDate } from '../utils/formatUtils.ts'
 // Registration ID utilities
 import { generateNextRegId, getDistrictCode } from '../utils/regIdUtils.js'
 
-// Enums and constants
-import { ROOT_COLLECTIONS, PROFILE_FIELDS } from '../enums/db.js'
-import { DISTRICT_MAPPING, District } from '../enums/districts.ts'
-import { LoanStatus, LoanType } from '../enums/loans.ts'
-import { ErrorMessage, SuccessMessage } from '../enums/messages.ts'
+// Enums and constants (PROJECT-LEVEL)
+import { RootCollection, ProfileField } from '../enums/db.js'
+import { DISTRICT_MAPPING, District } from '../enums/districts.js'
+import { LoanStatus, LoanType } from '../enums/loans.js'
 ```
 
-Remember: This database is shared across all projects, so any changes to the schema or structure will affect all applications. Always coordinate changes and test thoroughly. **ALWAYS** use the centralized utils and enums structure for consistency. 
+### 8. **Enum Naming Convention (STANDARDIZED)**
+- **ALWAYS** use PascalCase for enum names: `ProfileField`, `BANK_ACCOUNT_FIELD`, `RF_LOAN_FIELD`
+- **NEVER** use UPPER_SNAKE_CASE for enum names: `PROFILE_FIELDS`, `BANK_ACCOUNT_FIELDS`
+- **NEVER** create redundant enum definitions
+- **ALWAYS** use the same enum across all webapps for consistency
+
+### 9. **Critical Enum Structure**
+```javascript
+// ✅ CORRECT - PascalCase enums (STANDARDIZED)
+export const ProfileField = {
+  REG_ID: 'Reg_ID',
+  FULL_NAME: 'fullName',
+  DISTRICT: 'district',
+  // ... other fields
+}
+
+export const BANK_ACCOUNT_FIELD = {
+  FIRST_NAME: 'firstName',
+  LAST_NAME: 'lastName',
+  CURRENT_BANK_BALANCE: 'currentBankBalance',
+  // ... other fields
+}
+
+// ❌ WRONG - UPPER_SNAKE_CASE enums (REMOVED)
+// export const PROFILE_FIELDS = { ... }     // ❌ REMOVED
+// export const BANK_ACCOUNT_FIELDS = { ... } // ❌ REMOVED
+```
+
+### 10. **Project Structure Consistency**
+- **All webapps** must have identical `src/enums/db.js` files
+- **All webapps** must use the same enum naming convention
+- **All webapps** must import from `src/enums/` (not root-level enums)
+- **All webapps** must build successfully after enum changes
+
+### 11. **Change Management Process**
+1. **Before making changes**: Run `./impact-detector.sh report "Description of changes"`
+2. **After making changes**: Run `./impact-detector.sh build` to verify all webapps build
+3. **For enum changes**: Copy the updated enum file to all webapps
+4. **For critical changes**: Test all interconnected webapps
+
+Remember: This database is shared across all projects, so any changes to the schema or structure will affect all applications. Always coordinate changes and test thoroughly. **ALWAYS** use the standardized enum structure for consistency.
