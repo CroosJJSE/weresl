@@ -4,9 +4,14 @@ import {
   doc, 
   getDoc,
   query,
-  limit
+  limit,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp
 } from 'firebase/firestore'
 import { db } from '../firebase-config.js'
+import { RootCollection } from '../enums/db.js'
 
 export class DatabaseExplorerService {
   constructor() {
@@ -24,24 +29,35 @@ export class DatabaseExplorerService {
       
       const collections = []
       
-      // Try to get documents from common collections to discover them
-      const commonCollections = ['profiles', 'SearchElements', 'users', 'settings']
+      // Get all collections from the enums
+      const allCollections = Object.values(RootCollection)
       
-      for (const collectionName of commonCollections) {
+      for (const collectionName of allCollections) {
         try {
           const q = query(collection(this.db, collectionName), limit(1))
           const snapshot = await getDocs(q)
-          if (!snapshot.empty) {
-            collections.push({
-              id: collectionName,
-              name: collectionName,
-              type: 'collection',
-              path: collectionName,
-              documentCount: snapshot.size
-            })
-          }
+          
+          // Count total documents in this collection
+          const countQuery = query(collection(this.db, collectionName))
+          const countSnapshot = await getDocs(countQuery)
+          
+          collections.push({
+            id: collectionName,
+            name: collectionName,
+            type: 'collection',
+            path: collectionName,
+            documentCount: countSnapshot.size
+          })
         } catch (error) {
-          console.log(`Collection ${collectionName} not accessible or doesn't exist`)
+          console.log(`Collection ${collectionName} not accessible or doesn't exist:`, error.message)
+          // Still add the collection even if it's empty or has permission issues
+          collections.push({
+            id: collectionName,
+            name: collectionName,
+            type: 'collection',
+            path: collectionName,
+            documentCount: 0
+          })
         }
       }
       
@@ -96,8 +112,15 @@ export class DatabaseExplorerService {
       const collectionName = pathParts[0]
       const documentId = pathParts[1]
       
+      // Check if this is a loan document (has 3+ path parts like profiles/AMP001/RF_Loans/loanId)
+      // Loan documents typically don't have subcollections
+      if (pathParts.length >= 3) {
+        console.log('DatabaseExplorerService: This appears to be a loan document, no subcollections expected')
+        return []
+      }
+      
       // Try to get subcollections by attempting to access common ones
-      const commonSubcollections = ['RF_Loans', 'GRANT', 'loans', 'payments', 'history']
+      const commonSubcollections = ['RF_Loans', 'GRANT', 'loans', 'payments', 'history', 'bank_accounts', 'documents', 'attachments']
       const subcollections = []
       
       for (const subcollectionName of commonSubcollections) {
@@ -105,12 +128,16 @@ export class DatabaseExplorerService {
           const q = query(collection(this.db, collectionName, documentId, subcollectionName), limit(1))
           const snapshot = await getDocs(q)
           if (!snapshot.empty) {
+            // Get actual count
+            const countQuery = query(collection(this.db, collectionName, documentId, subcollectionName))
+            const countSnapshot = await getDocs(countQuery)
+            
             subcollections.push({
               id: subcollectionName,
               name: subcollectionName,
               type: 'subcollection',
               path: `${documentPath}/${subcollectionName}`,
-              documentCount: snapshot.size
+              documentCount: countSnapshot.size
             })
           }
         } catch (error) {
@@ -198,6 +225,105 @@ export class DatabaseExplorerService {
       return []
     } catch (error) {
       console.error('DatabaseExplorerService: Error exploring path:', error)
+      throw error
+    }
+  }
+
+  // CRUD Operations
+
+  // Create a new document
+  async createDocument(collectionPath, data) {
+    try {
+      console.log('DatabaseExplorerService: Creating document in:', collectionPath)
+      
+      const docRef = await addDoc(collection(this.db, collectionPath), {
+        ...data,
+        createdAt: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+      })
+      
+      console.log('DatabaseExplorerService: Document created with ID:', docRef.id)
+      return docRef.id
+    } catch (error) {
+      console.error('DatabaseExplorerService: Error creating document:', error)
+      throw error
+    }
+  }
+
+  // Update a document
+  async updateDocument(documentPath, data) {
+    try {
+      console.log('DatabaseExplorerService: Updating document:', documentPath)
+      
+      const pathParts = documentPath.split('/')
+      if (pathParts.length < 2) {
+        throw new Error('Invalid document path')
+      }
+      
+      const collectionName = pathParts[0]
+      const documentId = pathParts[1]
+      
+      const docRef = doc(this.db, collectionName, documentId)
+      await updateDoc(docRef, {
+        ...data,
+        lastUpdated: serverTimestamp()
+      })
+      
+      console.log('DatabaseExplorerService: Document updated successfully')
+      return true
+    } catch (error) {
+      console.error('DatabaseExplorerService: Error updating document:', error)
+      throw error
+    }
+  }
+
+  // Delete a document
+  async deleteDocument(documentPath) {
+    try {
+      console.log('DatabaseExplorerService: Deleting document:', documentPath)
+      
+      const pathParts = documentPath.split('/')
+      if (pathParts.length < 2) {
+        throw new Error('Invalid document path')
+      }
+      
+      const collectionName = pathParts[0]
+      const documentId = pathParts[1]
+      
+      const docRef = doc(this.db, collectionName, documentId)
+      await deleteDoc(docRef)
+      
+      console.log('DatabaseExplorerService: Document deleted successfully')
+      return true
+    } catch (error) {
+      console.error('DatabaseExplorerService: Error deleting document:', error)
+      throw error
+    }
+  }
+
+  // Create a new subcollection document
+  async createSubcollectionDocument(documentPath, subcollectionName, data) {
+    try {
+      console.log('DatabaseExplorerService: Creating subcollection document:', documentPath, subcollectionName)
+      
+      const pathParts = documentPath.split('/')
+      if (pathParts.length < 2) {
+        throw new Error('Invalid document path')
+      }
+      
+      const collectionName = pathParts[0]
+      const documentId = pathParts[1]
+      
+      const docRef = await addDoc(collection(this.db, collectionName, documentId, subcollectionName), {
+        ...data,
+        createdAt: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+      })
+      
+      console.log('DatabaseExplorerService: Subcollection document created with ID:', docRef.id)
+      return docRef.id
+    } catch (error) {
+      console.error('DatabaseExplorerService: Error creating subcollection document:', error)
       throw error
     }
   }

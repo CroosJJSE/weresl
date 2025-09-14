@@ -49,7 +49,8 @@ import {
   ProfileField, 
   RF_LOAN_FIELD, 
   GRANT_FIELD,
-  RootCollection 
+  RootCollection,
+  SearchElementDoc
 } from '../databaseWebApp/src/enums/db.js'
 
 // Firebase configuration
@@ -74,6 +75,9 @@ let currentProfileRegId = null
 let rfLoanCounter = 1
 let grantLoanCounter = 1
 
+// ARM mapping from Projects.csv
+let armMapping = {}
+
 /**
  * Generate simple loan ID for migration
  * Always starts from 01 for each new profile
@@ -97,6 +101,96 @@ function generateSimpleLoanId(regId, loanType) {
 }
 
 /**
+ * Load Projects.csv and create ARM mapping
+ */
+async function loadARMMapping() {
+  try {
+    const projectsPath = path.resolve(__dirname, 'Projects.csv')
+    
+    if (!fs.existsSync(projectsPath)) {
+      console.log('⚠️ Projects.csv not found, ARM mapping will be empty')
+      return
+    }
+    
+    const csvContent = fs.readFileSync(projectsPath, 'utf8')
+    const lines = csvContent.split('\n').filter(line => line.trim())
+    
+    if (lines.length === 0) {
+      console.log('⚠️ Projects.csv is empty')
+      return
+    }
+    
+    // Skip header line
+    const rows = lines.slice(1)
+    
+    for (const row of rows) {
+      const values = parseCSVLine(row)
+      if (values.length >= 6) {
+        const [regId, loanType, projectName, amount, date, arms] = values
+        
+        if (regId && loanType && arms) {
+          const key = `${regId}_${loanType}_${projectName.trim()}`
+          armMapping[key] = arms.trim()
+        }
+      }
+    }
+    
+    console.log(`📋 Loaded ${Object.keys(armMapping).length} ARM mappings from Projects.csv`)
+    
+  } catch (error) {
+    console.error('❌ Error loading Projects.csv:', error.message)
+  }
+}
+
+/**
+ * Get ARM value for a loan
+ */
+function getARMForLoan(regId, loanType, purpose) {
+  // Try exact match first
+  const exactKey = `${regId}_${loanType}_${purpose.trim()}`
+  if (armMapping[exactKey]) {
+    return armMapping[exactKey]
+  }
+  
+  // Try partial matches
+  for (const [key, arms] of Object.entries(armMapping)) {
+    if (key.startsWith(`${regId}_${loanType}_`) && purpose.includes(key.split('_').slice(2).join('_'))) {
+      return arms
+    }
+  }
+  
+  return '' // Return empty string if no match found
+}
+
+/**
+ * Create meaningful description by combining fields
+ */
+function createDescription(originalDescription, schoolGoingChildren, totalChildren, otherDependents) {
+  let description = originalDescription || ''
+  
+  const parts = []
+  
+  if (schoolGoingChildren && schoolGoingChildren > 0) {
+    parts.push(`${schoolGoingChildren} school-going children`)
+  }
+  
+  if (totalChildren && totalChildren > 0) {
+    parts.push(`${totalChildren} total children`)
+  }
+  
+  if (otherDependents && otherDependents > 0) {
+    parts.push(`${otherDependents} other dependents`)
+  }
+  
+  if (parts.length > 0) {
+    const additionalInfo = parts.join(', ')
+    description = description ? `${description}. Has ${additionalInfo}.` : `Has ${additionalInfo}.`
+  }
+  
+  return description
+}
+
+/**
  * Main migration function
  */
 async function migrateCSVData(csvFilePath) {
@@ -107,6 +201,9 @@ async function migrateCSVData(csvFilePath) {
     currentProfileRegId = null
     rfLoanCounter = 1
     grantLoanCounter = 1
+    
+    // Load ARM mapping from Projects.csv
+    await loadARMMapping()
     
     // Load and parse CSV data
     const data = await loadCSVData(csvFilePath)
@@ -489,7 +586,13 @@ async function processRecord(record) {
   // 5. Parse RF return history (fixed - copy from RF_Paid_History)
   const rfReturnHistory = parseRFReturnHistory(record.RF_Paid_History)
   
-  // 6. Create profile data with ALL fields - FIXED FIELD MAPPING
+  // 6. Create meaningful description by combining fields
+  const schoolGoingChildren = parseInt(record['school_kids']) || 0
+  const totalChildren = parseInt(record['total_children']) || 0
+  const otherDependents = parseInt(record.others) || 0
+  const combinedDescription = createDescription(record.Description, schoolGoingChildren, totalChildren, otherDependents)
+  
+  // 7. Create profile data with ALL fields - FIXED FIELD MAPPING
   const profileData = {
     [ProfileField.REG_ID]: record.Reg_ID,
     [ProfileField.FULL_NAME]: record.Name || '',
@@ -498,15 +601,11 @@ async function processRecord(record) {
     [ProfileField.ADDRESS]: record.Address || '',
     [ProfileField.NIC]: record.NIC || '',
     [ProfileField.PHONE_NUMBER]: record.contact || '',
-    [ProfileField.TOTAL_CHILDREN]: parseInt(record['total_children']) || 0,
-    [ProfileField.SCHOOL_GOING_CHILDREN]: parseInt(record['school_kids']) || 0,
-    [ProfileField.OTHER_DEPENDENTS]: parseInt(record.others) || 0,
-    [ProfileField.DESCRIPTION]: record.Description || '',
+    [ProfileField.DESCRIPTION]: combinedDescription,
     [ProfileField.OCCUPATION]: record.Occupation || '',
     [ProfileField.PROFILE_IMAGE_DRIVE_ID]: profileImageDriveId,
-    [ProfileField.GIF]: record.GIFor ? [record.GIFor] : [], // Fixed - only GIFor data
-    [ProfileField.RF_RETURN_HISTORY]: rfReturnHistory, // Fixed - from RF_Paid_History
-    [ProfileField.ARMS]: '', // Initialize ARMS field as empty string
+    [ProfileField.GIF]: record.GIFor ? [record.GIFor] : [], // Map as array
+    [ProfileField.RF_RETURN_HISTORY]: rfReturnHistory, // Map as object
     [ProfileField.CREATED_AT]: serverTimestamp(),
     [ProfileField.LAST_UPDATED]: serverTimestamp()
   }
@@ -514,22 +613,43 @@ async function processRecord(record) {
   // Debug: Log the profile data being saved
   console.log('💾 Profile data to save:', profileData)
   
-  // 7. Save profile
+  // 8. Save profile
   await saveProfile(profileData, record.Reg_ID)
   
-  // 8. Save RF loans with generated IDs
+  // 9. Add NIC to SearchElements if available
+  if (record.NIC) {
+    await addNICToSearchElements(record.Reg_ID, record.NIC)
+  }
+  
+  // 10. Save RF loans with generated IDs
   for (const loan of rfLoans) {
     const loanId = generateSimpleLoanId(record.Reg_ID, 'RF')
     await saveLoan(record.Reg_ID, loan, 'RF', loanId)
   }
   
-  // 9. Save Grant loans with generated IDs
+  // 11. Save Grant loans with generated IDs
   for (const loan of grantLoans) {
     const loanId = generateSimpleLoanId(record.Reg_ID, 'GRANT')
     await saveLoan(record.Reg_ID, loan, 'GRANT', loanId)
   }
   
   console.log(`✅ Successfully processed: ${record.Reg_ID}`)
+}
+
+/**
+ * Add NIC to SearchElements collection
+ */
+async function addNICToSearchElements(regId, nic) {
+  try {
+    const nicDataRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
+    await setDoc(nicDataRef, {
+      [regId]: nic
+    }, { merge: true })
+    console.log(`  ✅ NIC added to SearchElements: ${regId} -> ${nic}`)
+  } catch (error) {
+    console.error(`  ❌ Error adding NIC to SearchElements:`, error.message)
+    // Don't throw error here as the main profile save was successful
+  }
 }
 
 /**
@@ -568,14 +688,12 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
             [RF_LOAN_FIELD.TYPE]: 'RF',
             [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
             [RF_LOAN_FIELD.REG_ID]: '', // Will be set when saving
-            // [RF_LOAN_FIELD.PROJECT_DESCRIPTION]: purpose.trim(), // Removed - no longer using project description
             [RF_LOAN_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
             [RF_LOAN_FIELD.CURRENT_BALANCE]: 0, // Will be updated from RF_Cur_Prj
-            [RF_LOAN_FIELD.ARMS]: '', // Initialize ARMS field
+            [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
             [RF_LOAN_FIELD.LOAN_HISTORY]: [], // Initialize loan history
             [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
             // Additional fields for databaseWebApp compatibility
-            description: purpose.trim(), // For backward compatibility
             loanPurpose: purpose.trim(), // For backward compatibility
             loanAmount: parseFloat(amount.replace(/,/g, '')), // For backward compatibility
             loanSource: 'wereSL', // For backward compatibility
@@ -630,16 +748,14 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
               [RF_LOAN_FIELD.TYPE]: 'RF',
               [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
               [RF_LOAN_FIELD.REG_ID]: '', // Will be set when saving
-              // [RF_LOAN_FIELD.PROJECT_DESCRIPTION]: purposeTrimmed, // Removed - no longer using project description
               [RF_LOAN_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
               [RF_LOAN_FIELD.APPROVED_AT]: new Date(),
               [RF_LOAN_FIELD.CREATED_AT]: new Date(),
               [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
-              [RF_LOAN_FIELD.ARMS]: '', // Initialize ARMS field
+              [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
               [RF_LOAN_FIELD.LOAN_HISTORY]: parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed), // Populate from payment history
               [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (calculatedOriginalAmount === (currentBalanceAmount + totalPayments)), // Set based on calculation
               // Additional fields for databaseWebApp compatibility
-              description: purposeTrimmed, // For backward compatibility
               loanPurpose: purposeTrimmed, // For backward compatibility
               loanAmount: calculatedOriginalAmount, // For backward compatibility
               loanSource: 'wereSL', // For backward compatibility
@@ -694,17 +810,15 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
               [RF_LOAN_FIELD.TYPE]: 'RF',
               [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
               [RF_LOAN_FIELD.REG_ID]: '', // Will be set when saving
-              // [RF_LOAN_FIELD.PROJECT_DESCRIPTION]: purposeTrimmed, // Removed - no longer using project description
               [RF_LOAN_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
               [RF_LOAN_FIELD.CURRENT_BALANCE]: 0, // Completed loans have 0 balance
               [RF_LOAN_FIELD.APPROVED_AT]: new Date(),
               [RF_LOAN_FIELD.CREATED_AT]: new Date(),
               [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
-              [RF_LOAN_FIELD.ARMS]: '', // Initialize ARMS field
+              [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
               [RF_LOAN_FIELD.LOAN_HISTORY]: parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed), // Populate from payment history
               [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (calculatedOriginalAmount === (completedAmount + totalPayments)), // Set based on calculation
               // Additional fields for databaseWebApp compatibility
-              description: purposeTrimmed, // For backward compatibility
               loanPurpose: purposeTrimmed, // For backward compatibility
               loanAmount: calculatedOriginalAmount, // For backward compatibility
               loanSource: 'wereSL', // For backward compatibility
@@ -752,13 +866,11 @@ function parseGrantLoans(grantStr, grantCurPrjStr) {
             [GRANT_FIELD.TYPE]: 'GRANT',
             [GRANT_FIELD.LAST_UPDATED]: serverTimestamp(),
             [GRANT_FIELD.REG_ID]: '', // Will be set when saving
-            // [GRANT_FIELD.PROJECT_DESCRIPTION]: purpose.trim(), // Removed - no longer using project description
             [GRANT_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
-            [GRANT_FIELD.ARMS]: '', // Initialize ARMS field
+            [GRANT_FIELD.ARMS]: '', // Will be set from Projects.csv
             [GRANT_FIELD.LOAN_HISTORY]: [], // Initialize loan history
             [GRANT_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
             // Additional fields for databaseWebApp compatibility
-            description: purpose.trim(), // For backward compatibility
             grantPurpose: purpose.trim(), // For backward compatibility
             grantAmount: parseFloat(amount.replace(/,/g, '')), // For backward compatibility
             grantSource: 'wereSL', // For backward compatibility
@@ -784,16 +896,14 @@ function parseGrantLoans(grantStr, grantCurPrjStr) {
         [GRANT_FIELD.TYPE]: 'GRANT',
         [GRANT_FIELD.LAST_UPDATED]: serverTimestamp(),
         [GRANT_FIELD.REG_ID]: '', // Will be set when saving
-        // [GRANT_FIELD.PROJECT_DESCRIPTION]: 'Additional Grant', // Removed - no longer using project description
         [GRANT_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
         [GRANT_FIELD.APPROVED_AT]: new Date(),
         [GRANT_FIELD.CREATED_AT]: new Date(),
         [GRANT_FIELD.REQUESTED_DATE]: new Date(),
-        [GRANT_FIELD.ARMS]: '', // Initialize ARMS field
+        [GRANT_FIELD.ARMS]: '', // Will be set from Projects.csv
         [GRANT_FIELD.LOAN_HISTORY]: [], // Initialize loan history
         [GRANT_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
         // Additional fields for databaseWebApp compatibility
-        description: 'Additional Grant', // For backward compatibility
         grantPurpose: 'Additional Grant', // For backward compatibility
         grantAmount: remainingAmount, // For backward compatibility
         grantSource: 'wereSL', // For backward compatibility
@@ -939,17 +1049,23 @@ async function saveProfile(profileData, regId) {
 async function saveLoan(regId, loanData, loanType, loanId) {
   try {
     const collectionName = loanType === 'RF' ? ProfileField.RF_LOANS : ProfileField.GRANT
-    const loanRef = collection(db, RootCollection.PROFILES, regId, collectionName)
     
-    // Add the generated loan ID and REG_ID to the loan data
+    // Get ARM value from Projects.csv
+    const purpose = loanData[loanType === 'RF' ? RF_LOAN_FIELD.PURPOSE : GRANT_FIELD.PURPOSE]
+    const armsValue = getARMForLoan(regId, loanType, purpose)
+    
+    // Add the generated loan ID, REG_ID, and ARM to the loan data
     const loanDataWithId = {
       ...loanData,
-      id: loanId,
-      [loanType === 'RF' ? RF_LOAN_FIELD.REG_ID : GRANT_FIELD.REG_ID]: regId
+      [loanType === 'RF' ? RF_LOAN_FIELD.LOAN_ID : GRANT_FIELD.GRANT_ID]: loanId,
+      [loanType === 'RF' ? RF_LOAN_FIELD.REG_ID : GRANT_FIELD.REG_ID]: regId,
+      [loanType === 'RF' ? RF_LOAN_FIELD.ARMS : GRANT_FIELD.ARMS]: armsValue
     }
     
-    await addDoc(loanRef, loanDataWithId)
-    console.log(`  ✅ ${loanType} loan saved for: ${regId} (ID: ${loanId})`)
+    // Save to subcollection with loanID as document name
+    const loanRef = doc(db, RootCollection.PROFILES, regId, collectionName, loanId)
+    await setDoc(loanRef, loanDataWithId)
+    console.log(`  ✅ ${loanType} loan saved for: ${regId} (ID: ${loanId}, ARM: ${armsValue})`)
     
     // Also save to root loans collection for system-wide tracking (as expected by loan admin app)
     await saveLoanToRootCollection(regId, loanDataWithId, loanType, loanId)
@@ -974,11 +1090,12 @@ async function saveLoanToRootCollection(regId, loanData, loanType, loanId) {
       createdAt: loanData[loanType === 'RF' ? RF_LOAN_FIELD.CREATED_AT : GRANT_FIELD.CREATED_AT] || new Date(),
       initiationDate: loanData[loanType === 'RF' ? RF_LOAN_FIELD.INITIATION_DATE : GRANT_FIELD.REQUESTED_DATE] || new Date(),
       loanId: loanId,
-      projectDescription: '', // Removed - no longer using project description
       purpose: loanData[loanType === 'RF' ? RF_LOAN_FIELD.PURPOSE : GRANT_FIELD.PURPOSE] || '',
       source: loanData[loanType === 'RF' ? RF_LOAN_FIELD.SOURCE : GRANT_FIELD.SOURCE] || 'wereSL',
       status: loanData[loanType === 'RF' ? RF_LOAN_FIELD.STATUS : GRANT_FIELD.STATUS] || 'active',
-      type: loanType
+      type: loanType,
+      currentBalance: loanData[loanType === 'RF' ? RF_LOAN_FIELD.CURRENT_BALANCE : 0] || 0,
+      lastUpdated: loanData[loanType === 'RF' ? RF_LOAN_FIELD.LAST_UPDATED : GRANT_FIELD.LAST_UPDATED] || new Date()
     }
     
     const rootLoanRef = doc(db, RootCollection.LOANS, loanId)

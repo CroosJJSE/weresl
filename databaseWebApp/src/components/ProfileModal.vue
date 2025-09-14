@@ -40,8 +40,17 @@
         </div>
         
         <div v-else-if="profileDetails && (profileDetails.activeRFLoans?.length > 0 || profileDetails.completedRFLoans?.length > 0)" class="project-section">
-          <div class="project-header">RF Projects</div>
-          <div class="project-details" style="flex-direction: column;">
+          <div class="project-header">
+            <span>RF Projects</span>
+            <button 
+              @click="toggleRFLoans" 
+              class="collapse-toggle-btn"
+              :class="{ 'expanded': showRFLoans }"
+            >
+              {{ showRFLoans ? '▼' : '▶' }}
+            </button>
+          </div>
+          <div v-if="showRFLoans" class="project-details" style="flex-direction: column;">
             <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">RF Loans</div>
             
             <!-- Active RF Loans -->
@@ -83,16 +92,46 @@
             </div>
           </div>
         </div>
-        <!-- RF Payment History: prefer parsed array, fallback to map -->
-        <div v-if="profileDetails && profileDetails.returnHistory && profileDetails.returnHistory.length > 0" class="project-details" style="flex-direction: column;">
-          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History</div>
+        <!-- RF Payment History: New RRH Object Format -->
+        <div v-if="getRFReturnHistoryRRHObjects().length > 0 || getRFReturnHistoryLegacyFormat().length > 0" class="project-section">
+          <div class="project-header">
+            <span>RF Payment History</span>
+            <button 
+              @click="toggleRFReturnHistory" 
+              class="collapse-toggle-btn"
+              :class="{ 'expanded': showRFReturnHistory }"
+            >
+              {{ showRFReturnHistory ? '▼' : '▶' }}
+            </button>
+          </div>
+          <div v-if="showRFReturnHistory" class="project-details" style="flex-direction: column;">
+            <!-- New RRH Object Format -->
+            <div v-if="getRFReturnHistoryRRHObjects().length > 0">
+              <div v-for="rrhObject in getRFReturnHistoryRRHObjects()" :key="rrhObject.RRH_ID" class="rrh-item-legacy" @click="openRRHDetails(rrhObject)">
+                <span class="rrh-date-legacy">{{ formatDateCompact(rrhObject.approvedDate) }}</span>
+                <span class="rrh-amount-legacy">Rs. {{ formatAmount(rrhObject.amount) }}</span>
+              </div>
+            </div>
+            <!-- Legacy Format (converted to RRH-like objects) -->
+            <div v-else-if="getRFReturnHistoryLegacyFormat().length > 0">
+              <div v-for="rrhObject in getRFReturnHistoryLegacyFormat()" :key="rrhObject.RRH_ID" class="rrh-item-legacy" @click="openRRHDetails(rrhObject)">
+                <span class="rrh-date-legacy">{{ formatDateCompact(rrhObject.approvedDate) }}</span>
+                <span class="rrh-amount-legacy">Rs. {{ formatAmount(rrhObject.amount) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- RF Payment History: Legacy Format (fallback) -->
+        <div v-else-if="profileDetails && profileDetails.returnHistory && profileDetails.returnHistory.length > 0" class="project-details" style="flex-direction: column;">
+          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History (profileDetails.returnHistory)</div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Debug: {{ profileDetails.returnHistory.length }} items</div>
           <div v-for="payment in profileDetails.returnHistory" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
             <span style="color: #2e7d32">{{ payment.parsedDate || payment.dateKey }}</span>
             <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
           </div>
         </div>
         <div v-else-if="getRFReturnHistoryArray().length > 0" class="project-details" style="flex-direction: column;">
-          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History</div>
+          <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History (getRFReturnHistoryArray)</div>
           <div v-for="payment in getRFReturnHistoryArray()" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
             <span style="color: #2e7d32">{{ payment.dateKey }}</span>
             <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
@@ -100,8 +139,17 @@
         </div>
         <!-- GRANT Projects Section: prefer map, fallback to array -->
         <div v-if="getGrantArray().length > 0" class="project-section">
-          <div class="project-header">GRANT Projects</div>
-          <div class="project-details" style="flex-direction: column;">
+          <div class="project-header">
+            <span>GRANT Projects</span>
+            <button 
+              @click="toggleGrantProjects" 
+              class="collapse-toggle-btn"
+              :class="{ 'expanded': showGrantProjects }"
+            >
+              {{ showGrantProjects ? '▼' : '▶' }}
+            </button>
+          </div>
+          <div v-if="showGrantProjects" class="project-details" style="flex-direction: column;">
             <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">GRANT Loans</div>
             <div v-for="(grant, idx) in getGrantArray()" :key="grant.id || idx" class="loan-tile" @click="openLoanDetails(grant)">
               <div class="loan-tile-content">
@@ -131,6 +179,46 @@
       :isVisible="showLoanDetails" 
       @close="closeLoanDetails" 
     />
+    
+    <!-- RRH Details Modal -->
+    <div v-if="showRRHDetails" class="modal" @click="closeRRHDetails">
+      <div class="modal-content" @click.stop>
+        <div class="close-button" @click="closeRRHDetails">&times;</div>
+        <div class="modal-header">
+          <h2>RF Return Details</h2>
+        </div>
+        <div class="modal-body" v-if="selectedRRH">
+          <div class="detail-row">
+            <span class="detail-label">RRH ID:</span>
+            <span class="detail-value">{{ selectedRRH.RRH_ID }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Amount:</span>
+            <span class="detail-value">Rs. {{ formatAmount(selectedRRH.amount) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Receiver:</span>
+            <span class="detail-value">{{ selectedRRH.receiver }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date:</span>
+            <span class="detail-value">{{ formatDate(selectedRRH.approvedDate) }}</span>
+          </div>
+          <div v-if="selectedRRH.DRIVE_LINK_ID" class="detail-row">
+            <span class="detail-label">Receipt:</span>
+            <span class="detail-value">
+              <a 
+                :href="getReceiptUrl(selectedRRH.DRIVE_LINK_ID)" 
+                target="_blank" 
+                class="receipt-link-btn"
+              >
+                📄 View Receipt
+              </a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -141,7 +229,7 @@ import { imageService } from '@/services/imageService.js'
 import { dbOperations } from '@/firebase/db.js'
 import { ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '@/enums/db.js'
 import LoanDetailsModal from './LoanDetailsModal.vue'
-import { formatAmount, formatDate, calculateAge } from '@/utils/formatUtils.ts'
+import { formatAmount, formatDate, formatDateCompact, calculateAge } from '@/utils/formatUtils.ts'
 
 export default {
   name: 'ProfileModal',
@@ -167,6 +255,16 @@ export default {
     const loadError = ref(false)
     const selectedLoan = ref(null)
     const showLoanDetails = ref(false)
+    
+    // RRH-related state
+    const showRFReturnHistory = ref(false)
+    const showRRHDetails = ref(false)
+    const selectedRRH = ref(null)
+    const rrhObjects = ref([])
+    
+    // Collapse/expand state for sections
+    const showRFLoans = ref(false)
+    const showGrantProjects = ref(false)
 
     const profileTypes = computed(() => {
       return profileService.getProfileTypes(props.profile)
@@ -177,11 +275,14 @@ export default {
     // Helper: parse RF_return_history map to array
     const getRFReturnHistoryArray = () => {
       const map = props.profile[ProfileField.RF_RETURN_HISTORY]
-      if (!map || typeof map !== 'object') return []
-      return Object.entries(map).map(([key, value]) => ({
+      if (!map || typeof map !== 'object') {
+        return []
+      }
+      const result = Object.entries(map).map(([key, value]) => ({
         dateKey: key,
         amount: value
       }))
+      return result
     }
 
     // Helper: get GRANTs as array
@@ -215,11 +316,90 @@ export default {
         const details = await dbOperations.getProfileDetails(props.profile.id)
         if (props.profile?.id === props.profile?.id) {
           profileDetails.value = details
+          // Load RRH objects after profile details are loaded
+          await loadRRHObjects()
         }
       } catch (error) {
         loadError.value = true
       } finally {
         loadingDetails.value = false
+      }
+    }
+
+    const loadRRHObjects = async () => {
+      if (!props.profile?.id) return
+      try {
+        // Read RRH data from profile's RF_return_history field instead of root collection
+        const rrhMap = props.profile[ProfileField.RF_RETURN_HISTORY]
+        
+        // Check for alternative field names
+        const alternativeFields = ['RF_return_history', 'rf_return_history', 'RF_Paid_History', 'rf_paid_history']
+        for (const fieldName of alternativeFields) {
+          const fieldValue = props.profile[fieldName]
+          if (fieldValue && typeof fieldValue === 'object') {
+            rrhObjects.value = Object.values(fieldValue).filter(rrhObject => {
+              return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+            })
+            return
+          }
+        }
+        
+        // If no RRH data in profile, try to get it from the database directly
+        if (!rrhMap || typeof rrhMap !== 'object') {
+          try {
+            // Get the profile document directly to access the RF_return_history field
+            const { doc, getDoc } = await import('firebase/firestore')
+            const { db } = await import('@/firebase/index.js')
+            const { RootCollection } = await import('@/enums/db.js')
+            
+            const docRef = doc(db, RootCollection.PROFILES, props.profile.id)
+            const docSnap = await getDoc(docRef)
+            
+            if (docSnap.exists()) {
+              const data = docSnap.data()
+              const dbRrhMap = data.RF_return_history
+              
+              if (dbRrhMap && typeof dbRrhMap === 'object') {
+                rrhObjects.value = Object.values(dbRrhMap).filter(rrhObject => {
+                  return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+                })
+                return
+              }
+            }
+          } catch (error) {
+            console.error('Error loading RRH data from database:', error)
+          }
+          
+          // Fallback to profileDetails.returnHistory if database access fails
+          if (profileDetails.value?.returnHistory) {
+            const returnHistory = profileDetails.value.returnHistory
+            
+            // Convert returnHistory array to RRH objects format
+            rrhObjects.value = returnHistory.map(item => ({
+              RRH_ID: item.dateKey,
+              amount: item.amount,
+              receiver: 'weresl', // Default receiver
+              approvedDate: new Date().toISOString(), // Default date
+              regID: props.profile.id,
+              DRIVE_LINK_ID: item.proofUrl || '' // Map proofUrl to DRIVE_LINK_ID
+            }))
+            return
+          }
+        }
+        
+        if (!rrhMap || typeof rrhMap !== 'object') {
+          rrhObjects.value = []
+          return
+        }
+        
+        // Convert the RRH map to array format
+        rrhObjects.value = Object.values(rrhMap).filter(rrhObject => {
+          // Ensure the object has required fields
+          return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+        })
+      } catch (error) {
+        console.error('Error loading RRH objects from profile:', error)
+        rrhObjects.value = []
       }
     }
 
@@ -265,6 +445,68 @@ export default {
       showLoanDetails.value = false
       selectedLoan.value = null
     }
+
+    // RRH-related functions
+    const getRFReturnHistoryRRHObjects = () => {
+      // Return cached RRH objects, sorted by date (latest first)
+      return rrhObjects.value.sort((a, b) => {
+        const dateA = new Date(a.approvedDate || a.timestamp)
+        const dateB = new Date(b.approvedDate || b.timestamp)
+        return dateB - dateA // Latest first
+      })
+    }
+
+    const getRFReturnHistoryLegacyFormat = () => {
+      const rrhMap = props.profile[ProfileField.RF_RETURN_HISTORY]
+      if (!rrhMap || typeof rrhMap !== 'object') {
+        return []
+      }
+      
+      // Check if it's the legacy format (RRH IDs as keys, amounts as values)
+      const firstKey = Object.keys(rrhMap)[0]
+      const isLegacyFormat = firstKey && firstKey.startsWith('RRH_') && typeof rrhMap[firstKey] === 'number'
+      
+      if (isLegacyFormat) {
+        const result = Object.entries(rrhMap)
+          .map(([rrhId, amount]) => ({
+            RRH_ID: rrhId,
+            amount: amount,
+            receiver: 'weresl', // Default receiver for legacy data
+            approvedDate: new Date().toISOString() // Default date for legacy data
+          }))
+          .sort((a, b) => a.RRH_ID.localeCompare(b.RRH_ID)) // Sort by RRH ID
+        return result
+      }
+      
+      return []
+    }
+
+    const toggleRFReturnHistory = () => {
+      showRFReturnHistory.value = !showRFReturnHistory.value
+    }
+
+    const toggleRFLoans = () => {
+      showRFLoans.value = !showRFLoans.value
+    }
+
+    const toggleGrantProjects = () => {
+      showGrantProjects.value = !showGrantProjects.value
+    }
+
+    const openRRHDetails = (rrhObject) => {
+      selectedRRH.value = rrhObject
+      showRRHDetails.value = true
+    }
+
+    const closeRRHDetails = () => {
+      showRRHDetails.value = false
+      selectedRRH.value = null
+    }
+
+    const getReceiptUrl = (fileId) => {
+      if (!fileId) return '#'
+      return `https://drive.google.com/file/d/${fileId}/view`
+    }
     onMounted(() => {
       if (props.isVisible && props.profile?.id) {
         loadProfileDetails()
@@ -285,6 +527,7 @@ export default {
       profileTypes,
       formatAmount,
       formatDate,
+      formatDateCompact,
       calculateAge,
       handleImageError,
       handleImageLoad,
@@ -298,6 +541,24 @@ export default {
       closeLoanDetails,
       selectedLoan,
       showLoanDetails,
+      
+      // RRH-related
+      getRFReturnHistoryRRHObjects,
+      getRFReturnHistoryLegacyFormat,
+      toggleRFReturnHistory,
+      showRFReturnHistory,
+      openRRHDetails,
+      closeRRHDetails,
+      showRRHDetails,
+      selectedRRH,
+      getReceiptUrl,
+      
+      // Collapse/expand functions
+      toggleRFLoans,
+      showRFLoans,
+      toggleGrantProjects,
+      showGrantProjects,
+      
       ProfileField,
       RF_LOAN_FIELD,
       GRANT_FIELD
@@ -791,4 +1052,185 @@ export default {
     font-size: 9px;
   }
 }
-</style> 
+
+/* RRH Styles */
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.collapse-toggle-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #1565c0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.collapse-toggle-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.collapse-toggle-btn.expanded {
+  background-color: #e3f2fd;
+}
+
+.rrh-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: #f8f9fa;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid #1565c0;
+}
+
+.rrh-item:hover {
+  background: #e3f2fd;
+  transform: translateX(2px);
+}
+
+.rrh-item-single {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  margin: 2px 0;
+  background: #f8f9fa;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid #1565c0;
+}
+
+.rrh-item-single:hover {
+  background: #e3f2fd;
+  transform: translateX(2px);
+}
+
+.rrh-date-single {
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.rrh-amount-single {
+  color: #1565c0;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.rrh-item-legacy {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  margin-left: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.rrh-item-legacy:hover {
+  background-color: #f5f5f5;
+}
+
+.rrh-id-legacy {
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.rrh-date-legacy {
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.rrh-amount-legacy {
+  color: #1565c0;
+  font-weight: 600;
+  font-size: 13px;
+  margin-left: 10px;
+}
+
+.rrh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.rrh-id {
+  font-size: 12px;
+  font-weight: bold;
+  color: #1565c0;
+}
+
+.rrh-amount {
+  font-size: 12px;
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+.rrh-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #666;
+}
+
+.rrh-receiver {
+  font-weight: 500;
+}
+
+.rrh-date {
+  color: #999;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.detail-value {
+  color: #666;
+}
+
+.receipt-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.receipt-link-btn:hover {
+  background-color: #218838;
+}
+</style>

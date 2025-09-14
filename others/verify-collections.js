@@ -104,3 +104,4 @@ verifyRootCollections()
     console.error('❌ Collection verification failed:', error)
     process.exit(1)
   })
+

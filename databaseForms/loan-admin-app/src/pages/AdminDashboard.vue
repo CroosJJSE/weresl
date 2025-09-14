@@ -329,8 +329,21 @@
           </div>
           <div v-else class="return-history-list">
             <div v-for="(returnRecord, index) in returnHistory" :key="index" class="return-record">
-              <div class="return-date">{{ formatDateTime(returnRecord.date) }}</div>
-              <div class="return-amount">{{ formatAmount(returnRecord.amount) }}</div>
+              <div class="return-info">
+                <div class="return-date">{{ formatDateTime(returnRecord.date) }}</div>
+                <div class="return-details">
+                  <span class="rrh-id">{{ returnRecord.rrhId }}</span>
+                  <span class="receiver">{{ returnRecord.receiver }}</span>
+                </div>
+              </div>
+              <div class="return-amount-section">
+                <div class="return-amount">{{ formatAmount(returnRecord.amount) }}</div>
+                <div v-if="returnRecord.driveLinkId" class="receipt-link">
+                  <a :href="getReceiptUrl(returnRecord.driveLinkId)" target="_blank" class="receipt-link-btn">
+                    📄 Receipt
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1627,25 +1640,50 @@ export default {
           const profile = profileResult.data
           const rfReturnHistory = profile[ProfileField.RF_RETURN_HISTORY] || {}
           
-          // Convert to array format - show separate entries for each payment
+          // Convert RRH objects to array format for display
           const historyArray = []
-          for (const [timestampKey, amount] of Object.entries(rfReturnHistory)) {
-            if (timestampKey && amount) {
-              // Parse the timestamp (YYYY-MM-DD-HH-MIN format)
-              const parts = timestampKey.split('-')
-              if (parts.length >= 5) {
-                const year = parseInt(parts[0])
-                const month = parseInt(parts[1]) - 1 // Month is 0-indexed
-                const day = parseInt(parts[2])
-                const hours = parseInt(parts[3])
-                const minutes = parseInt(parts[4])
-                
-                const date = new Date(year, month, day, hours, minutes)
+          
+          // Check if it's the new RRH object format or legacy format
+          const firstKey = Object.keys(rfReturnHistory)[0]
+          const isRRHFormat = firstKey && firstKey.startsWith('RRH_')
+          
+          if (isRRHFormat) {
+            // New RRH object format: {RRH_ID: RRH_Object}
+            for (const [rrhId, rrhObject] of Object.entries(rfReturnHistory)) {
+              if (rrhObject && rrhObject.approvedDate && rrhObject.amount) {
                 historyArray.push({
-                  date: date,
-                  amount: amount,
-                  timestamp: timestampKey
+                  rrhId: rrhObject.RRH_ID,
+                  date: new Date(rrhObject.approvedDate),
+                  amount: rrhObject.amount,
+                  receiver: rrhObject.receiver || 'weresl',
+                  driveLinkId: rrhObject.DRIVE_LINK_ID || '',
+                  timestamp: rrhObject.approvedDate
                 })
+              }
+            }
+          } else {
+            // Legacy format: {timestampKey: amount}
+            for (const [timestampKey, amount] of Object.entries(rfReturnHistory)) {
+              if (timestampKey && amount) {
+                // Parse the timestamp (YYYY-MM-DD-HH-MIN format)
+                const parts = timestampKey.split('-')
+                if (parts.length >= 5) {
+                  const year = parseInt(parts[0])
+                  const month = parseInt(parts[1]) - 1 // Month is 0-indexed
+                  const day = parseInt(parts[2])
+                  const hours = parseInt(parts[3])
+                  const minutes = parseInt(parts[4])
+                  
+                  const date = new Date(year, month, day, hours, minutes)
+                  historyArray.push({
+                    rrhId: `LEGACY_${timestampKey}`,
+                    date: date,
+                    amount: amount,
+                    receiver: 'weresl',
+                    driveLinkId: '',
+                    timestamp: timestampKey
+                  })
+                }
               }
             }
           }
@@ -1669,6 +1707,12 @@ export default {
       showReturnHistoryModal.value = false
       returnHistory.value = []
       selectedRegId.value = ''
+    }
+
+    // Convert Google Drive file ID to viewable URL
+    const getReceiptUrl = (fileId) => {
+      if (!fileId) return '#'
+      return `https://drive.google.com/file/d/${fileId}/view`
     }
 
     // Watch for coordinator tab activation
@@ -1809,6 +1853,7 @@ export default {
         getMonthFromDateKey,
         showReturnHistory,
         closeReturnHistoryModal,
+        getReceiptUrl,
         getCurrentMonthName,
         getCurrentMonthPayment,
         navigateToBankAccounts,
@@ -2750,6 +2795,52 @@ select.form-control option {
   padding: 12px;
   border-bottom: 1px solid #eee;
   transition: background-color 0.2s ease;
+}
+
+.return-info {
+  flex: 1;
+}
+
+.return-details {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rrh-id {
+  font-size: 0.8rem;
+  color: #1565c0;
+  font-weight: 500;
+}
+
+.receiver {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.return-amount-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.receipt-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: #28a745;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.receipt-link-btn:hover {
+  background-color: #218838;
 }
 
 .return-record:hover {

@@ -67,7 +67,7 @@ export const ProfileFieldTypes = {
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
   GIF: 'array', //{timestamp : description}
-  RF_RETURN_HISTORY: 'object', //{RRH_ID: RRH_Object} - Map of RRH objects
+  RF_RETURN_HISTORY: 'array', //{timestamp : returned amount}
   RF_LOANS: 'collection', //{will have the documents as the name of the loan}
   GRANT: 'collection' //{will have the documents as the name of the grant}
 }
@@ -170,10 +170,7 @@ export const RF_RETURN_RECORD_FIELD = {
   STATUS : 'status',
   TIMESTAMP : 'timestamp',
   TOTAL_BALANCE : 'totalBalance',
-  PAID_AMOUNT : 'paidAmount', // amount that was paid in this repayment
-  // RRH-specific fields
-  RRH_ID : 'RRH_ID',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
+  PAID_AMOUNT : 'paidAmount' // amount that was paid in this repayment
 }
 
 export const RF_RETURN_RECORD_FIELD_TYPES = {
@@ -185,29 +182,7 @@ export const RF_RETURN_RECORD_FIELD_TYPES = {
   STATUS : 'string',
   TIMESTAMP : 'date',
   TOTAL_BALANCE : 'number',
-  PAID_AMOUNT : 'number',
-  // RRH-specific field types
-  RRH_ID : 'string',
-  DRIVE_LINK_ID : 'string'
-}
-
-// RRH Object structure for profile's RF_RETURN_HISTORY field
-export const RRH_OBJECT_FIELD = {
-  RRH_ID : 'RRH_ID',
-  APPROVED_DATE : 'approvedDate',
-  AMOUNT : 'amount',
-  RECEIVER : 'receiver',
-  REG_ID : 'regID',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
-}
-
-export const RRH_OBJECT_FIELD_TYPES = {
-  RRH_ID : 'string',
-  APPROVED_DATE : 'date',
-  AMOUNT : 'number',
-  RECEIVER : 'string',
-  REG_ID : 'string',
-  DRIVE_LINK_ID : 'string'
+  PAID_AMOUNT : 'number'
 }
 
 // Loan fields for root/loans collection
@@ -323,4 +298,4 @@ export const getSearchElementDocs = () => {
     value,
     label: label.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
   }))
-} 
+}

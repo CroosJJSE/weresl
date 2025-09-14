@@ -268,6 +268,7 @@ import { dbOperations } from '@/firebase/db.js'
 import { imageService } from '@/services/imageService.js'
 import { DISTRICT_MAPPING } from '@/enums/districts.js'
 import { ARMS, LOAN_FIELD } from '@/enums/db.js'
+import { formatAmount, formatDate, formatDateCompact } from '@/utils/formatUtils.ts'
 
 export default {
   name: 'HomePage',
@@ -300,6 +301,10 @@ export default {
     const selectedLoan = ref(null)
     const loanHistory = ref([])
     const loadingLoanHistory = ref(false)
+    
+    // Return modal state
+    const showReturnModal = ref(false)
+    const selectedReturn = ref(null)
     
     // Common state
     const showModal = ref(false)
@@ -387,7 +392,7 @@ export default {
       searchType.value = type
       if (type === 'profiles') {
         loadProfiles()
-      } else {
+      } else if (type === 'loans') {
         loadLoans()
       }
     }
@@ -485,53 +490,9 @@ export default {
     }
 
     // Utility functions
-    const formatAmount = (amount) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'LKR'
-      }).format(amount || 0)
-    }
-
-    const formatDate = (date) => {
-      if (!date) return 'N/A'
-      
-      try {
-        let dateObj
-        
-        // Handle Firestore timestamp
-        if (date && typeof date === 'object' && date.toDate) {
-          dateObj = date.toDate()
-        }
-        // Handle regular Date object
-        else if (date instanceof Date) {
-          dateObj = date
-        }
-        // Handle string or number
-        else if (typeof date === 'string' || typeof date === 'number') {
-          dateObj = new Date(date)
-        }
-        // Handle timestamp object
-        else if (date && date.seconds) {
-          dateObj = new Date(date.seconds * 1000)
-        }
-        else {
-          return 'N/A'
-        }
-        
-        // Check if date is valid
-        if (isNaN(dateObj.getTime())) {
-          return 'N/A'
-        }
-        
-        return dateObj.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
-      } catch (error) {
-        console.error('Error formatting date:', error, date)
-        return 'N/A'
-      }
+    const getReceiptUrl = (fileId) => {
+      if (!fileId) return '#'
+      return `https://drive.google.com/file/d/${fileId}/view`
     }
 
     const openProfileModal = (profile) => {
@@ -598,10 +559,6 @@ export default {
       }
     }
 
-    const getReceiptUrl = (fileId) => {
-      return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`
-    }
-
     const formatDateCompact = (date) => {
       if (!date) return 'N/A'
       
@@ -636,22 +593,6 @@ export default {
         })
       } catch (error) {
         return 'Invalid Date'
-      }
-    }
-
-    const formatAmountCompact = (amount) => {
-      if (!amount && amount !== 0) return 'N/A'
-      
-      try {
-        const numAmount = parseFloat(amount)
-        if (isNaN(numAmount)) return 'N/A'
-        
-        return numAmount.toLocaleString('en-US', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        })
-      } catch (error) {
-        return 'N/A'
       }
     }
 
@@ -737,7 +678,6 @@ export default {
       formatAmount,
       formatDate,
       formatDateCompact,
-      formatAmountCompact,
       getReceiptUrl,
       loadCoordinators,
       

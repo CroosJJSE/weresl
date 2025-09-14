@@ -41,6 +41,22 @@ import { createTimestamp } from '../utils/regIdUtils.js'
 import { getDistrictName } from '../enums/districts.js'
 import { addLoanInitiationRecord, addRFReturnRecord } from '../utils/gasUtils.js'
 
+// RRH ID counter for generating unique RRH IDs per regID
+let rrhIdCounter = {}
+
+// Generate RRH ID for RF return history records
+function generateRRHId(regId) {
+  if (!rrhIdCounter[regId]) {
+    rrhIdCounter[regId] = 1
+  }
+  
+  const counter = String(rrhIdCounter[regId]).padStart(3, '0')
+  const rrhId = `RRH_${regId}_${counter}`
+  
+  rrhIdCounter[regId]++
+  return rrhId
+}
+
 export const adminDbService = {
   // Get pending loans from SearchElements/pending-loan
   async getPendingLoans() {
@@ -666,7 +682,7 @@ export const adminDbService = {
         lastUpdated: serverTimestamp()
       })
       
-      // 6. Add payment to profile's RF_RETURN_HISTORY
+      // 6. Add payment to profile's RF_RETURN_HISTORY as RRH object
       const profileRef = doc(db, RootCollection.PROFILES, paymentData.regId)
       const profileDoc = await getDoc(profileRef)
       
@@ -674,19 +690,23 @@ export const adminDbService = {
         const profileData = profileDoc.data()
         const currentHistory = profileData[ProfileField.RF_RETURN_HISTORY] || {}
         
-        // Create timestamp key for current date and time (YYYY-MM-DD-HH-MIN format)
-        const now = new Date()
-        const year = now.getFullYear()
-        const month = String(now.getMonth() + 1).padStart(2, '0')
-        const day = String(now.getDate()).padStart(2, '0')
-        const hours = String(now.getHours()).padStart(2, '0')
-        const minutes = String(now.getMinutes()).padStart(2, '0')
-        const timestampKey = `${year}-${month}-${day}-${hours}-${minutes}`
+        // Generate RRH ID
+        const rrhId = generateRRHId(paymentData.regId)
         
-        // Add payment to history
+        // Create RRH object
+        const rrhObject = {
+          RRH_ID: rrhId,
+          approvedDate: new Date().toISOString(),
+          amount: paidAmount,
+          receiver: paymentData.receiver || 'weresl',
+          regID: paymentData.regId,
+          DRIVE_LINK_ID: paymentData.receiptLinkId || ''
+        }
+        
+        // Add RRH object to history
         const updatedHistory = {
           ...currentHistory,
-          [timestampKey]: (currentHistory[timestampKey] || 0) + paidAmount
+          [rrhId]: rrhObject
         }
         
         batch.update(profileRef, {
@@ -936,7 +956,7 @@ export const adminDbService = {
         lastUpdated: serverTimestamp()
       })
       
-      // 6. Add payment to profile's RF_RETURN_HISTORY
+      // 6. Add payment to profile's RF_RETURN_HISTORY as RRH object
       const profileRef = doc(db, RootCollection.PROFILES, paymentData.regId)
       const profileDoc = await getDoc(profileRef)
       
@@ -944,19 +964,23 @@ export const adminDbService = {
         const profileData = profileDoc.data()
         const currentHistory = profileData[ProfileField.RF_RETURN_HISTORY] || {}
         
-        // Create timestamp key for current date and time (YYYY-MM-DD-HH-MIN format)
-        const now = new Date()
-        const year = now.getFullYear()
-        const month = String(now.getMonth() + 1).padStart(2, '0')
-        const day = String(now.getDate()).padStart(2, '0')
-        const hours = String(now.getHours()).padStart(2, '0')
-        const minutes = String(now.getMinutes()).padStart(2, '0')
-        const timestampKey = `${year}-${month}-${day}-${hours}-${minutes}`
+        // Generate RRH ID
+        const rrhId = generateRRHId(paymentData.regId)
         
-        // Add payment to history
+        // Create RRH object
+        const rrhObject = {
+          RRH_ID: rrhId,
+          approvedDate: new Date().toISOString(),
+          amount: paidAmount,
+          receiver: paymentData.receiver || 'weresl',
+          regID: paymentData.regId,
+          DRIVE_LINK_ID: paymentData.receiptLinkId || ''
+        }
+        
+        // Add RRH object to history
         const updatedHistory = {
           ...currentHistory,
-          [timestampKey]: (currentHistory[timestampKey] || 0) + paidAmount
+          [rrhId]: rrhObject
         }
         
         batch.update(profileRef, {

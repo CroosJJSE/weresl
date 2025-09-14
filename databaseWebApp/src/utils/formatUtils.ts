@@ -21,6 +21,51 @@ export const formatAmount = (amount) => {
 }
 
 /**
+ * Format date to compact readable string (date only, no time)
+ */
+export const formatDateCompact = (date) => {
+  if (!date) return 'N/A'
+  
+  try {
+    let dateObj
+    
+    // Handle Firebase Timestamp objects
+    if (date.toDate) {
+      dateObj = date.toDate()
+    } else if (typeof date === 'string') {
+      // Handle DD-MM-YYYY format (common in our database)
+      if (date.includes('-') && date.split('-').length === 3) {
+        const parts = date.split('-')
+        if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+          // DD-MM-YYYY format
+          dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+        } else {
+          // Try as regular date string
+          dateObj = new Date(date)
+        }
+      } else {
+        // Try as regular date string
+        dateObj = new Date(date)
+      }
+    } else {
+      // Assume it's already a Date object
+      dateObj = date
+    }
+    
+    if (isNaN(dateObj.getTime())) return 'N/A'
+    
+    return dateObj.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch (error) {
+    console.error('Error formatting date:', error)
+    return 'N/A'
+  }
+}
+
+/**
  * Format date to readable string
  */
 export const formatDate = (date) => {
