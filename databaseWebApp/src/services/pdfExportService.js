@@ -13,7 +13,8 @@
 
 import { dbOperations } from '@/firebase/db.js'
 import { convertGoogleDriveUrl, extractFileId } from '@/utils/driveUtils.js'
-import { ProfileField, RootCollection, RF_LOAN_FIELD, GRANT_FIELD, RF_RETURN_RECORD_FIELD } from '@/enums/db.js'
+import { ProfileField, RootCollection, RF_LOAN_FIELD, GRANT_FIELD, RF_RETURN_RECORD_FIELD, RRH_OBJECT_FIELD } from '@/enums/db.js'
+import { jsPDF } from 'jspdf'
 
 // Logo file ID for the PDF header
 const LOGO_FILE_ID = '1F727f-TTYnFjl93DQiSXvvY9DJaJEaNX'
@@ -40,7 +41,6 @@ export const pdfExportService = {
         includeImages: true,
         includeLoanHistory: true,
         includeGrantHistory: true,
-        includeChildrenInfo: false,
         ...options
       }
 
@@ -94,7 +94,7 @@ export const pdfExportService = {
         try {
           const profileResult = await dbOperations.getProfileByRegId(regId)
           if (profileResult) {
-            // Load loan details and payment history in parallel
+            // Load loan details and RF return history in parallel
             const [loans, rfReturnHistory] = await Promise.all([
               dbOperations.getProfileLoans(regId),
               dbOperations.getRFReturnHistory(regId)
@@ -194,9 +194,6 @@ export const pdfExportService = {
    * Create PDF content for profiles with optimized layout
    */
   async createPDFContent(profiles, options = {}) {
-    // Import jsPDF dynamically to avoid SSR issues
-    const { jsPDF } = await import('jspdf')
-    
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
@@ -307,11 +304,20 @@ export const pdfExportService = {
       currentY = this.addLoanDetails(doc, profile.loans, currentY, pageWidth, margin, contentWidth)
     }
     
-    // Add RF payment history if option is enabled
-    if (options.includeRFHistory !== false && profile.rfReturnHistory && profile.rfReturnHistory.length > 0) {
-      const filteredHistory = this.filterRFHistoryByDateRange(profile.rfReturnHistory, options.rfHistoryFrom, options.rfHistoryTo)
-      if (filteredHistory.length > 0) {
-        currentY = this.addPaymentHistory(doc, filteredHistory, currentY, pageWidth, margin, contentWidth)
+    // Add RF payment history if option is enabled - using new table format
+    if (options.includeRFHistory !== false && profile.rfReturnHistory) {
+      // Handle both old array format and new object format
+      if (Array.isArray(profile.rfReturnHistory)) {
+        // Convert old array format to object format for consistency
+        const historyObj = {}
+        profile.rfReturnHistory.forEach((entry, index) => {
+          const timestamp = entry.dateKey || entry.timestamp || `entry_${index}`
+          historyObj[timestamp] = entry
+        })
+        currentY = this.addRFReturnHistoryTable(doc, historyObj, currentY, pageWidth, margin, contentWidth)
+      } else if (typeof profile.rfReturnHistory === 'object' && profile.rfReturnHistory !== null) {
+        // Use new object format directly
+        currentY = this.addRFReturnHistoryTable(doc, profile.rfReturnHistory, currentY, pageWidth, margin, contentWidth)
       }
     }
     
@@ -392,14 +398,7 @@ export const pdfExportService = {
       { keys: ['GRANT_Cur_Prj'], label: 'Grant Current Project' }
     ]
     
-    // Add children information fields if option is enabled
-    if (options.includeChildrenInfo) {
-      fieldsToInclude.push(
-        { keys: ['basicInfo.totalChildren', 'Total_Children', 'totalChildren', 'total_children'], label: 'Total Children' },
-        { keys: ['basicInfo.schoolKids', 'School_Kids', 'schoolGoingChildren', 'school_kids'], label: 'School Going Children' },
-        { keys: ['basicInfo.others', 'Others', 'otherDependents', 'others'], label: 'Other Dependents' }
-      )
-    }
+    // Children information fields removed as requested
     
     // Add each field
     for (const field of fieldsToInclude) {
@@ -449,10 +448,12 @@ export const pdfExportService = {
     currentY += 10 // Reduced spacing
     
     const rowHeight = 8 // Reduced row height
-    const col1Width = contentWidth * 0.25
-    const col2Width = contentWidth * 0.25
-    const col3Width = contentWidth * 0.25
-    const col4Width = contentWidth * 0.25
+    const col1Width = contentWidth * 0.15
+    const col2Width = contentWidth * 0.15
+    const col3Width = contentWidth * 0.15
+    const col4Width = contentWidth * 0.15
+    const col5Width = contentWidth * 0.15
+    const col6Width = contentWidth * 0.25
     
     // Table header (more compact)
     doc.setFontSize(9) // Smaller font
@@ -462,9 +463,11 @@ export const pdfExportService = {
     
     doc.setTextColor(26, 115, 232)
     doc.text('Type', margin + 2, currentY)
-    doc.text('Amount', margin + col1Width + 2, currentY)
-    doc.text('Status', margin + col1Width + col2Width + 2, currentY)
-    doc.text('Purpose', margin + col1Width + col2Width + col3Width + 2, currentY)
+    doc.text('Loan Amount', margin + col1Width + 2, currentY)
+    doc.text('Current Balance', margin + col1Width + col2Width + 2, currentY)
+    doc.text('Date', margin + col1Width + col2Width + col3Width + 2, currentY)
+    doc.text('Status', margin + col1Width + col2Width + col3Width + col4Width + 2, currentY)
+    doc.text('Purpose', margin + col1Width + col2Width + col3Width + col4Width + col5Width + 2, currentY)
     currentY += rowHeight + 3 // Reduced spacing
     
     // Add each loan
@@ -482,18 +485,44 @@ export const pdfExportService = {
       
       // Loan amount
       doc.setTextColor(0, 0, 0)
-      const amount = loan[RF_LOAN_FIELD.AMOUNT] || loan.amount || loan[GRANT_FIELD.AMOUNT] || 'N/A'
-      doc.text(String(amount), margin + col1Width + 2, currentY)
+      let loanAmount = 'N/A'
+      let currentBalance = 'N/A'
+      
+      if (loan.type === 'RF') {
+        // For RF loans, show both loan amount and current balance
+        loanAmount = loan[RF_LOAN_FIELD.AMOUNT] || loan.amount || 'N/A'
+        currentBalance = loan[RF_LOAN_FIELD.CURRENT_BALANCE] || loan.currentBalance || 'N/A'
+      } else if (loan.type === 'GRANT') {
+        // For Grant loans, only show loan amount (no current balance)
+        loanAmount = loan[GRANT_FIELD.AMOUNT] || loan[GRANT_FIELD.APPROVED_AMOUNT] || loan.amount || 'N/A'
+        currentBalance = 'N/A' // Grant loans don't have current balance
+      }
+      
+      doc.text(String(loanAmount), margin + col1Width + 2, currentY)
+      doc.text(String(currentBalance), margin + col1Width + col2Width + 2, currentY)
+      
+      // Loan date - using the correct field names
+      let loanDate = 'N/A'
+      if (loan.type === 'RF') {
+        // For RF loans, use initiationDate or approvedAt
+        const dateField = loan[RF_LOAN_FIELD.INITIATION_DATE] || loan[RF_LOAN_FIELD.APPROVED_AT] || loan.initiationDate || loan.approvedAt
+        loanDate = this.formatDateForPDF(dateField)
+      } else if (loan.type === 'GRANT') {
+        // For Grant loans, use requestedDate or approvedAt
+        const dateField = loan[GRANT_FIELD.REQUESTED_DATE] || loan[GRANT_FIELD.APPROVED_AT] || loan.requestedDate || loan.approvedAt
+        loanDate = this.formatDateForPDF(dateField)
+      }
+      doc.text(loanDate, margin + col1Width + col2Width + col3Width + 2, currentY)
       
       // Loan status
       const status = loan[RF_LOAN_FIELD.STATUS] || loan.status || 'N/A'
-      doc.text(String(status), margin + col1Width + col2Width + 2, currentY)
+      doc.text(String(status), margin + col1Width + col2Width + col3Width + col4Width + 2, currentY)
       
       // Loan purpose
       const purpose = loan[RF_LOAN_FIELD.PURPOSE] || loan.purpose || loan[GRANT_FIELD.PURPOSE] || 'N/A'
       const purposeText = String(purpose)
-      const wrappedPurpose = doc.splitTextToSize(purposeText, col4Width - 4)
-      doc.text(wrappedPurpose, margin + col1Width + col2Width + col3Width + 2, currentY)
+      const wrappedPurpose = doc.splitTextToSize(purposeText, col6Width - 4)
+      doc.text(wrappedPurpose, margin + col1Width + col2Width + col3Width + col4Width + col5Width + 2, currentY)
       
       currentY += Math.max(rowHeight, wrappedPurpose.length * 2.5) // Reduced multiplier
     }
@@ -502,79 +531,188 @@ export const pdfExportService = {
   },
 
   /**
-   * Add payment history to PDF
+   * Add RF return history table to PDF with new object format
    */
-  addPaymentHistory(doc, paymentHistory, currentY, pageWidth, margin, contentWidth) {
+  addRFReturnHistoryTable(doc, rfReturnHistory, currentY, pageWidth, margin, contentWidth) {
     // Check if we need a new page
-    if (currentY > doc.internal.pageSize.getHeight() - 80) { // Reduced threshold
+    if (currentY > doc.internal.pageSize.getHeight() - 100) {
       doc.addPage()
       currentY = 20
     }
     
-    // Section header (more compact)
-    doc.setFontSize(12) // Smaller header
+    // Section header
+    doc.setFontSize(12)
     doc.setTextColor(26, 115, 232)
-    doc.text('Payment History', margin, currentY)
-    currentY += 10 // Reduced spacing
+    doc.text('RF Return History', margin, currentY)
+    currentY += 15
     
-    const rowHeight = 8 // Reduced row height
-    const col1Width = contentWidth * 0.4
-    const col2Width = contentWidth * 0.6
+    // Table header
+    const rowHeight = 12
+    const colWidths = [
+      contentWidth * 0.25, // Date
+      contentWidth * 0.2,  // Amount
+      contentWidth * 0.25, // Receiver
+      contentWidth * 0.15, // Reduced Loan
+      contentWidth * 0.15  // Effect
+    ]
     
-    // Table header (more compact)
-    doc.setFontSize(9) // Smaller font
+    doc.setFontSize(9)
     doc.setTextColor(100, 100, 100)
     doc.setFillColor(240, 240, 240)
-    doc.rect(margin, currentY - 3, contentWidth, rowHeight + 1, 'F') // Reduced padding
+    doc.rect(margin, currentY - 3, contentWidth, rowHeight + 1, 'F')
     
     doc.setTextColor(26, 115, 232)
-    doc.text('Date', margin + 2, currentY)
-    doc.text('Amount', margin + col1Width + 2, currentY)
-    currentY += rowHeight + 3 // Reduced spacing
+    let xPos = margin + 2
+    doc.text('Date', xPos, currentY)
+    xPos += colWidths[0]
+    doc.text('Amount', xPos, currentY)
+    xPos += colWidths[1]
+    doc.text('Receiver', xPos, currentY)
+    xPos += colWidths[2]
+    doc.text('Reduced Loan', xPos, currentY)
+    xPos += colWidths[3]
+    doc.text('Effect', xPos, currentY)
+    currentY += rowHeight + 3
     
-    // Add each payment
-    for (const payment of paymentHistory) {
-      // Check if we need a new page
-      if (currentY > doc.internal.pageSize.getHeight() - 40) { // Reduced threshold
-        doc.addPage()
-        currentY = 20
-      }
+    // Process RF return history as object
+    if (typeof rfReturnHistory === 'object' && rfReturnHistory !== null) {
+      const entries = Object.entries(rfReturnHistory)
       
-      // Payment date
-      doc.setFontSize(8) // Smaller font
-      doc.setTextColor(100, 100, 100)
-      let paymentDate = 'N/A'
-      
-      if (payment.parsedDate) {
-        paymentDate = payment.parsedDate
-      } else if (payment.dateKey) {
-        // Try to parse the date key
-        try {
-          const parts = payment.dateKey.split('_')
-          if (parts.length >= 3) {
-            const day = parts[parts.length - 3] || parts[0]
-            const month = parts[parts.length - 2] || parts[1]
-            const year = parts[parts.length - 1] || parts[2]
-            paymentDate = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`
-          } else {
-            paymentDate = payment.dateKey
-          }
-        } catch (error) {
-          paymentDate = payment.dateKey
+      for (const [timestamp, record] of entries) {
+        // Check if we need a new page
+        if (currentY > doc.internal.pageSize.getHeight() - 40) {
+          doc.addPage()
+          currentY = 20
         }
+        
+        // Parse the record - handle both old and new formats
+        let dateStr = 'N/A'
+        let amount = 'N/A'
+        let receiver = 'N/A'
+        let reducedLoan = 'N/A' // Placeholder for future implementation
+        let effect = 'N/A' // Placeholder for future implementation
+        
+        // Handle new object format
+        if (typeof record === 'object' && record !== null) {
+          // Extract date from RRH object - use APPROVED_DATE field
+          if (record[RRH_OBJECT_FIELD.APPROVED_DATE]) {
+            dateStr = this.formatDateForPDF(record[RRH_OBJECT_FIELD.APPROVED_DATE])
+          } else if (record.approvedDate) {
+            dateStr = this.formatDateForPDF(record.approvedDate)
+          } else if (record[RF_RETURN_RECORD_FIELD.TIMESTAMP]) {
+            dateStr = this.formatDateForPDF(record[RF_RETURN_RECORD_FIELD.TIMESTAMP])
+          } else if (record.timestamp) {
+            dateStr = this.formatDateForPDF(record.timestamp)
+          } else {
+            // Try to parse timestamp key as fallback
+            dateStr = this.parseTimestampKey(timestamp)
+          }
+          
+          // Extract amount - use RRH object fields first
+          amount = record[RRH_OBJECT_FIELD.AMOUNT] || 
+                   record[RF_RETURN_RECORD_FIELD.PAID_AMOUNT] || 
+                   record[RF_RETURN_RECORD_FIELD.AMOUNT] || 
+                   record.amount || 'N/A'
+          
+          // Extract receiver - use RRH object fields first
+          receiver = record[RRH_OBJECT_FIELD.RECEIVER] || 
+                     record[RF_RETURN_RECORD_FIELD.RECEIVER] || 
+                     record.receiver || 'N/A'
+          
+          // Format amount as currency
+          if (typeof amount === 'number') {
+            amount = `LKR ${amount.toLocaleString()}`
+          }
+        } else {
+          // Handle old format (just amount)
+          amount = typeof record === 'number' ? `LKR ${record.toLocaleString()}` : record
+          dateStr = this.parseTimestampKey(timestamp)
+        }
+        
+        // Add table row
+        doc.setFontSize(8)
+        doc.setTextColor(0, 0, 0)
+        
+        xPos = margin + 2
+        doc.text(dateStr, xPos, currentY)
+        xPos += colWidths[0]
+        doc.text(String(amount), xPos, currentY)
+        xPos += colWidths[1]
+        doc.text(String(receiver), xPos, currentY)
+        xPos += colWidths[2]
+        doc.text(String(reducedLoan), xPos, currentY)
+        xPos += colWidths[3]
+        doc.text(String(effect), xPos, currentY)
+        
+        currentY += rowHeight + 1
       }
-      
-      doc.text(paymentDate, margin + 2, currentY)
-      
-      // Payment amount
-      doc.setTextColor(0, 0, 0)
-      const amount = payment.amount || payment[RF_RETURN_RECORD_FIELD.PAID_AMOUNT] || 'N/A'
-      doc.text(String(amount), margin + col1Width + 2, currentY)
-      
-      currentY += rowHeight + 1 // Reduced spacing
     }
     
-    return currentY + 5 // Reduced spacing
+    return currentY + 10
+  },
+
+  /**
+   * Format date for PDF display
+   */
+  formatDateForPDF(date) {
+    if (!date) return 'N/A'
+    
+    try {
+      const dateObj = date.toDate ? date.toDate() : new Date(date)
+      return dateObj.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    } catch (error) {
+      return String(date)
+    }
+  },
+
+  /**
+   * Parse timestamp key to readable date
+   */
+  parseTimestampKey(timestamp) {
+    try {
+      // Handle RRH ID format (e.g., "001-BAD001-RRH")
+      if (timestamp.includes('-') && timestamp.includes('RRH')) {
+        return 'Date N/A'
+      }
+      
+      // Handle various timestamp formats
+      if (timestamp.includes('_')) {
+        // Format: YYYY_MM_DD_HH_MM_SS
+        const parts = timestamp.split('_')
+        if (parts.length >= 3) {
+          const year = parts[0]
+          const month = parts[1]
+          const day = parts[2]
+          return `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`
+        }
+      } else if (timestamp.length === 13) {
+        // Unix timestamp in milliseconds
+        const date = new Date(parseInt(timestamp))
+        return date.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })
+      } else {
+        // Try to parse as date
+        const date = new Date(timestamp)
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
+        }
+      }
+    } catch (error) {
+      console.warn('Could not parse timestamp:', timestamp)
+    }
+    
+    return timestamp
   },
 
   /**

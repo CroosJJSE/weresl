@@ -15,9 +15,17 @@
         <p>Manage loan approvals and payment requests</p>
       </div>
 
-    <!-- Success Message -->
-    <div v-if="successMessage" class="success-message">
-      {{ successMessage }}
+    <!-- Success/Error Message -->
+    <div v-if="successMessage" :class="getMessageClass()">
+      <div class="message-content">
+        <div class="message-icon">
+          <span v-if="messageType === 'success'">✅</span>
+          <span v-else-if="messageType === 'error'">❌</span>
+          <span v-else-if="messageType === 'warning'">⚠️</span>
+          <span v-else>ℹ️</span>
+        </div>
+        <div class="message-text">{{ successMessage }}</div>
+      </div>
       <button @click="clearSuccessMessage" class="close-message">&times;</button>
     </div>
 
@@ -414,6 +422,14 @@
             <small class="form-help" v-if="!editingLoan.source || editingLoan.source.trim() === ''">
               Source is required
             </small>
+            <div v-if="editingLoan.source" class="balance-info">
+              <small class="balance-text" :class="{ 'insufficient-funds': !hasSufficientFunds }">
+                💰 Current balance: Rs. {{ formatAmount(currentSourceBalance) }}
+                <span v-if="!hasSufficientFunds" class="warning-text">
+                  ⚠️ Insufficient funds for this loan amount
+                </span>
+              </small>
+            </div>
           </div>
           <div class="form-group">
             <label>ARMS (Optional):</label>
@@ -721,10 +737,12 @@ export default {
     const approvingPayments = ref([])
     const approvingGIFReturns = ref([])
     const successMessage = ref('')
+    const messageType = ref('success') // 'success', 'error', 'warning', 'info'
     const savingLoan = ref(false)
     const savingPayment = ref(false)
     const savingGIFReturn = ref(false)
     const availableSources = ref([])
+    const sourceBalances = ref({}) // Store balances for all sources
     const armsOptions = {
       EDEN: 'EDEN',
       ARK: 'ARK',
@@ -766,12 +784,19 @@ export default {
     // Load pending loans from SearchElements/pending-loan
     const loadPendingLoans = async () => {
       try {
+        console.log('🔄 Loading pending loans...')
         loading.value = true
-        pendingLoans.value = await adminDbService.getPendingLoans()
+        const result = await adminDbService.getPendingLoans()
+        console.log('📊 Pending loans result:', result)
+        console.log('📊 Number of pending loans:', result.length)
+        pendingLoans.value = result
+        console.log('✅ Pending loans loaded successfully')
       } catch (error) {
+        console.error('❌ Error loading pending loans:', error)
         // Handle error silently
       } finally {
         loading.value = false
+        console.log('🏁 Finished loading pending loans')
       }
     }
 
@@ -793,12 +818,30 @@ export default {
       }
     }
 
-    // Load available sources
+    // Load available sources and their balances
     const loadAvailableSources = async () => {
       try {
         availableSources.value = await adminDbService.getAvailableSources()
+        
+        // Load balances for all sources
+        const balancePromises = availableSources.value.map(async (source) => {
+          try {
+            const balanceResult = await adminDbService.getBankBalanceByName(source)
+            if (balanceResult) {
+              sourceBalances.value[source] = balanceResult.balance || 0
+            } else {
+              sourceBalances.value[source] = 0
+            }
+          } catch (error) {
+            console.error(`Error loading balance for ${source}:`, error)
+            sourceBalances.value[source] = 0
+          }
+        })
+        
+        await Promise.all(balancePromises)
+        console.log('💰 Source balances loaded:', sourceBalances.value)
       } catch (error) {
-        // Handle error silently
+        console.error('Error loading available sources:', error)
       }
     }
 
@@ -939,45 +982,115 @@ export default {
              loan.requestDate
     })
 
+    // Get current source balance
+    const currentSourceBalance = computed(() => {
+      if (!editingLoan.value.source) return 0
+      return sourceBalances.value[editingLoan.value.source] || 0
+    })
+
+    // Check if source has sufficient funds
+    const hasSufficientFunds = computed(() => {
+      if (!editingLoan.value.amount || !editingLoan.value.source) return true
+      return currentSourceBalance.value >= editingLoan.value.amount
+    })
+
     // Approve loan (updated from save loan edit)
     const saveLoanEdit = async () => {
       const currentRegId = editingLoan.value.regId
       
       try {
+        console.log('🚀 Starting loan approval process...')
+        console.log('📋 Editing loan data:', editingLoan.value)
+        
         // Validate form
         if (!isFormValid.value) {
+          console.log('❌ Form validation failed')
           showSuccessMessage('Please fill in all required fields before approving', 'error')
           return
         }
         
+        console.log('✅ Form validation passed')
         savingLoan.value = true
         
         const loan = editingLoan.value
+        console.log('📝 Loan data to process:', {
+          regId: loan.regId,
+          loanType: loan.loanType,
+          loanId: loan.loanId,
+          amount: loan.amount,
+          purpose: loan.purpose,
+          source: loan.source,
+          arms: loan.arms
+        })
         
         // First update the loan with the edited values
-        await adminDbService.updateLoan(loan.regId, loan.loanType, loan.loanId, {
+        console.log('🔄 Step 1: Updating loan with edited values...')
+        const updateResult = await adminDbService.updateLoan(loan.regId, loan.loanType, loan.loanId, {
           amount: parseFloat(loan.amount),
           purpose: loan.purpose,
           source: loan.source,
           arms: loan.arms
         })
         
+        console.log('📊 Update loan result:', updateResult)
+        
+        if (!updateResult.success) {
+          console.log('❌ Failed to update loan:', updateResult.message)
+          throw new Error(updateResult.message || 'Failed to update loan')
+        }
+        
+        console.log('✅ Loan updated successfully')
+        
         // Then approve the loan
-        await adminDbService.approveLoan(loan.regId, loan.loanType, loan.loanId)
+        console.log('🔄 Step 2: Approving loan...')
+        const approvalResult = await adminDbService.approveLoan(loan.regId, loan.loanType, loan.loanId)
+        
+        console.log('📊 Approval result:', approvalResult)
+        
+        if (!approvalResult.success) {
+          console.log('❌ Failed to approve loan:', approvalResult.message)
+          throw new Error(approvalResult.message || 'Failed to approve loan')
+        }
+        
+        console.log('✅ Loan approved successfully')
         
         closeEditModal()
+        console.log('🔄 Step 3: Reloading pending loans...')
         await loadPendingLoans()
+        console.log('✅ Pending loans reloaded')
+        
         showSuccessMessage('Loan approved successfully!')
+        console.log('🎉 Loan approval process completed successfully')
         
       } catch (error) {
+        console.error('❌ Error in loan approval process:', error)
+        console.error('❌ Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        })
+        
         // Show specific error message for insufficient balance
         if (error.message && error.message.includes('Insufficient balance')) {
-          showSuccessMessage(error.message, 'error')
+          // Extract account name and amounts from error message
+          const balanceMatch = error.message.match(/Insufficient balance in (.+?)\. Available: Rs\. ([\d,]+), Required: Rs\. ([\d,]+)/)
+          if (balanceMatch) {
+            const accountName = balanceMatch[1]
+            const available = balanceMatch[2]
+            const required = balanceMatch[3]
+            showSuccessMessage(
+              `❌ Insufficient Funds: The ${accountName} account has Rs. ${available} but needs Rs. ${required} for this loan. Please add funds to the ${accountName} account before approving loans.`,
+              'error'
+            )
+          } else {
+            showSuccessMessage(error.message, 'error')
+          }
         } else {
           showSuccessMessage('Error approving loan. Please try again.', 'error')
         }
       } finally {
         savingLoan.value = false
+        console.log('🏁 Loan approval process finished')
       }
     }
 
@@ -1306,14 +1419,31 @@ export default {
     // Show success message
     const showSuccessMessage = (message, type = 'success') => {
       successMessage.value = message
+      messageType.value = type
       setTimeout(() => {
         successMessage.value = ''
-      }, 5000)
+        messageType.value = 'success'
+      }, 8000) // Longer timeout for error messages
     }
 
     // Clear success message
     const clearSuccessMessage = () => {
       successMessage.value = ''
+      messageType.value = 'success'
+    }
+
+    // Get message class based on type
+    const getMessageClass = () => {
+      switch (messageType.value) {
+        case 'error':
+          return 'error-message'
+        case 'warning':
+          return 'warning-message'
+        case 'info':
+          return 'info-message'
+        default:
+          return 'success-message'
+      }
     }
 
     // Utility functions
@@ -1823,6 +1953,7 @@ export default {
         closeEditPaymentModal,
         showSuccessMessage,
         clearSuccessMessage,
+        getMessageClass,
         formatAmount,
         formatAmountInMillions,
         formatDate,
@@ -1838,6 +1969,8 @@ export default {
         closeEditGIFReturnModal, // Added closeEditGIFReturnModal to return
         // Form validation
         isFormValid,
+        currentSourceBalance,
+        hasSufficientFunds,
         // Sheets Update
         isUpdatingSheets,
         sheetsProgress,
@@ -1894,17 +2027,59 @@ export default {
   margin-bottom: 10px;
 }
 
-/* Success Message */
-.success-message {
-  background: #d4edda;
-  color: #155724;
+/* Message Styles */
+.success-message, .error-message, .warning-message, .info-message {
   padding: 15px;
-  border-radius: 5px;
+  border-radius: 8px;
   margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  border: 1px solid #c3e6cb;
+  align-items: flex-start;
+  border: 1px solid;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+.warning-message {
+  background: #fff3cd;
+  color: #856404;
+  border-color: #ffeaa7;
+}
+
+.info-message {
+  background: #d1ecf1;
+  color: #0c5460;
+  border-color: #bee5eb;
+}
+
+.message-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.message-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.message-text {
+  flex: 1;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .close-message {
@@ -3060,5 +3235,30 @@ select.form-control option {
   background: #f8f9fa;
   border-radius: 6px;
   border: 1px solid #e9ecef;
+}
+
+/* Balance Info Styles */
+.balance-info {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+}
+
+.balance-text {
+  color: #495057;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.balance-text.insufficient-funds {
+  color: #dc3545;
+}
+
+.warning-text {
+  color: #dc3545;
+  font-weight: 600;
+  margin-left: 8px;
 }
 </style> 

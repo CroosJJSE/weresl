@@ -4,17 +4,15 @@
  */
 
 /**
- * Format amount to Sri Lankan Rupees
+ * Format amount without currency symbols (as requested)
  */
 export const formatAmount = (amount) => {
-  if (!amount && amount !== 0) return 'Rs. 0.00'
+  if (!amount && amount !== 0) return '0.00'
   
   const numAmount = parseFloat(amount)
-  if (isNaN(numAmount)) return 'Rs. 0.00'
+  if (isNaN(numAmount)) return '0.00'
   
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
+  return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(numAmount)
@@ -29,10 +27,19 @@ export const formatDateCompact = (date) => {
   try {
     let dateObj
     
-    // Handle Firebase Timestamp objects
+    // Handle Firebase Timestamp objects with .toDate() method
     if (date.toDate) {
       dateObj = date.toDate()
-    } else if (typeof date === 'string') {
+    } 
+    // Handle Firebase Timestamp objects with seconds/nanoseconds properties (from dev-data-dashboard)
+    else if (date.seconds && typeof date.seconds === 'number') {
+      dateObj = new Date(date.seconds * 1000)
+    }
+    // Handle plain timestamp numbers
+    else if (typeof date === 'number') {
+      dateObj = new Date(date * 1000) // Assume seconds if it's a reasonable timestamp
+    }
+    else if (typeof date === 'string') {
       // Handle DD-MM-YYYY format (common in our database)
       if (date.includes('-') && date.split('-').length === 3) {
         const parts = date.split('-')
@@ -49,7 +56,7 @@ export const formatDateCompact = (date) => {
       }
     } else {
       // Assume it's already a Date object
-      dateObj = date
+      dateObj = new Date(date)
     }
     
     if (isNaN(dateObj.getTime())) return 'N/A'
@@ -74,10 +81,19 @@ export const formatDate = (date) => {
   try {
     let dateObj
     
-    // Handle Firebase Timestamp objects
+    // Handle Firebase Timestamp objects with .toDate() method
     if (date.toDate) {
       dateObj = date.toDate()
-    } else if (typeof date === 'string') {
+    } 
+    // Handle Firebase Timestamp objects with seconds/nanoseconds properties (from dev-data-dashboard)
+    else if (date.seconds && typeof date.seconds === 'number') {
+      dateObj = new Date(date.seconds * 1000)
+    }
+    // Handle plain timestamp numbers
+    else if (typeof date === 'number') {
+      dateObj = new Date(date * 1000) // Assume seconds if it's a reasonable timestamp
+    }
+    else if (typeof date === 'string') {
       // Handle DD-MM-YYYY format (common in our database)
       if (date.includes('-') && date.split('-').length === 3) {
         const parts = date.split('-')
@@ -121,7 +137,24 @@ export const formatDateForInput = (date) => {
   if (!date) return ''
   
   try {
-    const dateObj = date.toDate ? date.toDate() : new Date(date)
+    let dateObj
+    
+    // Handle Firebase Timestamp objects with .toDate() method
+    if (date.toDate) {
+      dateObj = date.toDate()
+    } 
+    // Handle Firebase Timestamp objects with seconds/nanoseconds properties (from dev-data-dashboard)
+    else if (date.seconds && typeof date.seconds === 'number') {
+      dateObj = new Date(date.seconds * 1000)
+    }
+    // Handle plain timestamp numbers
+    else if (typeof date === 'number') {
+      dateObj = new Date(date * 1000) // Assume seconds if it's a reasonable timestamp
+    }
+    else {
+      dateObj = new Date(date)
+    }
+    
     return dateObj.toISOString().split('T')[0]
   } catch (error) {
     return ''
@@ -162,9 +195,26 @@ export const formatRelativeTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
   
   try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    let date
+    
+    // Handle Firebase Timestamp objects with .toDate() method
+    if (timestamp.toDate) {
+      date = timestamp.toDate()
+    } 
+    // Handle Firebase Timestamp objects with seconds/nanoseconds properties (from dev-data-dashboard)
+    else if (timestamp.seconds && typeof timestamp.seconds === 'number') {
+      date = new Date(timestamp.seconds * 1000)
+    }
+    // Handle plain timestamp numbers
+    else if (typeof timestamp === 'number') {
+      date = new Date(timestamp * 1000) // Assume seconds if it's a reasonable timestamp
+    }
+    else {
+      date = new Date(timestamp)
+    }
+    
     const now = new Date()
-    const diffInSeconds = Math.floor((now - date) / 1000)
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
     
     if (diffInSeconds < 60) return 'Just now'
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`

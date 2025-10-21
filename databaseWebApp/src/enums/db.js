@@ -42,6 +42,7 @@ export const ProfileField = {
   DESCRIPTION: 'description',
   OCCUPATION: 'occupation',
   PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
+  RF_BILL_DRIVE_FOLDER: 'rfBillDriveFolder',
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
   GIF: 'GIF', // Give It Forward
@@ -64,6 +65,7 @@ export const ProfileFieldTypes = {
   DESCRIPTION: 'string',
   OCCUPATION: 'string',
   PROFILE_IMAGE_DRIVE_ID: 'string',
+  RF_BILL_DRIVE_FOLDER: 'string',
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
   GIF: 'array', //{timestamp : description}
@@ -126,10 +128,12 @@ export const RF_LOAN_FIELD_TYPES = {
   PAYMENT_INTEGRITY : 'boolean'
 }
 export const GRANT_FIELD = { 
+  AMOUNT : 'approvedAmount', // Updated to match actual database field
   APPROVED_AMOUNT : 'approvedAmount',
   APPROVED_AT : 'approvedAt',
   CREATED_AT : 'createdAt',
   REQUESTED_DATE : 'requestedDate',
+  INITIATION_DATE : 'requestedDate', // Map initiation date to requested date
   LAST_UPDATED : 'lastUpdated',
   PROJECT_DESCRIPTION : 'projectDescription',
   PURPOSE : 'purpose',
@@ -141,10 +145,12 @@ export const GRANT_FIELD = {
   PAYMENT_INTEGRITY : 'paymentIntegrity'
 }
 export const GRANT_FIELD_TYPES = {
+  AMOUNT : 'number', // Updated to match actual database field
   APPROVED_AMOUNT : 'number',
   APPROVED_AT : 'date',
   CREATED_AT : 'date',
   REQUESTED_DATE : 'date',
+  INITIATION_DATE : 'date', // Map initiation date to requested date
   LAST_UPDATED : 'date',
     PROJECT_DESCRIPTION : 'string',
   PURPOSE : 'string',
@@ -198,7 +204,9 @@ export const RRH_OBJECT_FIELD = {
   AMOUNT : 'amount',
   RECEIVER : 'receiver',
   REG_ID : 'regID',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
+  DRIVE_LINK_ID : 'DRIVE_LINK_ID',
+  TARGET_LOAN : 'targetLoan',
+  CHANGE : 'change'
 }
 
 export const RRH_OBJECT_FIELD_TYPES = {
@@ -207,7 +215,9 @@ export const RRH_OBJECT_FIELD_TYPES = {
   AMOUNT : 'number',
   RECEIVER : 'string',
   REG_ID : 'string',
-  DRIVE_LINK_ID : 'string'
+  DRIVE_LINK_ID : 'string',
+  TARGET_LOAN : 'string',
+  CHANGE : 'string'
 }
 
 // Loan fields for root/loans collection
@@ -294,6 +304,14 @@ export const ARMS = {
   Metamorphosis : 'Metamorphosis',
   Keystone : 'Keystone'
 }
+
+// Return Record Status constants
+export const ReturnRecordStatus = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  FAILED: 'failed'
+}
+
 // Helper functions
 export const getCollectionName = (collection) => {
   return ROOT_COLLECTIONS[collection]

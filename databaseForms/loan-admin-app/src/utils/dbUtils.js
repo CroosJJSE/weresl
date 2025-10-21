@@ -165,9 +165,13 @@ export const addLoan = async (regId, loanData, loanType = 'RF') => {
     const loanToSave = {
       ...loanData,
       createdAt: serverTimestamp(),
-      lastUpdated: serverTimestamp(),
-      loanHistory: [], // Initialize empty loan history array
-      paymentIntegrity: true // Initialize payment integrity as true (no payments yet)
+      lastUpdated: serverTimestamp()
+    }
+    
+    // Only add loanHistory and paymentIntegrity for RF loans
+    if (loanType === 'RF') {
+      loanToSave.loanHistory = [] // Initialize empty loan history array
+      loanToSave.paymentIntegrity = true // Initialize payment integrity as true (no payments yet)
     }
     
     console.log('📝 Creating collection path:', [RootCollection.PROFILES, regId, collectionName])

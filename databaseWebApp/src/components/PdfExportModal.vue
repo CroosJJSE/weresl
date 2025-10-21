@@ -123,12 +123,7 @@
             <span class="option-text">Grant History</span>
           </label>
         </div>
-        <div class="option-item">
-          <label class="option-label">
-            <input type="checkbox" v-model="exportOptions.includeChildrenInfo" class="option-checkbox" />
-            <span class="option-text">Children Information</span>
-          </label>
-        </div>
+        <!-- Children Information option removed as requested -->
             </div>
           </div>
 
@@ -247,8 +242,8 @@ export default {
       includeRFHistory: false,
       rfHistoryFrom: '',
       rfHistoryTo: '',
-      includeGrantHistory: true,
-      includeChildrenInfo: false
+      includeGrantHistory: true
+      // includeChildrenInfo removed as requested
     })
 
     // Load profiles when modal opens

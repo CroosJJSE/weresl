@@ -489,7 +489,7 @@ export const transferMoneyBetweenAccounts = async (fromAccount, toAccount, amoun
     if (fromAccountBalance < amount) {
       return { 
         success: false, 
-        message: `Insufficient balance. Available: Rs. ${fromAccountBalance.toLocaleString()}, Required: Rs. ${amount.toLocaleString()}` 
+        message: `Insufficient balance. Available: ${fromAccountBalance.toLocaleString()}, Required: ${amount.toLocaleString()}` 
       }
     }
     
@@ -528,7 +528,7 @@ export const transferMoneyBetweenAccounts = async (fromAccount, toAccount, amoun
       toAccountPreviousBalance: toAccountBalance,
       toAccountNewBalance: toAccountBalance + amount,
       timestamp: serverTimestamp(),
-      description: `Internal Transaction: Rs. ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`
+      description: `Internal Transaction: ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`
     }
     
     const transactionRef = doc(collection(db, RootCollection.BANK_ACCOUNTS, 'wereSL', 'transactions'))
@@ -539,7 +539,7 @@ export const transferMoneyBetweenAccounts = async (fromAccount, toAccount, amoun
     
     return { 
       success: true, 
-      message: `Successfully transferred Rs. ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`,
+      message: `Successfully transferred ${amount.toLocaleString()} from ${fromAccount} to ${toAccount}`,
       data: {
         fromAccount: {
           name: fromAccount,
@@ -628,8 +628,8 @@ export const updateBankBalance = async (name, newAmount) => {
         balanceChange: balanceChange,
         timestamp: serverTimestamp(),
         description: balanceChange > 0 
-          ? `Balance increased by Rs. ${balanceChange.toLocaleString()}`
-          : `Balance decreased by Rs. ${Math.abs(balanceChange).toLocaleString()}`
+          ? `Balance increased by ${balanceChange.toLocaleString()}`
+          : `Balance decreased by ${Math.abs(balanceChange).toLocaleString()}`
       }
       
       const transactionRef = doc(collection(db, RootCollection.BANK_ACCOUNTS, 'wereSL', 'transactions'))

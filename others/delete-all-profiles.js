@@ -10,12 +10,13 @@
  * - All profile documents and their subcollection documents (RF_Loans, Grant)
  * - All documents from the root-level loans collection
  * - All documents from the root-level RF_return_record collection
+ * - Clears complex fields (RF_return_history, GIF, etc.) from profile documents before deletion
  * 
  * Collections themselves will remain intact.
  */
 
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore'
+import { getFirestore, collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { RootCollection, ProfileField } from '../enums/db.js'
 
 // Firebase configuration
@@ -63,6 +64,30 @@ async function deleteSubcollections(regId) {
     
   } catch (error) {
     console.error(`    ❌ Error deleting subcollections for ${regId}:`, error.message)
+  }
+}
+
+/**
+ * Clear complex fields from a profile document before deletion
+ * NOTE: This clears map/object fields that might contain nested data
+ */
+async function clearComplexFields(regId) {
+  try {
+    const profileRef = doc(db, RootCollection.PROFILES, regId)
+    
+    // Clear complex fields that might contain nested data
+    const fieldsToClear = {
+      [ProfileField.RF_RETURN_HISTORY]: null, // Map of maps
+      [ProfileField.GIF]: null, // Object field
+      // Add other complex fields here if needed
+    }
+    
+    await updateDoc(profileRef, fieldsToClear)
+    
+    console.log(`    🧹 Cleared complex fields (RF_return_history, GIF, etc.)`)
+    
+  } catch (error) {
+    console.error(`    ❌ Error clearing complex fields for ${regId}:`, error.message)
   }
 }
 
@@ -240,10 +265,13 @@ async function deleteAllProfiles() {
           const regId = profileDoc.id
           console.log(`  🗑️  Deleting profile document: ${regId}`)
           
-          // First delete all subcollection documents
+          // First clear complex fields (maps, objects, etc.)
+          await clearComplexFields(regId)
+          
+          // Then delete all subcollection documents
           await deleteSubcollections(regId)
           
-          // Then delete the profile document
+          // Finally delete the profile document
           await deleteDoc(doc(db, RootCollection.PROFILES, regId))
           deletedCount++
           console.log(`  ✅ Deleted profile document: ${regId}`)
@@ -361,6 +389,7 @@ if (process.argv.includes('--confirm')) {
   console.log('  - All Grant subcollection documents')
   console.log('  - All documents from the root-level loans collection')
   console.log('  - All documents from the root-level RF_return_record collection')
+  console.log('  - Clear complex fields (RF_return_history, GIF, etc.) from profile documents')
   console.log('')
   console.log('✅ Collections themselves will remain intact!')
   console.log('  - profiles collection (will be empty but exist)')
@@ -402,6 +431,7 @@ if (process.argv.includes('--confirm')) {
   console.log('  - Delete all Grant subcollection documents')
   console.log('  - Delete all documents from the root-level loans collection')
   console.log('  - Delete all documents from the root-level RF_return_record collection')
+  console.log('  - Clear complex fields (RF_return_history, GIF, etc.) from profile documents')
   console.log('')
   console.log('✅ Collections themselves will remain intact!')
   console.log('  - profiles collection (will be empty but exist)')

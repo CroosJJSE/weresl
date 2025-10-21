@@ -35,6 +35,7 @@
 
 <script>
 import { computed, ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { profileService } from '@/services/profile.js'
 import { imageService } from '@/services/imageService.js'
 
@@ -46,8 +47,8 @@ export default {
       required: true
     }
   },
-  emits: ['open-modal'],
-  setup(props, { emit }) {
+  setup(props) {
+    const router = useRouter()
     const profileImageUrl = ref('/placeholder-profile.jpg')
     const imageLoading = ref(true)
 
@@ -160,7 +161,10 @@ export default {
     }, { immediate: true })
 
     const openModal = () => {
-      emit('open-modal', props.profile)
+      const regId = props.profile.id || props.profile.Reg_ID
+      if (regId) {
+        router.push(`/${regId}`)
+      }
     }
 
     return {

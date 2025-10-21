@@ -129,7 +129,15 @@ export const RF_LOAN_FIELD = {
   PAYMENT_HISTORY : 'paymentHistory',
   COLLATERAL : 'collateral',
   GUARANTOR : 'guarantor',
-  NOTES : 'notes'
+  NOTES : 'notes',
+  // Additional fields for migration compatibility
+  CURRENT_BALANCE : 'currentBalance',
+  INITIATION_DATE : 'initiationDate',
+  ARMS : 'arms',
+  LOAN_HISTORY : 'loanHistory',
+  PAYMENT_INTEGRITY : 'paymentIntegrity',
+  TYPE : 'type',
+  REG_ID : 'Reg_ID'
 }
 
 export const RF_LOAN_FIELD_TYPES = {
@@ -156,11 +164,19 @@ export const RF_LOAN_FIELD_TYPES = {
   PAYMENT_HISTORY : 'array',
   COLLATERAL : 'string',
   GUARANTOR : 'string',
-  NOTES : 'string'
+  NOTES : 'string',
+  // Additional field types for migration compatibility
+  CURRENT_BALANCE : 'number',
+  INITIATION_DATE : 'date',
+  ARMS : 'string',
+  LOAN_HISTORY : 'array',
+  PAYMENT_INTEGRITY : 'boolean',
+  TYPE : 'string',
+  REG_ID : 'string'
 }
 
 export const GRANT_FIELD = { 
-  AMOUNT : 'amount',
+  AMOUNT : 'approvedAmount', // Updated to match actual database field
   PURPOSE : 'purpose',
   SOURCE : 'source',
   STATUS : 'status',
@@ -178,7 +194,14 @@ export const GRANT_FIELD = {
   VERIFICATION_STATUS : 'verificationStatus',
   VERIFIED_BY : 'verifiedBy',
   VERIFIED_AT : 'verifiedAt',
-  NOTES : 'notes'
+  NOTES : 'notes',
+  // Additional fields for migration compatibility
+  APPROVED_AMOUNT : 'approvedAmount',
+  REQUESTED_DATE : 'requestedDate',
+  INITIATION_DATE : 'requestedDate', // Map initiation date to requested date
+  ARMS : 'arms',
+  TYPE : 'type',
+  REG_ID : 'Reg_ID'
 }
 
 export const GRANT_FIELD_TYPES = {
@@ -200,7 +223,14 @@ export const GRANT_FIELD_TYPES = {
   VERIFICATION_STATUS : 'string',
   VERIFIED_BY : 'string',
   VERIFIED_AT : 'date',
-  NOTES : 'string'
+  NOTES : 'string',
+  // Additional field types for migration compatibility
+  APPROVED_AMOUNT : 'number',
+  REQUESTED_DATE : 'date',
+  INITIATION_DATE : 'date', // Map initiation date to requested date
+  ARMS : 'string',
+  TYPE : 'string',
+  REG_ID : 'string'
 }
 
 export const RF_RETURN_RECORD_FIELD = {
@@ -217,7 +247,11 @@ export const RF_RETURN_RECORD_FIELD = {
   // RRH-specific fields
   RRH_ID : 'RRH_ID',
   RECEIVER : 'receiver',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
+  DRIVE_LINK_ID : 'DRIVE_LINK_ID',
+  // Additional fields for migration compatibility
+  PAID_AMOUNT : 'PAID_AMOUNT',
+  TIMESTAMP : 'TIMESTAMP',
+  RECEIPT_DRIVE_LINK_ID : 'RECEIPT_DRIVE_LINK_ID'
 }
 
 export const RF_RETURN_RECORD_FIELD_TYPES = {
@@ -234,7 +268,11 @@ export const RF_RETURN_RECORD_FIELD_TYPES = {
   // RRH-specific field types
   RRH_ID : 'string',
   RECEIVER : 'string',
-  DRIVE_LINK_ID : 'string'
+  DRIVE_LINK_ID : 'string',
+  // Additional field types for migration compatibility
+  PAID_AMOUNT : 'number',
+  TIMESTAMP : 'date',
+  RECEIPT_DRIVE_LINK_ID : 'string'
 }
 
 // RRH Object structure for profile's RF_RETURN_HISTORY field

@@ -156,59 +156,97 @@ export const adminDbService = {
   // Approve loan and remove from pending
   async approveLoan(regId, loanType, loanId) {
     try {
+      console.log('🚀 Starting loan approval in dbService...')
+      console.log('📋 Approval parameters:', { regId, loanType, loanId })
+      
       // Get the loan data to find the source account and amount
       const collectionName = loanType === 'RF' ? ProfileField.RF_LOANS : ProfileField.GRANT
+      console.log('📁 Collection name:', collectionName)
+      
       const loanRef = doc(db, RootCollection.PROFILES, regId, collectionName, loanId)
+      console.log('📄 Loan reference path:', [RootCollection.PROFILES, regId, collectionName, loanId])
+      
       const loanDoc = await getDoc(loanRef)
+      console.log('📊 Loan document exists:', loanDoc.exists())
       
       if (!loanDoc.exists()) {
+        console.log('❌ Loan document not found')
         throw new Error('Loan not found')
       }
       
       const loanData = loanDoc.data()
+      console.log('📋 Loan data:', loanData)
+      
       const loanAmount = loanData.amount || loanData.loanAmount || 0
       const sourceAccount = loanData.source || loanData.loanSource || ''
       
+      console.log('💰 Loan amount:', loanAmount)
+      console.log('🏦 Source account:', sourceAccount)
+      
       // Validate source account and amount
       if (!sourceAccount) {
+        console.log('❌ No source account specified')
         throw new Error('No source account specified for this loan')
       }
       
       if (loanAmount <= 0) {
+        console.log('❌ Invalid loan amount:', loanAmount)
         throw new Error('Invalid loan amount')
       }
       
       // Check if source account has sufficient balance
+      console.log('🔄 Checking source account balance...')
       const sourceAccountResult = await getBankBalanceByNameUtil(sourceAccount)
+      console.log('📊 Source account result:', sourceAccountResult)
+      
       if (!sourceAccountResult.success) {
+        console.log('❌ Source account not found:', sourceAccount)
         throw new Error(`Source account '${sourceAccount}' not found`)
       }
       
       const sourceAccountBalance = sourceAccountResult.data.balance
+      console.log('💰 Source account balance:', sourceAccountBalance)
+      
       if (sourceAccountBalance < loanAmount) {
+        console.log('❌ Insufficient balance:', { available: sourceAccountBalance, required: loanAmount })
         throw new Error(`Insufficient balance in ${sourceAccount}. Available: Rs. ${sourceAccountBalance.toLocaleString()}, Required: Rs. ${loanAmount.toLocaleString()}`)
       }
       
+      console.log('✅ Balance check passed')
+      
       // Use batch operation to ensure atomicity
+      console.log('🔄 Starting batch operations...')
       const batch = writeBatch(db)
       
       // 1. Update loan status to active
+      console.log('📝 Step 1: Updating loan status to active...')
       const updateData = {
         status: 'active',
         approvedAt: serverTimestamp(),
-        lastUpdated: serverTimestamp(),
-        loanHistory: [], // Initialize empty loan history array
-        paymentIntegrity: true // Initialize payment integrity as true (no payments yet)
+        lastUpdated: serverTimestamp()
       }
       
+      // Only add loanHistory and paymentIntegrity for RF loans
+      if (loanType === 'RF') {
+        updateData.loanHistory = [] // Initialize empty loan history array
+        updateData.paymentIntegrity = true // Initialize payment integrity as true (no payments yet)
+      }
+      
+      console.log('📋 Loan update data:', updateData)
       batch.update(loanRef, updateData)
+      console.log('✅ Loan status update added to batch')
       
       // 2. Reduce money from source account
+      console.log('📝 Step 2: Reducing money from source account...')
       const sourceAccountRef = doc(db, RootCollection.BANK_ACCOUNTS, sourceAccount)
+      const newBalance = sourceAccountBalance - loanAmount
+      console.log('💰 New source account balance:', newBalance)
+      
       batch.update(sourceAccountRef, {
-        [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: sourceAccountBalance - loanAmount,
+        [BANK_ACCOUNT_FIELD.CURRENT_BANK_BALANCE]: newBalance,
         [BANK_ACCOUNT_FIELD.LAST_UPDATED]: serverTimestamp()
       })
+      console.log('✅ Source account balance update added to batch')
       
       // 3. Create null type with REG_ID as field in BANK_ACCOUNT.RF_LOANS
       if (loanType === 'RF') {
@@ -259,25 +297,37 @@ export const adminDbService = {
         purpose: loanData.purpose || loanData.loanPurpose || '',
         source: sourceAccount,
         status: 'active',
-        type: loanType,
-        loanHistory: [], // Initialize empty loan history array
-        paymentIntegrity: true // Initialize payment integrity as true (no payments yet)
+        type: loanType
+      }
+      
+      // Only add loanHistory and paymentIntegrity for RF loans
+      if (loanType === 'RF') {
+        loanInfoData.loanHistory = [] // Initialize empty loan history array
+        loanInfoData.paymentIntegrity = true // Initialize payment integrity as true (no payments yet)
       }
       
       const rootLoanRef = doc(db, RootCollection.LOANS, loanId)
       batch.set(rootLoanRef, loanInfoData)
       
       // 6. Remove from pending loans
+      console.log('📝 Step 6: Removing from pending loans...')
       const pendingLoanRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN)
+      console.log('📄 Pending loan reference:', [RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN])
+      
       const pendingLoanDoc = await getDoc(pendingLoanRef)
+      console.log('📊 Pending loan document exists:', pendingLoanDoc.exists())
       
       if (pendingLoanDoc.exists()) {
         const pendingData = pendingLoanDoc.data()
+        console.log('📋 Current pending data:', pendingData)
+        console.log('🔍 Looking for loan to remove:', { regId, loanId })
         
         // Find and remove the specific loan entry
         let foundAndRemoved = false
         for (const [key, loanData] of Object.entries(pendingData)) {
+          console.log('🔍 Checking pending entry:', { key, loanData })
           if (loanData.regId === regId && loanData.loanId === loanId) {
+            console.log('✅ Found matching loan entry, removing:', key)
             delete pendingData[key]
             foundAndRemoved = true
             break
@@ -285,15 +335,27 @@ export const adminDbService = {
         }
         
         if (!foundAndRemoved) {
+          console.log('⚠️ Specific loan not found, trying fallback removal by regId')
           // Fallback: remove by regId if specific loan not found
-          delete pendingData[regId]
+          if (pendingData[regId]) {
+            console.log('✅ Found regId entry, removing:', regId)
+            delete pendingData[regId]
+          } else {
+            console.log('❌ No regId entry found either')
+          }
         }
         
+        console.log('📋 Updated pending data:', pendingData)
         batch.set(pendingLoanRef, pendingData)
+        console.log('✅ Pending loan removal added to batch')
+      } else {
+        console.log('⚠️ Pending loan document does not exist')
       }
       
       // Commit all changes
+      console.log('🚀 Committing batch operations...')
       await batch.commit()
+      console.log('✅ Batch operations committed successfully')
       
       // 6. Send loan approval data to Google Sheets
       try {
@@ -317,8 +379,15 @@ export const adminDbService = {
         // Don't throw error - Google Sheets integration is not critical for loan approval
       }
       
+      console.log('🎉 Loan approval completed successfully')
       return { success: true }
     } catch (error) {
+      console.error('❌ Error in loan approval:', error)
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
       return { success: false, message: error.message }
     }
   },
@@ -329,8 +398,8 @@ export const adminDbService = {
       const collectionName = loanType === 'RF' ? ProfileField.RF_LOANS : ProfileField.GRANT
       const loanRef = doc(db, RootCollection.PROFILES, regId, collectionName, loanId)
       
-      // If amount is being updated, also update currentBalance
-      if (updateData.amount !== undefined) {
+      // If amount is being updated, also update currentBalance (only for RF loans)
+      if (updateData.amount !== undefined && loanType === 'RF') {
         updateData.currentBalance = updateData.amount
       }
       

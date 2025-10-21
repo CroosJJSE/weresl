@@ -12,11 +12,11 @@
       <!-- Loan Content (only show when ready) -->
       <div v-if="isLoanReady">
       
-      <!-- Payment Integrity Indicator -->
-      <div class="payment-integrity-indicator" :class="{ 'integrity-true': getPaymentIntegrity(), 'integrity-false': !getPaymentIntegrity() }">
+      <!-- Payment Integrity Indicator - REMOVED as requested -->
+      <!-- <div class="payment-integrity-indicator" :class="{ 'integrity-true': getPaymentIntegrity(), 'integrity-false': !getPaymentIntegrity() }">
         <span v-if="getPaymentIntegrity()" class="integrity-tick">✓</span>
         <span v-else class="integrity-x">✗</span>
-      </div>
+      </div> -->
 
       <div class="loan-modal-header">
         <h3>{{ getLoanTypeName(loan.type) }} Loan Details</h3>
@@ -42,10 +42,6 @@
                 <div class="info-value balance" :class="{ 'paid': (loan[RF_LOAN_FIELD.CURRENT_BALANCE] || loan.currentBalance || 0) === 0 }">
                   {{ formatAmountCompact(loan[RF_LOAN_FIELD.CURRENT_BALANCE] || loan.currentBalance || 0) }}
                 </div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">Initiation Date:</div>
-                <div class="info-value">{{ formatDateCompact(loan[getLoanField(loan.type).INITIATION_DATE] || loan[getLoanField(loan.type).REQUESTED_DATE] || loan.initiationDate || loan.requestedDate) }}</div>
               </div>
              <div class="info-row">
                <div class="info-label">Approved Date:</div>
@@ -416,7 +412,7 @@ export default {
 }
 
 .loan-modal-header {
-  margin: 15px 0 15px 50px;
+  margin: 15px 0 15px 0;
   padding-bottom: 12px;
   border-bottom: 2px solid #eee;
   display: flex;
@@ -649,7 +645,7 @@ export default {
   }
   
   .loan-modal-header {
-    margin: 15px 0 15px 45px;
+    margin: 15px 0 15px 0;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -737,7 +733,7 @@ export default {
   }
   
   .loan-modal-header {
-    margin: 10px 0 10px 45px;
+    margin: 10px 0 10px 0;
   }
   
   .loan-modal-header h3 {

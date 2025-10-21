@@ -50,7 +50,9 @@ import {
   RF_LOAN_FIELD, 
   GRANT_FIELD,
   RootCollection,
-  SearchElementDoc
+  SearchElementDoc,
+  RF_RETURN_RECORD_FIELD,
+  RRH_OBJECT_FIELD
 } from '../databaseWebApp/src/enums/db.js'
 
 // Firebase configuration
@@ -77,6 +79,12 @@ let grantLoanCounter = 1
 
 // ARM mapping from Projects.csv
 let armMapping = {}
+
+// RF Return History mapping from rf_return_history.csv
+let rfReturnHistoryMapping = {}
+
+// RRH ID counter for each profile
+let rrhIdCounter = {}
 
 /**
  * Generate simple loan ID for migration
@@ -204,6 +212,9 @@ async function migrateCSVData(csvFilePath) {
     
     // Load ARM mapping from Projects.csv
     await loadARMMapping()
+    
+    // Load RF return history from rf_return_history.csv
+    loadRFReturnHistory()
     
     // Load and parse CSV data
     const data = await loadCSVData(csvFilePath)
@@ -583,8 +594,21 @@ async function processRecord(record) {
   // 4. Parse Grant loans
   const grantLoans = parseGrantLoans(record.GRANT, record.GRANT_Cur_Prj)
   
-  // 5. Parse RF return history (fixed - copy from RF_Paid_History)
-  const rfReturnHistory = parseRFReturnHistory(record.RF_Paid_History)
+  // 5. Parse RF return history (RRH objects) - NEW IMPLEMENTATION
+  const rrhObjects = getRFReturnHistoryForProfile(record.Reg_ID, record.RF_Paid_History)
+  
+  // Convert RRH objects to map for profile storage
+  const rfReturnHistoryMap = {}
+  for (const rrhObj of rrhObjects) {
+    rfReturnHistoryMap[rrhObj[RF_RETURN_RECORD_FIELD.RRH_ID]] = {
+      [RRH_OBJECT_FIELD.RRH_ID]: rrhObj[RF_RETURN_RECORD_FIELD.RRH_ID],
+      [RRH_OBJECT_FIELD.REG_ID]: rrhObj[RF_RETURN_RECORD_FIELD.REG_ID],
+      [RRH_OBJECT_FIELD.AMOUNT]: rrhObj[RF_RETURN_RECORD_FIELD.PAID_AMOUNT],
+      [RRH_OBJECT_FIELD.APPROVED_DATE]: rrhObj[RF_RETURN_RECORD_FIELD.TIMESTAMP],
+      [RRH_OBJECT_FIELD.RECEIVER]: rrhObj[RF_RETURN_RECORD_FIELD.RECEIVER],
+      [RRH_OBJECT_FIELD.DRIVE_LINK_ID]: rrhObj[RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID]
+    }
+  }
   
   // 6. Create meaningful description by combining fields
   const schoolGoingChildren = parseInt(record['school_kids']) || 0
@@ -605,7 +629,7 @@ async function processRecord(record) {
     [ProfileField.OCCUPATION]: record.Occupation || '',
     [ProfileField.PROFILE_IMAGE_DRIVE_ID]: profileImageDriveId,
     [ProfileField.GIF]: record.GIFor ? [record.GIFor] : [], // Map as array
-    [ProfileField.RF_RETURN_HISTORY]: rfReturnHistory, // Map as object
+    [ProfileField.RF_RETURN_HISTORY]: rfReturnHistoryMap, // Map as object with RRH objects
     [ProfileField.CREATED_AT]: serverTimestamp(),
     [ProfileField.LAST_UPDATED]: serverTimestamp()
   }
@@ -616,7 +640,12 @@ async function processRecord(record) {
   // 8. Save profile
   await saveProfile(profileData, record.Reg_ID)
   
-  // 9. Add NIC to SearchElements if available
+  // 9. Save individual RRH records to root collection
+  for (const rrhObj of rrhObjects) {
+    await saveRRHRecord(rrhObj)
+  }
+  
+  // 10. Add NIC to SearchElements if available
   if (record.NIC) {
     await addNICToSearchElements(record.Reg_ID, record.NIC)
   }
@@ -634,6 +663,26 @@ async function processRecord(record) {
   }
   
   console.log(`✅ Successfully processed: ${record.Reg_ID}`)
+}
+
+/**
+ * Save RRH record to root collection
+ */
+async function saveRRHRecord(rrhObject) {
+  try {
+    const rrhId = rrhObject[RF_RETURN_RECORD_FIELD.RRH_ID]
+    const rrhDocRef = doc(db, RootCollection.RF_RETURN_RECORD, rrhId)
+    
+    await setDoc(rrhDocRef, {
+      ...rrhObject,
+      [RF_RETURN_RECORD_FIELD.CREATED_AT]: serverTimestamp(),
+      [RF_RETURN_RECORD_FIELD.LAST_UPDATED]: serverTimestamp()
+    })
+    
+    console.log(`✅ Saved RRH record: ${rrhId}`)
+  } catch (error) {
+    console.error(`❌ Error saving RRH record ${rrhObject[RF_RETURN_RECORD_FIELD.RRH_ID]}:`, error.message)
+  }
 }
 
 /**
@@ -692,12 +741,7 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
             [RF_LOAN_FIELD.CURRENT_BALANCE]: 0, // Will be updated from RF_Cur_Prj
             [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
             [RF_LOAN_FIELD.LOAN_HISTORY]: [], // Initialize loan history
-            [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
-            // Additional fields for databaseWebApp compatibility
-            loanPurpose: purpose.trim(), // For backward compatibility
-            loanAmount: parseFloat(amount.replace(/,/g, '')), // For backward compatibility
-            loanSource: 'wereSL', // For backward compatibility
-            loanStatus: 'active' // For backward compatibility
+            [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: false // Initialize payment integrity as false
           }
           loans.push(loanData)
         }
@@ -721,29 +765,23 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
           if (existingLoan) {
             existingLoan[RF_LOAN_FIELD.CURRENT_BALANCE] = currentBalanceAmount
             
-            // Calculate payment integrity: current balance + total payments = original loan amount
+            // Use the original amount from RF_Loan column, don't calculate from payments
+            // The payment integrity will be calculated as: current balance + total payments = original amount
             const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
-            const calculatedOriginalAmount = currentBalanceAmount + totalPayments
-            
-            // Update loan amount if calculated amount is higher
-            if (calculatedOriginalAmount > existingLoan[RF_LOAN_FIELD.AMOUNT]) {
-              existingLoan[RF_LOAN_FIELD.AMOUNT] = calculatedOriginalAmount
-            }
             
             // Set payment integrity based on calculation
-            existingLoan[RF_LOAN_FIELD.PAYMENT_INTEGRITY] = (existingLoan[RF_LOAN_FIELD.AMOUNT] === calculatedOriginalAmount)
+            existingLoan[RF_LOAN_FIELD.PAYMENT_INTEGRITY] = (existingLoan[RF_LOAN_FIELD.AMOUNT] === (currentBalanceAmount + totalPayments))
             
             // Populate loan history from payment history
             existingLoan[RF_LOAN_FIELD.LOAN_HISTORY] = parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed)
           } else {
-            // Create new loan if not found - calculate amount and payment integrity
+            // Create new loan if not found - use current balance as amount since no original amount available
             const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
-            const calculatedOriginalAmount = currentBalanceAmount + totalPayments
             
             loans.push({
               [RF_LOAN_FIELD.PURPOSE]: purposeTrimmed,
               [RF_LOAN_FIELD.CURRENT_BALANCE]: currentBalanceAmount,
-              [RF_LOAN_FIELD.AMOUNT]: calculatedOriginalAmount, // Original amount = current balance + total payments
+              [RF_LOAN_FIELD.AMOUNT]: currentBalanceAmount, // Use current balance as amount when no original amount available
               [RF_LOAN_FIELD.STATUS]: 'active',
               [RF_LOAN_FIELD.TYPE]: 'RF',
               [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
@@ -754,12 +792,7 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
               [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
               [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
               [RF_LOAN_FIELD.LOAN_HISTORY]: parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed), // Populate from payment history
-              [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (calculatedOriginalAmount === (currentBalanceAmount + totalPayments)), // Set based on calculation
-              // Additional fields for databaseWebApp compatibility
-              loanPurpose: purposeTrimmed, // For backward compatibility
-              loanAmount: calculatedOriginalAmount, // For backward compatibility
-              loanSource: 'wereSL', // For backward compatibility
-              loanStatus: 'active' // For backward compatibility
+              [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (currentBalanceAmount === (currentBalanceAmount + totalPayments)) // Set based on calculation
             })
           }
         }
@@ -767,65 +800,80 @@ function parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr) {
     }
   }
   
-  // Parse Com_prjs column (completed loans)
+  // Parse Com_prjs column (completed loans) - Enhanced to handle complex formats
   if (comPrjsStr) {
-    const completedMatches = comPrjsStr.match(/([^(]+)\s*\(([^)]+)\)/g)
-    if (completedMatches) {
-      for (const match of completedMatches) {
-        const purposeMatch = match.match(/([^(]+)\s*\(([^)]+)\)/)
+    // Remove quotes and clean the string
+    const cleanComPrjsStr = comPrjsStr.replace(/^["']|["']$/g, '').trim()
+    
+    // Split by + to handle multiple projects
+    const projectParts = cleanComPrjsStr.split('+').map(part => part.trim())
+    
+    for (const projectPart of projectParts) {
+      // Handle formats like:
+      // - "Small shop (30000)"
+      // - "Bicycle (50000) + Scooter(100000)" 
+      // - "Scooter(100000) [18-04-2024]"
+      // - "Small shop (30000)" (with quotes)
+      
+      // First try to match with date brackets: "Project (amount) [date]"
+      let purposeMatch = projectPart.match(/^([^(]+)\s*\(([^)]+)\)\s*\[([^\]]+)\]$/)
+      let purpose, amount, date
+      
+      if (purposeMatch) {
+        [, purpose, amount, date] = purposeMatch
+      } else {
+        // Try without date brackets: "Project (amount)"
+        purposeMatch = projectPart.match(/^([^(]+)\s*\(([^)]+)\)$/)
         if (purposeMatch) {
-          const [, purpose, amount] = purposeMatch
-          const purposeTrimmed = purpose.trim()
-          const completedAmount = parseFloat(amount.replace(/,/g, ''))
-          
-          // Find existing loan with same purpose and mark as completed
-          const existingLoan = loans.find(loan => loan[RF_LOAN_FIELD.PURPOSE] === purposeTrimmed)
-          if (existingLoan) {
-            existingLoan[RF_LOAN_FIELD.STATUS] = 'completed'
-            existingLoan[RF_LOAN_FIELD.CURRENT_BALANCE] = 0 // Completed loans have 0 balance
-            
-            // Calculate payment integrity: 0 balance + total payments = original loan amount
-            const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
-            const calculatedOriginalAmount = 0 + totalPayments
-            
-            // Update loan amount if calculated amount is higher
-            if (calculatedOriginalAmount > existingLoan[RF_LOAN_FIELD.AMOUNT]) {
-              existingLoan[RF_LOAN_FIELD.AMOUNT] = calculatedOriginalAmount
-            }
-            
-            // Set payment integrity based on calculation
-            existingLoan[RF_LOAN_FIELD.PAYMENT_INTEGRITY] = (existingLoan[RF_LOAN_FIELD.AMOUNT] === calculatedOriginalAmount)
-            
-            // Populate loan history from payment history
-            existingLoan[RF_LOAN_FIELD.LOAN_HISTORY] = parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed)
-          } else {
-            // Create new completed loan if not found
-            const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
-            const calculatedOriginalAmount = completedAmount + totalPayments
-            
-            loans.push({
-              [RF_LOAN_FIELD.PURPOSE]: purposeTrimmed,
-              [RF_LOAN_FIELD.AMOUNT]: calculatedOriginalAmount, // Original amount = completed amount + total payments
-              [RF_LOAN_FIELD.STATUS]: 'completed',
-              [RF_LOAN_FIELD.TYPE]: 'RF',
-              [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
-              [RF_LOAN_FIELD.REG_ID]: '', // Will be set when saving
-              [RF_LOAN_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
-              [RF_LOAN_FIELD.CURRENT_BALANCE]: 0, // Completed loans have 0 balance
-              [RF_LOAN_FIELD.APPROVED_AT]: new Date(),
-              [RF_LOAN_FIELD.CREATED_AT]: new Date(),
-              [RF_LOAN_FIELD.INITIATION_DATE]: new Date(),
-              [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
-              [RF_LOAN_FIELD.LOAN_HISTORY]: parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed), // Populate from payment history
-              [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (calculatedOriginalAmount === (completedAmount + totalPayments)), // Set based on calculation
-              // Additional fields for databaseWebApp compatibility
-              loanPurpose: purposeTrimmed, // For backward compatibility
-              loanAmount: calculatedOriginalAmount, // For backward compatibility
-              loanSource: 'wereSL', // For backward compatibility
-              loanStatus: 'completed' // For backward compatibility
-            })
-          }
+          [, purpose, amount] = purposeMatch
+          date = null
+        } else {
+          // Skip if format doesn't match
+          console.warn(`⚠️  Skipping Com_prjs project with unrecognized format: "${projectPart}"`)
+          continue
         }
+      }
+      
+      const purposeTrimmed = purpose.trim()
+      const completedAmount = parseFloat(amount.replace(/,/g, ''))
+      
+      // Find existing loan with same purpose and mark as completed
+      const existingLoan = loans.find(loan => loan[RF_LOAN_FIELD.PURPOSE] === purposeTrimmed)
+      if (existingLoan) {
+        existingLoan[RF_LOAN_FIELD.STATUS] = 'completed'
+        existingLoan[RF_LOAN_FIELD.CURRENT_BALANCE] = 0 // Completed loans have 0 balance
+        
+        // Use the original amount from RF_Loan column, don't calculate from payments
+        const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
+        
+        // Set payment integrity based on calculation
+        existingLoan[RF_LOAN_FIELD.PAYMENT_INTEGRITY] = (existingLoan[RF_LOAN_FIELD.AMOUNT] === (0 + totalPayments))
+        
+        // Populate loan history from payment history
+        existingLoan[RF_LOAN_FIELD.LOAN_HISTORY] = parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed)
+      } else {
+        // Create new completed loan if not found - use completed amount as original amount
+        const totalPayments = calculateTotalPayments(rfPaidHistoryStr, purposeTrimmed)
+        
+        // Use date from Com_prjs if available, otherwise use current date
+        const loanDate = date ? parseDate(date) : new Date()
+        
+        loans.push({
+          [RF_LOAN_FIELD.PURPOSE]: purposeTrimmed,
+          [RF_LOAN_FIELD.AMOUNT]: completedAmount, // Use completed amount as original amount
+          [RF_LOAN_FIELD.STATUS]: 'completed',
+          [RF_LOAN_FIELD.TYPE]: 'RF',
+          [RF_LOAN_FIELD.LAST_UPDATED]: serverTimestamp(),
+          [RF_LOAN_FIELD.REG_ID]: '', // Will be set when saving
+          [RF_LOAN_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
+          [RF_LOAN_FIELD.CURRENT_BALANCE]: 0, // Completed loans have 0 balance
+          [RF_LOAN_FIELD.APPROVED_AT]: loanDate,
+          [RF_LOAN_FIELD.CREATED_AT]: loanDate,
+          [RF_LOAN_FIELD.INITIATION_DATE]: loanDate,
+          [RF_LOAN_FIELD.ARMS]: '', // Will be set from Projects.csv
+          [RF_LOAN_FIELD.LOAN_HISTORY]: parsePaymentHistoryToLoanHistory(rfPaidHistoryStr, purposeTrimmed), // Populate from payment history
+          [RF_LOAN_FIELD.PAYMENT_INTEGRITY]: (completedAmount === (0 + totalPayments)) // Set based on calculation
+        })
       }
     }
   }
@@ -863,18 +911,14 @@ function parseGrantLoans(grantStr, grantCurPrjStr) {
             [GRANT_FIELD.CREATED_AT]: parseDate(date),
             [GRANT_FIELD.REQUESTED_DATE]: parseDate(date),
             [GRANT_FIELD.STATUS]: 'active',
-            [GRANT_FIELD.TYPE]: 'GRANT',
+            [GRANT_FIELD.GRANT_TYPE]: 'GRANT',
             [GRANT_FIELD.LAST_UPDATED]: serverTimestamp(),
             [GRANT_FIELD.REG_ID]: '', // Will be set when saving
             [GRANT_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
             [GRANT_FIELD.ARMS]: '', // Will be set from Projects.csv
-            [GRANT_FIELD.LOAN_HISTORY]: [], // Initialize loan history
-            [GRANT_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
-            // Additional fields for databaseWebApp compatibility
-            grantPurpose: purpose.trim(), // For backward compatibility
-            grantAmount: parseFloat(amount.replace(/,/g, '')), // For backward compatibility
-            grantSource: 'wereSL', // For backward compatibility
-            grantStatus: 'active' // For backward compatibility
+            [GRANT_FIELD.CONDITIONS]: [], // Initialize conditions array
+            [GRANT_FIELD.VERIFICATION_STATUS]: 'pending', // Initialize verification status
+            [GRANT_FIELD.NOTES]: '' // Initialize notes
           })
         }
       }
@@ -888,31 +932,219 @@ function parseGrantLoans(grantStr, grantCurPrjStr) {
     
     if (totalGrantAmount > currentGrantAmount) {
       const remainingAmount = totalGrantAmount - currentGrantAmount
-      loans.push({
-        [GRANT_FIELD.PURPOSE]: 'Additional Grant',
-        [GRANT_FIELD.APPROVED_AMOUNT]: remainingAmount,
-        [GRANT_FIELD.AMOUNT]: remainingAmount, // For backward compatibility
-        [GRANT_FIELD.STATUS]: 'active',
-        [GRANT_FIELD.TYPE]: 'GRANT',
-        [GRANT_FIELD.LAST_UPDATED]: serverTimestamp(),
-        [GRANT_FIELD.REG_ID]: '', // Will be set when saving
-        [GRANT_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
-        [GRANT_FIELD.APPROVED_AT]: new Date(),
-        [GRANT_FIELD.CREATED_AT]: new Date(),
-        [GRANT_FIELD.REQUESTED_DATE]: new Date(),
-        [GRANT_FIELD.ARMS]: '', // Will be set from Projects.csv
-        [GRANT_FIELD.LOAN_HISTORY]: [], // Initialize loan history
-        [GRANT_FIELD.PAYMENT_INTEGRITY]: false, // Initialize payment integrity as false
-        // Additional fields for databaseWebApp compatibility
-        grantPurpose: 'Additional Grant', // For backward compatibility
-        grantAmount: remainingAmount, // For backward compatibility
-        grantSource: 'wereSL', // For backward compatibility
-        grantStatus: 'active' // For backward compatibility
-      })
+        loans.push({
+          [GRANT_FIELD.PURPOSE]: 'Additional Grant',
+          [GRANT_FIELD.APPROVED_AMOUNT]: remainingAmount,
+          [GRANT_FIELD.AMOUNT]: remainingAmount, // For backward compatibility
+          [GRANT_FIELD.STATUS]: 'active',
+          [GRANT_FIELD.GRANT_TYPE]: 'GRANT',
+          [GRANT_FIELD.LAST_UPDATED]: serverTimestamp(),
+          [GRANT_FIELD.REG_ID]: '', // Will be set when saving
+          [GRANT_FIELD.SOURCE]: 'wereSL', // Default source for migrated loans
+          [GRANT_FIELD.APPROVED_AT]: new Date(),
+          [GRANT_FIELD.CREATED_AT]: new Date(),
+          [GRANT_FIELD.REQUESTED_DATE]: new Date(),
+          [GRANT_FIELD.ARMS]: '', // Will be set from Projects.csv
+          [GRANT_FIELD.CONDITIONS]: [], // Initialize conditions array
+          [GRANT_FIELD.VERIFICATION_STATUS]: 'pending', // Initialize verification status
+          [GRANT_FIELD.NOTES]: '' // Initialize notes
+        })
     }
   }
   
   return loans
+}
+
+/**
+ * Load RF return history from rf_return_history.csv
+ */
+function loadRFReturnHistory() {
+  try {
+    const csvPath = path.join(__dirname, 'rf_return_history.csv')
+    const csvContent = fs.readFileSync(csvPath, 'utf-8')
+    const lines = csvContent.split('\n').filter(line => line.trim())
+    
+    // Skip header
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      
+      // Parse CSV line (handle quoted fields)
+      const fields = parseCSVLine(line)
+      if (fields.length < 5) continue
+      
+      const [timestamp, regId, loanType, amount, receipt] = fields
+      
+      if (!rfReturnHistoryMapping[regId]) {
+        rfReturnHistoryMapping[regId] = []
+      }
+      
+      // Parse timestamp
+      const paymentDate = parseTimestamp(timestamp)
+      const timestampKey = formatTimestampKey(paymentDate)
+      
+      rfReturnHistoryMapping[regId].push({
+        timestampKey,
+        amount: parseFloat(amount),
+        receipt,
+        originalTimestamp: timestamp,
+        paymentDate
+      })
+    }
+    
+    console.log(`✅ Loaded RF return history for ${Object.keys(rfReturnHistoryMapping).length} profiles`)
+  } catch (error) {
+    console.error('❌ Error loading RF return history:', error.message)
+  }
+}
+
+/**
+ * Parse timestamp string to Date object
+ */
+function parseTimestamp(timestampStr) {
+  if (!timestampStr) return new Date()
+  
+  try {
+    // Handle format: "07/04/2025 11:28:27"
+    const parts = timestampStr.split(' ')
+    if (parts.length !== 2) return new Date()
+    
+    const datePart = parts[0] // "07/04/2025"
+    const timePart = parts[1] // "11:28:27"
+    
+    const [day, month, year] = datePart.split('/').map(p => parseInt(p))
+    const [hour, minute, second] = timePart.split(':').map(p => parseInt(p))
+    
+    if (day && month && year && hour !== undefined && minute !== undefined && second !== undefined) {
+      return new Date(year, month - 1, day, hour, minute, second)
+    }
+  } catch (error) {
+    console.warn(`⚠️  Could not parse timestamp: ${timestampStr}`)
+  }
+  
+  return new Date()
+}
+
+/**
+ * Format date to timestamp key
+ */
+function formatTimestampKey(date) {
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const hour = date.getHours().toString().padStart(2, '0')
+  const minute = date.getMinutes().toString().padStart(2, '0')
+  
+  return `${year}-${month}-${day}-${hour}-${minute}`
+}
+
+/**
+ * Generate RRH ID for a profile
+ */
+function generateRRHId(regId) {
+  if (!rrhIdCounter[regId]) {
+    rrhIdCounter[regId] = 1
+  }
+  
+  const counter = rrhIdCounter[regId]++
+  const formattedCounter = counter.toString().padStart(3, '0')
+  return `RRH_${regId}_${formattedCounter}`
+}
+
+/**
+ * Parse RF_Paid_History from data3.csv to RRH objects
+ */
+function parseRFPaidHistoryToRRHObjects(regId, rfPaidHistoryStr) {
+  if (!rfPaidHistoryStr) return []
+  
+  const rrhObjects = []
+  const paymentEntries = rfPaidHistoryStr.split('+').map(entry => entry.trim())
+  
+  for (const entry of paymentEntries) {
+    const match = entry.match(/(\d+(?:,\d+)*)\s*\[([^\]]+)\]/)
+    if (match) {
+      const [, amount, date] = match
+      const cleanAmount = parseFloat(amount.replace(/,/g, ''))
+      
+      // Parse date (format: DD-MM-YYYY)
+      const [day, month, year] = date.split('-').map(p => parseInt(p))
+      const paymentDate = new Date(year, month - 1, day)
+      
+      const rrhId = generateRRHId(regId)
+      rrhObjects.push({
+        [RF_RETURN_RECORD_FIELD.RRH_ID]: rrhId,
+        [RF_RETURN_RECORD_FIELD.REG_ID]: regId,
+        [RF_RETURN_RECORD_FIELD.PAID_AMOUNT]: cleanAmount,
+        [RF_RETURN_RECORD_FIELD.TIMESTAMP]: paymentDate,
+        [RF_RETURN_RECORD_FIELD.RECEIVER]: 'System', // Default receiver
+        [RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID]: '' // No drive link from data3.csv
+      })
+    }
+  }
+  
+  return rrhObjects
+}
+
+/**
+ * Create RRH objects from rf_return_history.csv data
+ */
+function createRRHObjectsFromCSV(regId) {
+  const payments = rfReturnHistoryMapping[regId] || []
+  const rrhObjects = []
+  
+  for (const payment of payments) {
+    const rrhId = generateRRHId(regId)
+    
+    // Extract drive link ID from Google Drive URL
+    const driveLinkId = extractFileId(payment.receipt)
+    
+    rrhObjects.push({
+      [RF_RETURN_RECORD_FIELD.RRH_ID]: rrhId,
+      [RF_RETURN_RECORD_FIELD.REG_ID]: regId,
+      [RF_RETURN_RECORD_FIELD.PAID_AMOUNT]: payment.amount,
+      [RF_RETURN_RECORD_FIELD.TIMESTAMP]: payment.paymentDate,
+      [RF_RETURN_RECORD_FIELD.RECEIVER]: 'System', // Default receiver
+      [RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID]: driveLinkId
+    })
+  }
+  
+  return rrhObjects
+}
+
+/**
+ * Get combined RF return history for a profile
+ * Merges data from both data3.csv and rf_return_history.csv
+ * rf_return_history.csv entries take precedence (override duplicates)
+ */
+function getRFReturnHistoryForProfile(regId, rfPaidHistoryStr) {
+  // Get RRH objects from data3.csv
+  const data3RRHObjects = parseRFPaidHistoryToRRHObjects(regId, rfPaidHistoryStr)
+  
+  // Get RRH objects from rf_return_history.csv
+  const csvRRHObjects = createRRHObjectsFromCSV(regId)
+  
+  // Create a map to track duplicates by date (date only) and amount
+  const duplicateMap = new Map()
+  
+  // Add data3.csv entries first
+  for (const rrhObj of data3RRHObjects) {
+    const dateOnly = rrhObj[RF_RETURN_RECORD_FIELD.TIMESTAMP].toISOString().split('T')[0] // YYYY-MM-DD
+    const key = `${dateOnly}_${rrhObj[RF_RETURN_RECORD_FIELD.PAID_AMOUNT]}`
+    duplicateMap.set(key, rrhObj)
+  }
+  
+  // Override with rf_return_history.csv entries (these have drive links)
+  for (const rrhObj of csvRRHObjects) {
+    const dateOnly = rrhObj[RF_RETURN_RECORD_FIELD.TIMESTAMP].toISOString().split('T')[0] // YYYY-MM-DD
+    const key = `${dateOnly}_${rrhObj[RF_RETURN_RECORD_FIELD.PAID_AMOUNT]}`
+    duplicateMap.set(key, rrhObj) // This will override the data3.csv entry
+  }
+  
+  // Convert back to array and sort by date
+  const combinedRRHObjects = Array.from(duplicateMap.values())
+  combinedRRHObjects.sort((a, b) => a[RF_RETURN_RECORD_FIELD.TIMESTAMP] - b[RF_RETURN_RECORD_FIELD.TIMESTAMP])
+  
+  return combinedRRHObjects
 }
 
 /**
@@ -950,6 +1182,8 @@ function parseRFReturnHistory(rfPaidHistoryStr) {
 /**
  * Calculate total payments made for a specific loan purpose
  * Used to calculate current balance: Original amount - Total payments
+ * NOTE: This function currently calculates ALL payments, not purpose-specific
+ * This is a limitation of the CSV data format - payments are not linked to specific purposes
  */
 function calculateTotalPayments(rfPaidHistoryStr, loanPurpose) {
   if (!rfPaidHistoryStr) return 0
@@ -969,6 +1203,12 @@ function calculateTotalPayments(rfPaidHistoryStr, loanPurpose) {
       totalPayments += cleanAmount
     }
   }
+  
+  // NOTE: The CSV data doesn't specify which payments belong to which loan purpose
+  // So we return the total payments for all purposes
+  // This means the amount calculation will be: currentBalance + totalPayments
+  // For HAM072: Trishaw Repair (25000) + total payments (200000) = 225000
+  // This is incorrect - we should use the original amount from RF_Loan column
   
   return totalPayments
 }
@@ -1120,7 +1360,7 @@ function chunkArray(array, size) {
 }
 
 // Export functions for testing
-export { testCSVParsing, parseCSVLine, loadCSVData, generateSimpleLoanId, testLoanIdGeneration, testRFReturnHistoryParsing, testPaymentCalculation, testRFLoanParsing }
+export { testCSVParsing, parseCSVLine, loadCSVData, generateSimpleLoanId, testLoanIdGeneration, testRFReturnHistoryParsing, testPaymentCalculation, testRFLoanParsing, testHAM072Case }
 
 /**
  * Test loan ID generation to verify the format
@@ -1210,6 +1450,97 @@ function testPaymentCalculation() {
 /**
  * Test the complete RF loan parsing logic with the new format
  */
+/**
+ * Test HAM072 specific case to debug amount calculation
+ */
+function testHAM072Case() {
+  console.log('🧪 Testing HAM072 specific case...')
+  
+  try {
+    // HAM072 data from CSV
+    const rfLoanStr = "Fish stall and Trishaw (1120000) [04-03-2025] + Trishaw Repair (25000) [04-07-2025]"
+    const rfCurPrjStr = "Fish stall and Trishaw (920000) + Trishaw Repair (25000)"
+    const comPrjsStr = ""
+    const rfPaidHistoryStr = "110000 [04-03-2025] + 20000 [01-04-2025] + 15000 [06-05-2025] + 35000 [03-07-2025] + 20000 [29-07-2025]"
+    
+    console.log('📥 RF_Loan:', rfLoanStr)
+    console.log('📥 RF_Cur_Prj:', rfCurPrjStr)
+    console.log('📥 Com_prjs:', comPrjsStr)
+    console.log('📥 RF_Paid_History:', rfPaidHistoryStr)
+    
+    const loans = parseRFLoans(rfLoanStr, rfCurPrjStr, comPrjsStr, rfPaidHistoryStr)
+    
+    console.log('\n📋 Parsed Loans:')
+    loans.forEach((loan, index) => {
+      console.log(`\n  Loan ${index + 1}:`)
+      console.log(`    Purpose: ${loan[RF_LOAN_FIELD.PURPOSE]}`)
+      console.log(`    Amount: ${loan[RF_LOAN_FIELD.AMOUNT].toLocaleString()}`)
+      console.log(`    Status: ${loan[RF_LOAN_FIELD.STATUS]}`)
+      console.log(`    Current Balance: ${loan[RF_LOAN_FIELD.CURRENT_BALANCE].toLocaleString()}`)
+      console.log(`    Payment Integrity: ${loan[RF_LOAN_FIELD.PAYMENT_INTEGRITY]}`)
+      
+      // Debug payment calculation
+      const totalPayments = calculateTotalPayments(rfPaidHistoryStr, loan[RF_LOAN_FIELD.PURPOSE])
+      console.log(`    Total Payments for this purpose: ${totalPayments.toLocaleString()}`)
+      console.log(`    Calculated Original Amount: ${(loan[RF_LOAN_FIELD.CURRENT_BALANCE] + totalPayments).toLocaleString()}`)
+    })
+    
+    console.log('\n✅ Expected Results:')
+    console.log('  - Fish stall and Trishaw: active, balance = 920000, amount = 1120000')
+    console.log('  - Trishaw Repair: active, balance = 25000, amount = 25000')
+  } catch (error) {
+    console.error('❌ Error in testHAM072Case:', error)
+  }
+}
+function testRRHProcessing() {
+  console.log('🧪 Testing RRH Processing Logic...')
+  
+  // Reset RRH counter for testing
+  rrhIdCounter = {}
+  
+  // Test data
+  const regId = 'BAD001'
+  const rfPaidHistoryStr = '5000 [07-04-2025] + 5000 [08-05-2025]'
+  
+  console.log(`\n📝 Testing profile: ${regId}`)
+  console.log(`📥 RF_Paid_History: ${rfPaidHistoryStr}`)
+  
+  // Load RF return history for testing
+  loadRFReturnHistory()
+  
+  // Get combined RRH objects
+  const rrhObjects = getRFReturnHistoryForProfile(regId, rfPaidHistoryStr)
+  
+  console.log(`\n📋 Combined RRH Objects (${rrhObjects.length}):`)
+  rrhObjects.forEach((rrhObj, index) => {
+    console.log(`\n  RRH ${index + 1}:`)
+    console.log(`    RRH_ID: ${rrhObj[RF_RETURN_RECORD_FIELD.RRH_ID]}`)
+    console.log(`    Amount: ${rrhObj[RF_RETURN_RECORD_FIELD.PAID_AMOUNT]}`)
+    console.log(`    Date: ${rrhObj[RF_RETURN_RECORD_FIELD.TIMESTAMP].toISOString()}`)
+    console.log(`    Drive Link ID: ${rrhObj[RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID] || 'None'}`)
+  })
+  
+  // Test duplicate detection
+  console.log('\n🔍 Duplicate Detection Test:')
+  const duplicateMap = new Map()
+  for (const rrhObj of rrhObjects) {
+    const dateOnly = rrhObj[RF_RETURN_RECORD_FIELD.TIMESTAMP].toISOString().split('T')[0] // YYYY-MM-DD
+    const key = `${dateOnly}_${rrhObj[RF_RETURN_RECORD_FIELD.PAID_AMOUNT]}`
+    if (duplicateMap.has(key)) {
+      console.log(`  ⚠️  Duplicate found: ${key}`)
+    } else {
+      duplicateMap.set(key, rrhObj)
+      console.log(`  ✅ Unique: ${key}`)
+    }
+  }
+  
+  console.log(`\n✅ Total unique RRH records: ${duplicateMap.size}`)
+  console.log(`✅ Expected: 6 (3 from data3.csv + 3 from rf_return_history.csv, but duplicates merged)`)
+}
+
+/**
+ * Test the complete RF loan parsing logic with the new format
+ */
 function testRFLoanParsing() {
   console.log('🧪 Testing Complete RF Loan Parsing Logic...')
   
@@ -1241,6 +1572,28 @@ function testRFLoanParsing() {
   console.log('  - Fish1: completed, balance = 0, amount = 50000')
   console.log('  - Fish: active, balance = 50000, amount = 50000')
   console.log('  - Fish2: active, balance = 50000, amount = 50000')
+  
+  // Test Com_prjs parsing with complex formats
+  console.log('\n🧪 Testing Com_prjs parsing with complex formats:')
+  
+  const testComPrjsFormats = [
+    'Small shop (30000)',
+    '"Small shop (30000)"',
+    'Bicycle (50000) + Scooter(100000)',
+    'Scooter(100000) [18-04-2024]',
+    'Small shop (30000) + Bicycle (50000) + Scooter(100000) [18-04-2024]',
+    '"Bicycle (50000) + Scooter(100000)"',
+    'Fish business (50000) [01-02-2024] + Farming (30000)'
+  ]
+  
+  for (const comPrjsStr of testComPrjsFormats) {
+    console.log(`\n📝 Testing: "${comPrjsStr}"`)
+    const testLoans = parseRFLoans('', '', comPrjsStr, '')
+    console.log(`   ✅ Parsed ${testLoans.length} completed loan(s):`)
+    testLoans.forEach(loan => {
+      console.log(`      - ${loan[RF_LOAN_FIELD.PURPOSE]}: ${loan[RF_LOAN_FIELD.AMOUNT]} (${loan[RF_LOAN_FIELD.STATUS]})`)
+    })
+  }
   console.log('  - Bicycle: completed, balance = 0, amount = 50000')
   console.log('  - Scooter: completed, balance = 0, amount = 100000')
 }
@@ -1249,10 +1602,22 @@ function testRFLoanParsing() {
 if (process.argv.length > 2) {
   const csvFilePath = process.argv[2]
   
+  // Handle test commands
+  if (csvFilePath === 'test-rfloan') {
+    testRFLoanParsing()
+    process.exit(0)
+  }
+  
+  if (csvFilePath === 'test-ham072') {
+    testHAM072Case()
+    process.exit(0)
+  }
+  
   if (!csvFilePath) {
     console.error('❌ Please provide a CSV file path')
     console.log('Usage: node migrate-csv-data.js <path-to-csv-file>')
     console.log('Example: node migrate-csv-data.js data.csv')
+    console.log('Test: node migrate-csv-data.js test-rfloan')
     process.exit(1)
   }
   

@@ -145,6 +145,7 @@ export const dbOperations = {
           [ProfileField.OCCUPATION]: data[ProfileField.OCCUPATION] || data.Occupation || data.basicInfo?.occupation || 'N/A',
           [ProfileField.DESCRIPTION]: data[ProfileField.DESCRIPTION] || data.Description || data.description || 'N/A',
           [ProfileField.PROFILE_IMAGE_DRIVE_ID]: data[ProfileField.PROFILE_IMAGE_DRIVE_ID] || data.Image,
+          [ProfileField.RF_BILL_DRIVE_FOLDER]: data[ProfileField.RF_BILL_DRIVE_FOLDER] || data.rfBillDriveFolder,
           [ProfileField.CREATED_AT]: data[ProfileField.CREATED_AT] || data.createdAt,
           [ProfileField.LAST_UPDATED]: data[ProfileField.LAST_UPDATED] || data.updatedAt,
           
@@ -252,7 +253,7 @@ export const dbOperations = {
     }
   },
 
-  // Get RF return history for a profile
+  // Get RF return history for a profile - updated to handle new object format
   async getRFReturnHistory(profileId) {
     try {
       const docRef = doc(db, RootCollection.PROFILES, profileId);
@@ -262,41 +263,15 @@ export const dbOperations = {
         const data = docSnap.data();
         const returnHistory = data[ProfileField.RF_RETURN_HISTORY] || {};
         
-        // Parse the return history structure - handle both map and array formats
-        const parsedHistory = [];
-        
-        if (Array.isArray(returnHistory)) {
-          // If it's already an array, use it directly
-          parsedHistory.push(...returnHistory);
-        } else if (typeof returnHistory === 'object' && returnHistory !== null) {
-          // If it's a map/object, convert to array
-          Object.entries(returnHistory).forEach(([key, value]) => {
-            if (typeof value === 'object' && value !== null) {
-              // If value is an object with amount and date
-              parsedHistory.push({
-                dateKey: key,
-                amount: value.amount || value,
-                parsedDate: this.parseDateFromKey(key),
-                proofUrl: value.proofUrl || null
-              });
-            } else {
-              // If value is just a number
-              parsedHistory.push({
-                dateKey: key,
-                amount: value,
-                parsedDate: this.parseDateFromKey(key)
-              });
-            }
-          });
-        }
-        
-        return parsedHistory;
+        // Return the raw object format for new PDF generation
+        // The PDF service will handle both old and new formats
+        return returnHistory;
       }
       
-      return [];
+      return {};
     } catch (error) {
       console.error('[dbOperations] Error loading RF return history:', error);
-      return [];
+      return {};
     }
   },
 
@@ -400,7 +375,12 @@ export const dbOperations = {
         // Calculate totals
         totalRFLoans: loans.filter(l => l.type === 'RF').length,
         totalGrants: loans.filter(l => l.type === 'GRANT').length,
-        totalReturnAmount: returnHistory.reduce((sum, payment) => sum + (payment.amount || 0), 0),
+        totalReturnAmount: Array.isArray(returnHistory) 
+          ? returnHistory.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+          : Object.values(returnHistory).reduce((sum, payment) => {
+              const amount = typeof payment === 'object' ? payment.amount : payment;
+              return sum + (amount || 0);
+            }, 0),
         activeRFLoans: loans.filter(l => l.type === 'RF' && (l[RF_LOAN_FIELD.STATUS] === 'active' || l.status === 'active')),
         completedRFLoans: loans.filter(l => l.type === 'RF' && (l[RF_LOAN_FIELD.STATUS] === 'completed' || l.status === 'completed')),
         activeGrants: loans.filter(l => l.type === 'GRANT')
@@ -466,6 +446,72 @@ export const dbOperations = {
     } catch (error) {
       console.error('[dbOperations] Error fetching loan history:', error)
       return []
+    }
+  },
+
+  // Get loan by ID from subcollection
+  async getLoanById(regId, loanId, loanType) {
+    try {
+      console.log(`[dbOperations] Fetching ${loanType} loan ${loanId} from profile ${regId}`)
+      
+      // Determine the subcollection name based on loan type
+      let subcollectionName
+      if (loanType === 'RF') {
+        subcollectionName = ProfileField.RF_LOANS
+      } else if (loanType === 'GRANT') {
+        subcollectionName = ProfileField.GRANT
+      } else {
+        console.error('[dbOperations] Invalid loan type:', loanType)
+        return null
+      }
+      
+      // Get the loan document from the subcollection
+      const loanDocRef = doc(db, RootCollection.PROFILES, regId, subcollectionName, loanId)
+      const loanDoc = await getDoc(loanDocRef)
+      
+      if (!loanDoc.exists()) {
+        console.log(`[dbOperations] Loan document not found: ${loanId}`)
+        return null
+      }
+      
+      const loanData = loanDoc.data()
+      loanData.id = loanId // Add the document ID to the data
+      
+      console.log(`[dbOperations] Found loan ${loanId}:`, loanData)
+      return loanData
+      
+    } catch (error) {
+      console.error('[dbOperations] Error fetching loan by ID:', error)
+      return null
+    }
+  },
+
+  // Get RF bill drive folder link for a profile
+  async getRFBillDriveFolderLink(regId) {
+    try {
+      console.log(`[dbOperations] Fetching RF bill drive folder link for profile: ${regId}`)
+      
+      const docRef = doc(db, RootCollection.PROFILES, regId)
+      const docSnap = await getDoc(docRef)
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        const folderLink = data[ProfileField.RF_BILL_DRIVE_FOLDER] || data.rfBillDriveFolder
+        
+        if (folderLink) {
+          console.log(`[dbOperations] Found RF bill drive folder link: ${folderLink}`)
+          return folderLink
+        } else {
+          console.log(`[dbOperations] No RF bill drive folder link found for profile: ${regId}`)
+          return null
+        }
+      } else {
+        console.log(`[dbOperations] Profile not found: ${regId}`)
+        return null
+      }
+    } catch (error) {
+      console.error('[dbOperations] Error fetching RF bill drive folder link:', error)
+      return null
     }
   }
 }

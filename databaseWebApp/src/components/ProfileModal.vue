@@ -61,11 +61,11 @@
                   <div class="loan-tile-left">
                     <div class="loan-purpose">{{ loan[RF_LOAN_FIELD.PURPOSE] || 'RF Project' }}</div>
                     <div class="loan-status-badge active">Active</div>
-                    <div v-if="loan[RF_LOAN_FIELD.CURRENT_BALANCE]" class="loan-balance">Balance: Rs. {{ formatAmount(loan[RF_LOAN_FIELD.CURRENT_BALANCE]) }}</div>
+                    <div v-if="loan[RF_LOAN_FIELD.CURRENT_BALANCE]" class="loan-balance">Balance: {{ formatAmount(loan[RF_LOAN_FIELD.CURRENT_BALANCE]) }}</div>
                   </div>
                   <div class="loan-tile-right">
-                    <div class="loan-amount">Rs. {{ formatAmount(loan[RF_LOAN_FIELD.AMOUNT]) }}</div>
-                    <div class="loan-date">{{ formatDate(loan[RF_LOAN_FIELD.INITIATION_DATE]) }}</div>
+                    <div class="loan-amount">{{ formatAmount(loan[RF_LOAN_FIELD.AMOUNT]) }}</div>
+                    <div class="loan-date">{{ formatDate(loan[RF_LOAN_FIELD.APPROVED_AT]) }}</div>
                   </div>
                 </div>
               </div>
@@ -84,8 +84,8 @@
                     </div>
                   </div>
                   <div class="loan-tile-right">
-                    <div class="loan-amount">Rs. {{ formatAmount(loan[RF_LOAN_FIELD.AMOUNT]) }}</div>
-                    <div class="loan-date">{{ formatDate(loan[RF_LOAN_FIELD.INITIATION_DATE]) }}</div>
+                    <div class="loan-amount">{{ formatAmount(loan[RF_LOAN_FIELD.AMOUNT]) }}</div>
+                    <div class="loan-date">{{ formatDate(loan[RF_LOAN_FIELD.APPROVED_AT]) }}</div>
                   </div>
                 </div>
               </div>
@@ -96,27 +96,39 @@
         <div v-if="getRFReturnHistoryRRHObjects().length > 0 || getRFReturnHistoryLegacyFormat().length > 0" class="project-section">
           <div class="project-header">
             <span>RF Payment History</span>
-            <button 
-              @click="toggleRFReturnHistory" 
-              class="collapse-toggle-btn"
-              :class="{ 'expanded': showRFReturnHistory }"
-            >
-              {{ showRFReturnHistory ? '▼' : '▶' }}
-            </button>
+            <div class="header-actions">
+              <!-- Folder icon link for RF Bill Drive Folder -->
+              <a 
+                :href="rfBillDriveFolderLink || '#'" 
+                target="_blank" 
+                class="folder-link-btn"
+                :title="'Open RF Bills Folder'"
+                @click="handleRFBillFolderClick"
+              >
+                📁
+              </a>
+              <button 
+                @click="toggleRFReturnHistory" 
+                class="collapse-toggle-btn"
+                :class="{ 'expanded': showRFReturnHistory }"
+              >
+                {{ showRFReturnHistory ? '▼' : '▶' }}
+              </button>
+            </div>
           </div>
           <div v-if="showRFReturnHistory" class="project-details" style="flex-direction: column;">
             <!-- New RRH Object Format -->
             <div v-if="getRFReturnHistoryRRHObjects().length > 0">
               <div v-for="rrhObject in getRFReturnHistoryRRHObjects()" :key="rrhObject.RRH_ID" class="rrh-item-legacy" @click="openRRHDetails(rrhObject)">
                 <span class="rrh-date-legacy">{{ formatDateCompact(rrhObject.approvedDate) }}</span>
-                <span class="rrh-amount-legacy">Rs. {{ formatAmount(rrhObject.amount) }}</span>
+                <span class="rrh-amount-legacy">{{ formatAmount(rrhObject.amount) }}</span>
               </div>
             </div>
             <!-- Legacy Format (converted to RRH-like objects) -->
             <div v-else-if="getRFReturnHistoryLegacyFormat().length > 0">
               <div v-for="rrhObject in getRFReturnHistoryLegacyFormat()" :key="rrhObject.RRH_ID" class="rrh-item-legacy" @click="openRRHDetails(rrhObject)">
                 <span class="rrh-date-legacy">{{ formatDateCompact(rrhObject.approvedDate) }}</span>
-                <span class="rrh-amount-legacy">Rs. {{ formatAmount(rrhObject.amount) }}</span>
+                <span class="rrh-amount-legacy">{{ formatAmount(rrhObject.amount) }}</span>
               </div>
             </div>
           </div>
@@ -125,16 +137,16 @@
         <div v-else-if="profileDetails && profileDetails.returnHistory && profileDetails.returnHistory.length > 0" class="project-details" style="flex-direction: column;">
           <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History (profileDetails.returnHistory)</div>
           <div style="font-size: 12px; color: #666; margin-bottom: 10px;">Debug: {{ profileDetails.returnHistory.length }} items</div>
-          <div v-for="payment in profileDetails.returnHistory" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
+          <div v-for="payment in getSortedReturnHistory()" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
             <span style="color: #2e7d32">{{ payment.parsedDate || payment.dateKey }}</span>
-            <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
+            <span style="margin-left: 10px;">{{ formatAmount(payment.amount) }}</span>
           </div>
         </div>
         <div v-else-if="getRFReturnHistoryArray().length > 0" class="project-details" style="flex-direction: column;">
           <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">RF Payment History (getRFReturnHistoryArray)</div>
-          <div v-for="payment in getRFReturnHistoryArray()" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
+          <div v-for="payment in getSortedRFReturnHistoryArray()" :key="payment.dateKey" style="display: flex; justify-content: space-between; padding: 5px 0; margin-left: 20px;">
             <span style="color: #2e7d32">{{ payment.dateKey }}</span>
-            <span style="margin-left: 10px;">Rs. {{ formatAmount(payment.amount) }}</span>
+            <span style="margin-left: 10px;">{{ formatAmount(payment.amount) }}</span>
           </div>
         </div>
         <!-- GRANT Projects Section: prefer map, fallback to array -->
@@ -156,11 +168,11 @@
                 <div class="loan-tile-left">
                   <div class="loan-purpose">{{ grant[GRANT_FIELD.PURPOSE] || grant.purpose || 'GRANT Project' }}</div>
                   <div class="loan-status-badge grant">GRANT</div>
-                  <div v-if="grant.currentBalance" class="loan-balance">Balance: Rs. {{ formatAmount(grant.currentBalance) }}</div>
+                  <div v-if="grant.currentBalance" class="loan-balance">Balance: {{ formatAmount(grant.currentBalance) }}</div>
                 </div>
                 <div class="loan-tile-right">
-                  <div class="loan-amount">Rs. {{ formatAmount(grant[GRANT_FIELD.AMOUNT] || grant[GRANT_FIELD.APPROVED_AMOUNT] || grant.amount || grant.approvedAmount || grant.currentBalance) }}</div>
-                  <div class="loan-date">{{ formatDate(grant[GRANT_FIELD.REQUESTED_DATE] || grant[GRANT_FIELD.CREATED_AT] || grant.requestedDate || grant.createdAt || grant.initiationDate || grant.approvedAt) }}</div>
+                  <div class="loan-amount">{{ formatAmount(grant[GRANT_FIELD.AMOUNT] || grant[GRANT_FIELD.APPROVED_AMOUNT] || grant.amount || grant.approvedAmount || grant.currentBalance) }}</div>
+                  <div class="loan-date">{{ formatDate(grant[GRANT_FIELD.APPROVED_AT] || grant.approvedAt) }}</div>
                 </div>
               </div>
             </div>
@@ -194,7 +206,7 @@
           </div>
           <div class="detail-row">
             <span class="detail-label">Amount:</span>
-            <span class="detail-value">Rs. {{ formatAmount(selectedRRH.amount) }}</span>
+            <span class="detail-value">{{ formatAmount(selectedRRH.amount) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Receiver:</span>
@@ -203,6 +215,14 @@
           <div class="detail-row">
             <span class="detail-label">Date:</span>
             <span class="detail-value">{{ formatDate(selectedRRH.approvedDate) }}</span>
+          </div>
+          <div v-if="selectedRRH.targetLoan" class="detail-row">
+            <span class="detail-label">Target Loan:</span>
+            <span class="detail-value">{{ selectedRRH.targetLoan }}</span>
+          </div>
+          <div v-if="selectedRRH.change" class="detail-row">
+            <span class="detail-label">Change:</span>
+            <span class="detail-value">{{ selectedRRH.change }}</span>
           </div>
           <div v-if="selectedRRH.DRIVE_LINK_ID" class="detail-row">
             <span class="detail-label">Receipt:</span>
@@ -265,6 +285,9 @@ export default {
     // Collapse/expand state for sections
     const showRFLoans = ref(false)
     const showGrantProjects = ref(false)
+    
+    // RF Bill Drive Folder state
+    const rfBillDriveFolderLink = ref(null)
 
     const profileTypes = computed(() => {
       return profileService.getProfileTypes(props.profile)
@@ -339,6 +362,24 @@ export default {
           if (fieldValue && typeof fieldValue === 'object') {
             rrhObjects.value = Object.values(fieldValue).filter(rrhObject => {
               return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+            }).map(rrhObject => {
+              // Handle Firestore Timestamps
+              let timestamp = rrhObject.approvedDate || rrhObject.timestamp || rrhObject.TIMESTAMP
+              if (timestamp && typeof timestamp === 'object' && timestamp.toDate) {
+                timestamp = timestamp.toDate()
+              } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+                timestamp = new Date(timestamp.seconds * 1000)
+              }
+              
+              return {
+                ...rrhObject,
+                approvedDate: timestamp || parseDateFromKey(rrhObject.RRH_ID) || new Date()
+              }
+            }).sort((a, b) => {
+              // Sort by date (latest first)
+              const dateA = new Date(a.approvedDate)
+              const dateB = new Date(b.approvedDate)
+              return dateB - dateA // Latest first
             })
             return
           }
@@ -362,6 +403,24 @@ export default {
               if (dbRrhMap && typeof dbRrhMap === 'object') {
                 rrhObjects.value = Object.values(dbRrhMap).filter(rrhObject => {
                   return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+                }).map(rrhObject => {
+                  // Handle Firestore Timestamps
+                  let timestamp = rrhObject.approvedDate || rrhObject.timestamp || rrhObject.TIMESTAMP
+                  if (timestamp && typeof timestamp === 'object' && timestamp.toDate) {
+                    timestamp = timestamp.toDate()
+                  } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+                    timestamp = new Date(timestamp.seconds * 1000)
+                  }
+                  
+                  return {
+                    ...rrhObject,
+                    approvedDate: timestamp || parseDateFromKey(rrhObject.RRH_ID) || new Date()
+                  }
+                }).sort((a, b) => {
+                  // Sort by date (latest first)
+                  const dateA = new Date(a.approvedDate)
+                  const dateB = new Date(b.approvedDate)
+                  return dateB - dateA // Latest first
                 })
                 return
               }
@@ -374,15 +433,20 @@ export default {
           if (profileDetails.value?.returnHistory) {
             const returnHistory = profileDetails.value.returnHistory
             
-            // Convert returnHistory array to RRH objects format
+            // Convert returnHistory array to RRH objects format and sort by date (latest first)
             rrhObjects.value = returnHistory.map(item => ({
               RRH_ID: item.dateKey,
               amount: item.amount,
               receiver: 'weresl', // Default receiver
-              approvedDate: new Date().toISOString(), // Default date
+              approvedDate: parseDateFromKey(item.dateKey) ? parseDateFromKey(item.dateKey).toISOString() : new Date().toISOString(),
               regID: props.profile.id,
               DRIVE_LINK_ID: item.proofUrl || '' // Map proofUrl to DRIVE_LINK_ID
-            }))
+            })).sort((a, b) => {
+              // Sort by date (latest first)
+              const dateA = new Date(a.approvedDate)
+              const dateB = new Date(b.approvedDate)
+              return dateB - dateA // Latest first
+            })
             return
           }
         }
@@ -392,10 +456,28 @@ export default {
           return
         }
         
-        // Convert the RRH map to array format
+        // Convert the RRH map to array format and sort by date (latest first)
         rrhObjects.value = Object.values(rrhMap).filter(rrhObject => {
           // Ensure the object has required fields
           return rrhObject && rrhObject.RRH_ID && rrhObject.amount
+        }).map(rrhObject => {
+          // Handle Firestore Timestamps
+          let timestamp = rrhObject.approvedDate || rrhObject.timestamp || rrhObject.TIMESTAMP
+          if (timestamp && typeof timestamp === 'object' && timestamp.toDate) {
+            timestamp = timestamp.toDate()
+          } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+            timestamp = new Date(timestamp.seconds * 1000)
+          }
+          
+          return {
+            ...rrhObject,
+            approvedDate: timestamp || parseDateFromKey(rrhObject.RRH_ID) || new Date()
+          }
+        }).sort((a, b) => {
+          // Sort by date (latest first)
+          const dateA = new Date(a.approvedDate)
+          const dateB = new Date(b.approvedDate)
+          return dateB - dateA // Latest first
         })
       } catch (error) {
         console.error('Error loading RRH objects from profile:', error)
@@ -425,6 +507,37 @@ export default {
       }
     }
 
+    const loadRFBillDriveFolderLink = async () => {
+      try {
+        if (!props.profile?.id) {
+          console.log('[ProfileModal] No profile ID available for RF bill folder link')
+          return
+        }
+        
+        const folderLink = await dbOperations.getRFBillDriveFolderLink(props.profile.id)
+        rfBillDriveFolderLink.value = folderLink
+        
+        if (folderLink) {
+          console.log('[ProfileModal] RF bill drive folder link loaded:', folderLink)
+        } else {
+          console.log('[ProfileModal] No RF bill drive folder link found for profile:', props.profile.id)
+        }
+      } catch (error) {
+        console.error('[ProfileModal] Error loading RF bill drive folder link:', error)
+        rfBillDriveFolderLink.value = null
+      }
+    }
+
+    const handleRFBillFolderClick = (event) => {
+      if (!rfBillDriveFolderLink.value) {
+        event.preventDefault()
+        console.log('[ProfileModal] No RF bill drive folder link available')
+        return
+      }
+      
+      console.log('[ProfileModal] Opening RF bill drive folder:', rfBillDriveFolderLink.value)
+    }
+
     const handleImageError = () => {
       profileImageUrl.value = '/placeholder-profile.jpg'
       imageLoading.value = false
@@ -450,8 +563,8 @@ export default {
     const getRFReturnHistoryRRHObjects = () => {
       // Return cached RRH objects, sorted by date (latest first)
       return rrhObjects.value.sort((a, b) => {
-        const dateA = new Date(a.approvedDate || a.timestamp)
-        const dateB = new Date(b.approvedDate || b.timestamp)
+        const dateA = new Date(a.approvedDate)
+        const dateB = new Date(b.approvedDate)
         return dateB - dateA // Latest first
       })
     }
@@ -474,7 +587,15 @@ export default {
             receiver: 'weresl', // Default receiver for legacy data
             approvedDate: new Date().toISOString() // Default date for legacy data
           }))
-          .sort((a, b) => a.RRH_ID.localeCompare(b.RRH_ID)) // Sort by RRH ID
+          .sort((a, b) => {
+            // Sort by date (latest first), fallback to RRH ID if dates are same
+            const dateA = new Date(a.approvedDate)
+            const dateB = new Date(b.approvedDate)
+            if (dateA.getTime() === dateB.getTime()) {
+              return b.RRH_ID.localeCompare(a.RRH_ID) // Latest RRH ID first
+            }
+            return dateB - dateA // Latest date first
+          })
         return result
       }
       
@@ -507,10 +628,87 @@ export default {
       if (!fileId) return '#'
       return `https://drive.google.com/file/d/${fileId}/view`
     }
+
+    // Sorting functions for payment history
+    const getSortedReturnHistory = () => {
+      if (!profileDetails.value?.returnHistory) return []
+      
+      return [...profileDetails.value.returnHistory].sort((a, b) => {
+        // Try to parse dates from dateKey or parsedDate
+        const dateA = parseDateFromKey(a.parsedDate || a.dateKey)
+        const dateB = parseDateFromKey(b.parsedDate || b.dateKey)
+        
+        // Sort by date (latest first), fallback to dateKey string comparison
+        if (dateA && dateB) {
+          return dateB - dateA
+        }
+        return (b.dateKey || '').localeCompare(a.dateKey || '')
+      })
+    }
+
+    const getSortedRFReturnHistoryArray = () => {
+      const array = getRFReturnHistoryArray()
+      if (!array || array.length === 0) return []
+      
+      return [...array].sort((a, b) => {
+        // Try to parse dates from dateKey
+        const dateA = parseDateFromKey(a.dateKey)
+        const dateB = parseDateFromKey(b.dateKey)
+        
+        // Sort by date (latest first), fallback to dateKey string comparison
+        if (dateA && dateB) {
+          return dateB - dateA
+        }
+        return (b.dateKey || '').localeCompare(a.dateKey || '')
+      })
+    }
+
+    // Helper function to parse date from various key formats
+    const parseDateFromKey = (dateKey) => {
+      if (!dateKey) return null
+      
+      try {
+        // Try different date formats that might be in the keys
+        // Format 1: DD-MM-YYYY
+        if (dateKey.includes('-') && dateKey.split('-').length === 3) {
+          const parts = dateKey.split('-')
+          if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+          }
+        }
+        
+        // Format 2: YYYY-MM-DD
+        if (dateKey.includes('-') && dateKey.split('-').length === 3) {
+          const parts = dateKey.split('-')
+          if (parts[0].length === 4 && parts[1].length === 2 && parts[2].length === 2) {
+            return new Date(dateKey)
+          }
+        }
+        
+        // Format 3: DD/MM/YYYY
+        if (dateKey.includes('/') && dateKey.split('/').length === 3) {
+          const parts = dateKey.split('/')
+          if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+          }
+        }
+        
+        // Format 4: Try as regular date string
+        const date = new Date(dateKey)
+        if (!isNaN(date.getTime())) {
+          return date
+        }
+        
+        return null
+      } catch (error) {
+        return null
+      }
+    }
     onMounted(() => {
       if (props.isVisible && props.profile?.id) {
         loadProfileDetails()
         loadProfileImage()
+        loadRFBillDriveFolderLink()
       }
     })
     watch(() => [props.isVisible, props.profile?.id], ([isVisible, profileId]) => {
@@ -519,6 +717,7 @@ export default {
         loadError.value = false
         loadProfileDetails()
         loadProfileImage()
+        loadRFBillDriveFolderLink()
       }
     }, { immediate: true })
     return {
@@ -558,6 +757,14 @@ export default {
       showRFLoans,
       toggleGrantProjects,
       showGrantProjects,
+      
+      // Sorting functions
+      getSortedReturnHistory,
+      getSortedRFReturnHistoryArray,
+      
+      // RF Bill Drive Folder
+      rfBillDriveFolderLink,
+      handleRFBillFolderClick,
       
       ProfileField,
       RF_LOAN_FIELD,
@@ -837,6 +1044,16 @@ export default {
     padding: 8px;
   }
   
+  .header-actions {
+    gap: 6px;
+  }
+  
+  .folder-link-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+  
   .info-item {
     font-size: 13px;
     padding: 4px 0;
@@ -885,6 +1102,16 @@ export default {
   .info-item strong {
     min-width: 45px;
     font-size: 11px;
+  }
+  
+  .header-actions {
+    gap: 4px;
+  }
+  
+  .folder-link-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
   }
 }
 
@@ -1059,6 +1286,34 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folder-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.folder-link-btn:hover {
+  background-color: #e9ecef;
+  border-color: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .collapse-toggle-btn {
