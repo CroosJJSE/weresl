@@ -389,7 +389,9 @@ export const BANK_ACCOUNT_FIELD = {
   POSITION : 'position',
   CURRENT_BANK_BALANCE : 'currentBankBalance',
   CREATED_AT : 'createdAt',
-  LAST_UPDATED : 'lastUpdated'
+  LAST_UPDATED : 'lastUpdated',
+  PROFILES : 'profiles',
+  ACTIVE_RF_LOAN : 'activeRF_loan'
 }
 
 export const BANK_ACCOUNT_FIELD_TYPES = {
@@ -401,7 +403,9 @@ export const BANK_ACCOUNT_FIELD_TYPES = {
   POSITION : 'string',
   CURRENT_BANK_BALANCE : 'number',
   CREATED_AT : 'date',
-  LAST_UPDATED : 'date'
+  LAST_UPDATED : 'date',
+  PROFILES : 'array',
+  ACTIVE_RF_LOAN : 'array'
 }
 
 export const ARMS = {

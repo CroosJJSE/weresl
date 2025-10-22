@@ -1635,12 +1635,26 @@ export default {
         const selectedAccount = bankAccountsResult.data.find(account => account.name === selectedBankAccount.value)
         
         if (!selectedAccount) {
+          console.log('⚠️ Selected bank account not found:', selectedBankAccount.value)
           coordinatorLoans.value = []
           return
         }
         
+        console.log('📊 Selected bank account data:', selectedAccount)
+        
         const allLoans = []
         const activeRFLoans = selectedAccount[BANK_ACCOUNT_FIELD.ACTIVE_RF_LOAN] || []
+        
+        console.log('📊 Raw activeRFLoans data:', activeRFLoans, 'Type:', typeof activeRFLoans)
+        
+        // Ensure activeRFLoans is an array
+        if (!Array.isArray(activeRFLoans)) {
+          console.warn('⚠️ activeRFLoans is not an array:', activeRFLoans)
+          coordinatorLoans.value = []
+          return
+        }
+        
+        console.log('📊 Processing active RF loans:', activeRFLoans.length, 'loans')
         
         // Define current month and year at the top level
         const currentMonth = new Date().toLocaleString('en-US', { month: 'long' })
@@ -1648,85 +1662,99 @@ export default {
         
         // Process activeRF_loan entries
         for (const loanEntry of activeRFLoans) {
-          if (loanEntry.regId) {
-            // Get profile data
-            const profileResult = await getProfileByRegId(loanEntry.regId)
-            if (profileResult.success && profileResult.data) {
-              const profile = profileResult.data
-              
-              // Process payment data from activeRF_loan paymentHistory
-              const payments = {}
-              
-              // Check paymentHistory for current month payments
-              if (loanEntry.paymentHistory && Array.isArray(loanEntry.paymentHistory)) {
-                let totalCurrentMonthAmount = 0
+          console.log('📊 Processing loan entry:', loanEntry)
+          
+          if (loanEntry && loanEntry.regId) {
+            try {
+              // Get profile data
+              const profileResult = await getProfileByRegId(loanEntry.regId)
+              if (profileResult.success && profileResult.data) {
+                const profile = profileResult.data
                 
-                for (const paymentEntry of loanEntry.paymentHistory) {
-                  if (paymentEntry && typeof paymentEntry === 'string') {
-                    // Parse DD-MM-YYYY-MIN-HH : amount format
-                    const parts = paymentEntry.split(' : ')
-                    if (parts.length === 2) {
-                      const dateTimeStr = parts[0]
-                      const amount = parseInt(parts[1]) || 0
-                      
-                      // Parse DD-MM-YYYY-MIN-HH format
-                      const dateParts = dateTimeStr.split('-')
-                      if (dateParts.length >= 3) {
-                        const day = parseInt(dateParts[0])
-                        const month = parseInt(dateParts[1])
-                        const year = parseInt(dateParts[2])
+                // Process payment data from activeRF_loan paymentHistory
+                const payments = {}
+                
+                // Check paymentHistory for current month payments
+                if (loanEntry.paymentHistory && Array.isArray(loanEntry.paymentHistory)) {
+                  console.log('📊 Processing payment history for', loanEntry.regId, ':', loanEntry.paymentHistory)
+                  let totalCurrentMonthAmount = 0
+                  
+                  for (const paymentEntry of loanEntry.paymentHistory) {
+                    if (paymentEntry && typeof paymentEntry === 'string') {
+                      // Parse DD-MM-YYYY-MIN-HH : amount format
+                      const parts = paymentEntry.split(' : ')
+                      if (parts.length === 2) {
+                        const dateTimeStr = parts[0]
+                        const amount = parseInt(parts[1]) || 0
                         
-                        // Create date object
-                        const paymentDate = new Date(year, month - 1, day)
-                        const paymentMonth = paymentDate.toLocaleString('en-US', { month: 'long' })
-                        
-                        // Only process current month and year payments
-                        if (paymentMonth === currentMonth && year === currentYear) {
-                          totalCurrentMonthAmount += amount
+                        // Parse DD-MM-YYYY-MIN-HH format
+                        const dateParts = dateTimeStr.split('-')
+                        if (dateParts.length >= 3) {
+                          const day = parseInt(dateParts[0])
+                          const month = parseInt(dateParts[1])
+                          const year = parseInt(dateParts[2])
+                          
+                          // Create date object
+                          const paymentDate = new Date(year, month - 1, day)
+                          const paymentMonth = paymentDate.toLocaleString('en-US', { month: 'long' })
+                          
+                          // Only process current month and year payments
+                          if (paymentMonth === currentMonth && year === currentYear) {
+                            totalCurrentMonthAmount += amount
+                            console.log('📊 Found current month payment:', amount, 'for', loanEntry.regId)
+                          }
                         }
                       }
                     }
                   }
-                }
-                
-                if (totalCurrentMonthAmount > 0) {
-                  payments[currentMonth] = {
-                    paid: true,
-                    amount: totalCurrentMonthAmount
+                  
+                  if (totalCurrentMonthAmount > 0) {
+                    payments[currentMonth] = {
+                      paid: true,
+                      amount: totalCurrentMonthAmount
+                    }
+                    console.log('📊 Total current month amount for', loanEntry.regId, ':', totalCurrentMonthAmount)
                   }
                 }
-              }
-              
-              // Add current month if not paid
-              if (!payments[currentMonth]) {
-                payments[currentMonth] = {
-                  paid: false,
-                  amount: 0
-                }
-              }
-              
-              allLoans.push({
-                regId: loanEntry.regId,
-                name: loanEntry.profileName || profile.fullName || profile.Name || 'Unknown',
-                payments,
-                bankAccount: selectedAccount.name,
-                rfLoanId: loanEntry.rfLoanId
-              })
-            } else {
-              // Add regId even if profile not found, with unknown name
-              allLoans.push({
-                regId: loanEntry.regId,
-                name: loanEntry.profileName || 'Unknown',
-                payments: {
-                  [currentMonth]: {
+                
+                // Add current month if not paid
+                if (!payments[currentMonth]) {
+                  payments[currentMonth] = {
                     paid: false,
                     amount: 0
                   }
-                },
-                bankAccount: selectedAccount.name,
-                rfLoanId: loanEntry.rfLoanId
-              })
+                }
+                
+                allLoans.push({
+                  regId: loanEntry.regId,
+                  name: loanEntry.profileName || profile.fullName || profile.Name || 'Unknown',
+                  payments,
+                  bankAccount: selectedAccount.name,
+                  rfLoanId: loanEntry.rfLoanId
+                })
+                
+                console.log('📊 Added loan to coordinator list:', loanEntry.regId, 'Payments:', payments)
+              } else {
+                console.log('⚠️ Profile not found for regId:', loanEntry.regId)
+                // Add regId even if profile not found, with unknown name
+                allLoans.push({
+                  regId: loanEntry.regId,
+                  name: loanEntry.profileName || 'Unknown',
+                  payments: {
+                    [currentMonth]: {
+                      paid: false,
+                      amount: 0
+                    }
+                  },
+                  bankAccount: selectedAccount.name,
+                  rfLoanId: loanEntry.rfLoanId
+                })
+              }
+            } catch (error) {
+              console.error('❌ Error processing loan entry:', loanEntry, error)
             }
+          } else {
+            console.warn('⚠️ Invalid loan entry:', loanEntry)
           }
         }
         
