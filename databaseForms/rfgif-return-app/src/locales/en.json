@@ -52,6 +52,8 @@
   "form.selectReceiver": "Select Receiver",
   "form.pleaseSelectReceiver": "Please select a receiver",
   "form.errorLoadingReceivers": "Error loading receivers",
+  "form.enterReceiverName": "Enter receiver name",
+  "form.pleaseEnterReceiverName": "Please enter receiver name",
   "form.requestRepayment": "Request Repayment",
   "form.repaymentRequestSubmitted": "Repayment request submitted successfully!",
   "form.errorSubmittingRepaymentRequest": "Error submitting repayment request",

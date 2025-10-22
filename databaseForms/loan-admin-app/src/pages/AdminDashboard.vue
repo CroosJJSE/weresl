@@ -35,11 +35,13 @@
     <div class="stats-grid">
       <div class="stat-card" @click="activeTab = 'loans'" :class="{ active: activeTab === 'loans' }">
         <div class="stat-content">
+          <div class="stat-value">{{ pendingLoanCount }}</div>
           <div class="stat-label">Loan</div>
         </div>
       </div>
       <div class="stat-card" @click="activeTab = 'returns'" :class="{ active: activeTab === 'returns' }">
         <div class="stat-content">
+          <div class="stat-value">{{ pendingPaymentCount }}</div>
           <div class="stat-label">Payment</div>
         </div>
       </div>
@@ -784,27 +786,24 @@ export default {
     // Load pending loans from SearchElements/pending-loan
     const loadPendingLoans = async () => {
       try {
-        console.log('🔄 Loading pending loans...')
         loading.value = true
         const result = await adminDbService.getPendingLoans()
-        console.log('📊 Pending loans result:', result)
-        console.log('📊 Number of pending loans:', result.length)
         pendingLoans.value = result
-        console.log('✅ Pending loans loaded successfully')
       } catch (error) {
-        console.error('❌ Error loading pending loans:', error)
+        console.error('Error loading pending loans:', error)
         // Handle error silently
       } finally {
         loading.value = false
-        console.log('🏁 Finished loading pending loans')
       }
     }
 
     // Load pending payments
     const loadPendingPayments = async () => {
       try {
-        pendingPayments.value = await adminDbService.getPendingPayments()
+        const result = await adminDbService.getPendingPayments()
+        pendingPayments.value = result
       } catch (error) {
+        console.error('❌ AdminDashboard: Error loading pending payments:', error)
         // Handle error silently
       }
     }
@@ -839,7 +838,6 @@ export default {
         })
         
         await Promise.all(balancePromises)
-        console.log('💰 Source balances loaded:', sourceBalances.value)
       } catch (error) {
         console.error('Error loading available sources:', error)
       }
@@ -866,26 +864,41 @@ export default {
           throw new Error('Failed to load profiles')
         }
 
-        const profiles = profilesResult.data
-        if (!profiles || profiles.length === 0) {
+        const allProfiles = profilesResult.data
+        if (!allProfiles || allProfiles.length === 0) {
           showSuccessMessage('No profiles found to update', 'warning')
           return
         }
 
-        sheetsProgress.value.total = profiles.length
-        sheetsProgress.value.status = `📊 Found ${profiles.length} profiles to update...`
+        // Filter profiles that need backup
+        const profilesNeedingBackup = []
+        for (const profile of allProfiles) {
+          const backupCheck = await adminDbService.needsGoogleSheetsBackup(profile)
+          if (backupCheck.success && backupCheck.needsBackup) {
+            profilesNeedingBackup.push(profile)
+          }
+        }
+
+        if (profilesNeedingBackup.length === 0) {
+          showSuccessMessage('All profiles are already backed up to Google Sheets!', 'info')
+          return
+        }
+
+        sheetsProgress.value.total = profilesNeedingBackup.length
+        sheetsProgress.value.status = `📊 Found ${profilesNeedingBackup.length} profiles needing backup (${allProfiles.length - profilesNeedingBackup.length} already backed up)...`
 
         let totalCompleted = 0
         let totalFailed = 0
+        let totalSkipped = 0
         const batchSize = 5 // Process 5 profiles at a time
-        const totalBatches = Math.ceil(profiles.length / batchSize)
+        const totalBatches = Math.ceil(profilesNeedingBackup.length / batchSize)
 
         for (let batchNumber = 1; batchNumber <= totalBatches; batchNumber++) {
           const startIndex = (batchNumber - 1) * batchSize
-          const endIndex = Math.min(startIndex + batchSize, profiles.length)
-          const batch = profiles.slice(startIndex, endIndex)
+          const endIndex = Math.min(startIndex + batchSize, profilesNeedingBackup.length)
+          const batch = profilesNeedingBackup.slice(startIndex, endIndex)
 
-          sheetsProgress.value.status = `⚡ Processing batch ${batchNumber}/${totalBatches} (${totalCompleted + totalFailed}/${profiles.length} completed)...`
+          sheetsProgress.value.status = `⚡ Processing batch ${batchNumber}/${totalBatches} (${totalCompleted + totalFailed}/${profilesNeedingBackup.length} completed)...`
 
           // Process batch in parallel
           const batchPromises = batch.map(async (profile) => {
@@ -895,7 +908,11 @@ export default {
 
               const result = await updateMainTabRow(profile)
               if (result.success) {
-                totalCompleted++
+                if (result.skipped) {
+                  totalSkipped++
+                } else {
+                  totalCompleted++
+                }
               } else {
                 totalFailed++
               }
@@ -908,11 +925,11 @@ export default {
 
           // Update progress
           sheetsProgress.value.current = totalCompleted + totalFailed
-          sheetsProgress.value.status = `📊 Progress: ${totalCompleted + totalFailed}/${profiles.length} profiles processed`
+          sheetsProgress.value.status = `📊 Progress: ${totalCompleted + totalFailed}/${profilesNeedingBackup.length} profiles processed`
         }
 
-        sheetsProgress.value.status = `🎉 Completed: ${totalCompleted} updated, ${totalFailed} failed`
-        showSuccessMessage(`Sheets update completed: ${totalCompleted} profiles updated, ${totalFailed} failed`)
+        sheetsProgress.value.status = `🎉 Completed: ${totalCompleted} updated, ${totalFailed} failed, ${totalSkipped} skipped`
+        showSuccessMessage(`Sheets update completed: ${totalCompleted} profiles updated, ${totalFailed} failed, ${totalSkipped} skipped`)
 
       } catch (error) {
         showSuccessMessage('Error during Sheets update. Please try again.', 'error')
@@ -999,68 +1016,40 @@ export default {
       const currentRegId = editingLoan.value.regId
       
       try {
-        console.log('🚀 Starting loan approval process...')
-        console.log('📋 Editing loan data:', editingLoan.value)
-        
         // Validate form
         if (!isFormValid.value) {
-          console.log('❌ Form validation failed')
           showSuccessMessage('Please fill in all required fields before approving', 'error')
           return
         }
         
-        console.log('✅ Form validation passed')
         savingLoan.value = true
         
         const loan = editingLoan.value
-        console.log('📝 Loan data to process:', {
-          regId: loan.regId,
-          loanType: loan.loanType,
-          loanId: loan.loanId,
-          amount: loan.amount,
-          purpose: loan.purpose,
-          source: loan.source,
-          arms: loan.arms
-        })
         
         // First update the loan with the edited values
-        console.log('🔄 Step 1: Updating loan with edited values...')
         const updateResult = await adminDbService.updateLoan(loan.regId, loan.loanType, loan.loanId, {
           amount: parseFloat(loan.amount),
           purpose: loan.purpose,
           source: loan.source,
-          arms: loan.arms
+          arms: loan.arms,
+          coordinator: loan.source // Set coordinator = source
         })
         
-        console.log('📊 Update loan result:', updateResult)
-        
         if (!updateResult.success) {
-          console.log('❌ Failed to update loan:', updateResult.message)
           throw new Error(updateResult.message || 'Failed to update loan')
         }
         
-        console.log('✅ Loan updated successfully')
-        
         // Then approve the loan
-        console.log('🔄 Step 2: Approving loan...')
-        const approvalResult = await adminDbService.approveLoan(loan.regId, loan.loanType, loan.loanId)
-        
-        console.log('📊 Approval result:', approvalResult)
+        const approvalResult = await adminDbService.approveLoan(loan.regId, loan.loanType, loan.loanId, loan.source)
         
         if (!approvalResult.success) {
-          console.log('❌ Failed to approve loan:', approvalResult.message)
           throw new Error(approvalResult.message || 'Failed to approve loan')
         }
         
-        console.log('✅ Loan approved successfully')
-        
         closeEditModal()
-        console.log('🔄 Step 3: Reloading pending loans...')
         await loadPendingLoans()
-        console.log('✅ Pending loans reloaded')
         
         showSuccessMessage('Loan approved successfully!')
-        console.log('🎉 Loan approval process completed successfully')
         
       } catch (error) {
         console.error('❌ Error in loan approval process:', error)
@@ -1090,7 +1079,6 @@ export default {
         }
       } finally {
         savingLoan.value = false
-        console.log('🏁 Loan approval process finished')
       }
     }
 
@@ -1291,14 +1279,12 @@ export default {
     // Save payment edit
     const savePaymentEdit = async () => {
       try {
-        console.log('🔍 savePaymentEdit called')
         
         // Validation
         const paidAmount = parseFloat(editingPayment.value.paidAmount)
         const totalBalance = parseFloat(editingPayment.value.totalBalance)
         const targetLoanId = editingPayment.value.targetLoanId
         
-        console.log('📊 Validation data:', { paidAmount, totalBalance, targetLoanId })
         
         // Check if paid amount is empty or invalid
         if (!paidAmount || paidAmount <= 0) {
@@ -1577,8 +1563,10 @@ export default {
       if (transaction.type === 'transfer') {
         return transaction.fromAccount || '-'
       } else if (transaction.type === 'loan_approval') {
-        return 'wereSL'
+        // Loan approval: sourceAccount → regId (money flows from sourceAccount to regId)
+        return transaction.sourceAccount || 'wereSL'
       } else if (transaction.type === 'payment_approval') {
+        // Payment approval: regId → receiverAccount (money flows from regId to receiverAccount)
         return transaction.regId || '-'
       }
       return '-'
@@ -1589,9 +1577,11 @@ export default {
       if (transaction.type === 'transfer') {
         return transaction.toAccount || '-'
       } else if (transaction.type === 'loan_approval') {
+        // Loan approval: sourceAccount → regId (money flows from sourceAccount to regId)
         return transaction.regId || '-'
       } else if (transaction.type === 'payment_approval') {
-        return 'wereSL'
+        // Payment approval: regId → receiverAccount (money flows from regId to receiverAccount)
+        return transaction.receiverAccount || 'wereSL'
       }
       return '-'
     }
@@ -1650,43 +1640,50 @@ export default {
         }
         
         const allLoans = []
-        const rfLoans = selectedAccount[BANK_ACCOUNT_FIELD.RF_LOANS] || {}
+        const activeRFLoans = selectedAccount[BANK_ACCOUNT_FIELD.ACTIVE_RF_LOAN] || []
         
         // Define current month and year at the top level
         const currentMonth = new Date().toLocaleString('en-US', { month: 'long' })
         const currentYear = new Date().getFullYear()
         
-        for (const [regId, regData] of Object.entries(rfLoans)) {
-          if (regId) {
+        // Process activeRF_loan entries
+        for (const loanEntry of activeRFLoans) {
+          if (loanEntry.regId) {
             // Get profile data
-            const profileResult = await getProfileByRegId(regId)
+            const profileResult = await getProfileByRegId(loanEntry.regId)
             if (profileResult.success && profileResult.data) {
               const profile = profileResult.data
               
-              // Process payment data from BANK_ACCOUNT.RF_LOANS
+              // Process payment data from activeRF_loan paymentHistory
               const payments = {}
               
-              // Check BANK_ACCOUNT.RF_LOANS for current month payments
-              if (typeof regData === 'object' && regData !== null) {
+              // Check paymentHistory for current month payments
+              if (loanEntry.paymentHistory && Array.isArray(loanEntry.paymentHistory)) {
                 let totalCurrentMonthAmount = 0
                 
-                for (const [dateKey, isPaid] of Object.entries(regData)) {
-                  if (dateKey && isPaid) {
-                    // Parse DDMMYYYY:amount format
-                    const parts = dateKey.split(':')
+                for (const paymentEntry of loanEntry.paymentHistory) {
+                  if (paymentEntry && typeof paymentEntry === 'string') {
+                    // Parse DD-MM-YYYY-MIN-HH : amount format
+                    const parts = paymentEntry.split(' : ')
                     if (parts.length === 2) {
-                      const dateStr = parts[0]
+                      const dateTimeStr = parts[0]
                       const amount = parseInt(parts[1]) || 0
                       
-                      // Convert DDMMYYYY to month name
-                      const month = getMonthFromDateKey(dateStr)
-                      
-                      // Parse the year from the dateStr
-                      const paymentYear = parseInt(dateStr.substring(4, 8))
-                      
-                      // Only process current month and year payments for coordinator view
-                      if (month === currentMonth && paymentYear === currentYear) {
-                        totalCurrentMonthAmount += amount
+                      // Parse DD-MM-YYYY-MIN-HH format
+                      const dateParts = dateTimeStr.split('-')
+                      if (dateParts.length >= 3) {
+                        const day = parseInt(dateParts[0])
+                        const month = parseInt(dateParts[1])
+                        const year = parseInt(dateParts[2])
+                        
+                        // Create date object
+                        const paymentDate = new Date(year, month - 1, day)
+                        const paymentMonth = paymentDate.toLocaleString('en-US', { month: 'long' })
+                        
+                        // Only process current month and year payments
+                        if (paymentMonth === currentMonth && year === currentYear) {
+                          totalCurrentMonthAmount += amount
+                        }
                       }
                     }
                   }
@@ -1709,23 +1706,25 @@ export default {
               }
               
               allLoans.push({
-                regId,
-                name: profile.fullName || profile.Name || 'Unknown',
+                regId: loanEntry.regId,
+                name: loanEntry.profileName || profile.fullName || profile.Name || 'Unknown',
                 payments,
-                bankAccount: selectedAccount.name
+                bankAccount: selectedAccount.name,
+                rfLoanId: loanEntry.rfLoanId
               })
             } else {
               // Add regId even if profile not found, with unknown name
               allLoans.push({
-                regId,
-                name: 'Unknown',
+                regId: loanEntry.regId,
+                name: loanEntry.profileName || 'Unknown',
                 payments: {
                   [currentMonth]: {
                     paid: false,
                     amount: 0
                   }
                 },
-                bankAccount: selectedAccount.name
+                bankAccount: selectedAccount.name,
+                rfLoanId: loanEntry.rfLoanId
               })
             }
           }

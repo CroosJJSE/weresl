@@ -172,6 +172,7 @@
             </div>
           </div>
           
+          
           <div class="form-row">
             <div class="form-group">
               <label for="billUpload">{{ t('form.billUpload') }} *</label>
@@ -291,7 +292,6 @@ export default {
     const showGIFError = ref(false)
     const showRFAmountError = ref(false)
     const showRFBillError = ref(false)
-    const showRFReceiverError = ref(false)
 
     // GIF Return Data
     const gifData = reactive({
@@ -301,7 +301,7 @@ export default {
     // RF Repayment Data
     const rfData = reactive({
       amount: '',
-      receiver: '',
+      receiver: 'WERESL', // Always set to WERESL
       billFile: null,
       billUrl: ''
     })
@@ -313,13 +313,10 @@ export default {
 
     // Computed properties
     const totalBalance = computed(() => {
-      console.log('[TOTAL BALANCE DEBUG] Active RF loans:', activeRFLoans.value)
       const balance = activeRFLoans.value.reduce((sum, loan) => {
         const currentBalance = loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0
-        console.log('[TOTAL BALANCE DEBUG] Loan:', loan.id, 'Current Balance:', currentBalance)
         return sum + currentBalance
       }, 0)
-      console.log('[TOTAL BALANCE DEBUG] Total balance:', balance)
       return balance
     })
 
@@ -446,6 +443,7 @@ export default {
       // Reset form data
       gifData.description = ''
       rfData.amount = ''
+      rfData.receiver = 'wereSL' // Always set to WERESL
       rfData.billFile = null
       rfData.billUrl = ''
       billPreview.value = null
@@ -464,7 +462,8 @@ export default {
       }
 
       // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
+      const maxSize = 5 * 1024 * 1024
+      if (file.size > maxSize) {
         billError.value = t('form.fileTooLarge')
         return
       }
@@ -560,7 +559,6 @@ export default {
       
       // Reset validation states
       showRFAmountError.value = false
-      showRFReceiverError.value = false
       showRFBillError.value = false
       
       // Validate mandatory fields
@@ -571,10 +569,8 @@ export default {
         hasErrors = true
       }
       
-      if (!rfData.receiver) {
-        showRFReceiverError.value = true
-        hasErrors = true
-      }
+      // Set receiver to WERESL automatically
+      rfData.receiver = 'WERESL'
       
       if (!rfData.billFile) {
         showRFBillError.value = true
@@ -615,19 +611,37 @@ export default {
           [RF_RETURN_RECORD_FIELD.RECEIVER]: rfData.receiver,
           [RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID]: billUrl,
           loans: activeRFLoans.value.map(loan => ({
-            id: loan.id,
-            purpose: loan[RF_LOAN_FIELD.PURPOSE],
-            amount: loan[RF_LOAN_FIELD.AMOUNT],
-            currentBalance: loan[RF_LOAN_FIELD.CURRENT_BALANCE],
-            initiationDate: loan[RF_LOAN_FIELD.INITIATION_DATE],
-            status: loan[RF_LOAN_FIELD.STATUS]
+            id: loan.id || '',
+            purpose: loan[RF_LOAN_FIELD.PURPOSE] || '',
+            amount: loan[RF_LOAN_FIELD.AMOUNT] || 0,
+            currentBalance: loan[RF_LOAN_FIELD.CURRENT_BALANCE] || 0,
+            initiationDate: loan[RF_LOAN_FIELD.INITIATION_DATE] || new Date(),
+            status: loan[RF_LOAN_FIELD.STATUS] || 'active'
           })),
           createdAt: serverTimestamp()
         }
 
+        // Validate all required fields are not undefined
+        const requiredFields = [
+          'regId', 'timestamp', 'status', 'paidAmount', 'totalBalance', 'receiver', 'receiptDriveLinkId'
+        ]
+        
+        for (const field of requiredFields) {
+          const fieldValue = repaymentRequest[RF_RETURN_RECORD_FIELD[field.toUpperCase()]] || repaymentRequest[field]
+          if (fieldValue === undefined || fieldValue === null) {
+            throw new Error(`Required field ${field} is undefined`)
+          }
+        }
+
         // Save to RF_return_record collection using enum
         const repaymentRef = doc(db, RootCollection.RF_RETURN_RECORD, timestamp)
-        await setDoc(repaymentRef, repaymentRequest)
+        
+        try {
+          await setDoc(repaymentRef, repaymentRequest)
+        } catch (firestoreError) {
+          console.error('Firestore save error:', firestoreError)
+          throw firestoreError
+        }
 
         // Send email notification
         try {
@@ -652,7 +666,7 @@ export default {
         }
 
         rfData.amount = ''
-        rfData.receiver = ''
+        rfData.receiver = 'WERESL' // Always set to WERESL
         rfData.billFile = null
         rfData.billUrl = ''
         billPreview.value = null
@@ -745,9 +759,6 @@ export default {
       showRFBillError.value = true
     }
 
-    const validateRFReceiver = () => {
-      showRFReceiverError.value = true
-    }
 
     // Load receivers on component mount
     onMounted(() => {
@@ -784,11 +795,9 @@ export default {
       validateGIFDescription,
       validateRFAmount,
       validateRFBill,
-      validateRFReceiver,
       showGIFError,
       showRFAmountError,
       showRFBillError,
-      showRFReceiverError,
       t,
       hasGrantLoans,
       getStatusText

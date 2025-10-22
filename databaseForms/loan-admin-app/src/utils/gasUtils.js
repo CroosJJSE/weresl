@@ -15,6 +15,7 @@ import {
 import { ProfileField, RF_LOAN_FIELD, GRANT_FIELD } from '../enums/db.js'
 import { convertGoogleDriveUrl } from './driveUtils.js'
 import { convertProfileToMainTabFormat } from './dbUtils.js'
+import { adminDbService } from '../services/dbService.js'
 
 // GAS Web App URL - Update this with your actual GAS deployment URL
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzaXn7q0Ze-I-s8zw18RxFJxHuDxSrVFbq8WLiaZgRaHhn8aBvl4Nc55HsCJS-dfd3zzg/exec'
@@ -128,18 +129,29 @@ export const prepareMainTabData = async (profile) => {
  */
 export const prepareRFReturnTabData = (paymentData, profile) => {
   try {
+    // Debug: Log the input data
+    console.log('🔍 DEBUG: prepareRFReturnTabData input:', {
+      paymentData: paymentData,
+      profile: profile
+    })
+    
     // Convert receipt drive link to viewable URL if available
     const receiptUrl = paymentData.receiptDriveLinkId ? 
       convertGoogleDriveUrl(paymentData.receiptDriveLinkId) : ''
 
-    return {
+    const result = {
       [RF_RETURN_TAB_FIELDS.TIMESTAMP]: new Date().toISOString(),
       [RF_RETURN_TAB_FIELDS.REG_ID]: profile[ProfileField.REG_ID] || profile.regId || profile.Reg_ID || '',
       [RF_RETURN_TAB_FIELDS.NAME]: profile[ProfileField.FULL_NAME] || profile.fullName || profile.Name || profile.name || '',
-      [RF_RETURN_TAB_FIELDS.AMOUNT_DEPOSITED]: paymentData.amount || 0,
+      [RF_RETURN_TAB_FIELDS.AMOUNT_DEPOSITED]: paymentData.paidAmount || paymentData.amount || 0,
       [RF_RETURN_TAB_FIELDS.RECEIVER]: paymentData.receiver || 'Admin',
       [RF_RETURN_TAB_FIELDS.RECEIPT]: receiptUrl
     }
+    
+    // Debug: Log the result
+    console.log('🔍 DEBUG: prepareRFReturnTabData result:', result)
+    
+    return result
   } catch (error) {
     console.error('Error preparing RF return tab data:', error)
     throw error
@@ -185,12 +197,26 @@ export const prepareLoanInitiationTabData = (loanData, profile) => {
 }
 
 /**
- * Update main tab row with profile data
+ * Update main tab row with profile data (with backup logic)
  * @param {Object} profile - Profile data
  * @returns {Promise<Object>} Response from GAS
  */
 export const updateMainTabRow = async (profile) => {
   try {
+    // Check if profile needs backup
+    const backupCheck = await adminDbService.needsGoogleSheetsBackup(profile)
+    if (!backupCheck.success) {
+      throw new Error('Failed to check backup status')
+    }
+    
+    // If profile is already backed up, skip
+    if (!backupCheck.needsBackup) {
+      console.log('⏭️ Profile already backed up, skipping:', profile[ProfileField.REG_ID] || profile.Reg_ID)
+      return { success: true, message: 'Profile already backed up', skipped: true }
+    }
+    
+    console.log('📤 Profile needs backup, proceeding with Google Sheets update:', profile[ProfileField.REG_ID] || profile.Reg_ID)
+    
     const dataResult = await prepareMainTabData(profile)
     
     if (!dataResult.success) {
@@ -205,7 +231,41 @@ export const updateMainTabRow = async (profile) => {
       source: 'loan-admin-app'
     }
 
-    return await sendDataParcelToGAS(dataParcel)
+    // Retry mechanism for Google Sheets update
+    const maxRetries = 3
+    let lastError = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Attempt ${attempt}/${maxRetries} to update Google Sheets for profile:`, profile[ProfileField.REG_ID] || profile.Reg_ID)
+        
+        const result = await sendDataParcelToGAS(dataParcel)
+        
+        if (result.success) {
+          // Success! Update the backedUp status to true
+          console.log('✅ Google Sheets update successful, updating backedUp status')
+          await adminDbService.updateProfileBackedUpStatus(profile[ProfileField.REG_ID] || profile.Reg_ID, true)
+          return result
+        } else {
+          throw new Error(result.message || 'Google Sheets update failed')
+        }
+      } catch (error) {
+        lastError = error
+        console.log(`❌ Attempt ${attempt}/${maxRetries} failed:`, error.message)
+        
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          const waitTime = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        }
+      }
+    }
+    
+    // All retries failed, set backedUp to false
+    console.log('❌ All retry attempts failed, setting backedUp to false')
+    await adminDbService.updateProfileBackedUpStatus(profile[ProfileField.REG_ID] || profile.Reg_ID, false)
+    throw lastError
 
   } catch (error) {
     console.error('Error updating main tab row:', error)
@@ -297,13 +357,17 @@ export const logActivity = async (activity, data = {}) => {
  */
 export const testGASConnection = async () => {
   try {
-    const testData = {
-      action: 'test',
-      message: 'Testing GAS connection from loan admin app',
-      timestamp: new Date().toISOString()
+    const dataParcel = {
+      action: GAS_ACTION_TYPES.LOG_ACTIVITY,
+      data: {
+        activity: 'GAS Connection Test',
+        message: 'Testing GAS connection from loan admin app',
+        timestamp: new Date().toISOString(),
+        source: 'loan-admin-app'
+      }
     }
 
-    return await sendDataParcelToGAS(testData)
+    return await sendDataParcelToGAS(dataParcel)
 
   } catch (error) {
     console.error('Error testing GAS connection:', error)

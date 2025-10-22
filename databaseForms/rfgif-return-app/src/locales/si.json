@@ -52,6 +52,8 @@
   "form.selectReceiver": "ලබන්නා තෝරන්න",
   "form.pleaseSelectReceiver": "කරුණාකර ලබන්නා තෝරන්න",
   "form.errorLoadingReceivers": "ලබන්නන් පූරණය කිරීමේ දෝෂය",
+  "form.enterReceiverName": "ලබන්නාගේ නම ඇතුළත් කරන්න",
+  "form.pleaseEnterReceiverName": "කරුණාකර ලබන්නාගේ නම ඇතුළත් කරන්න",
   "form.requestRepayment": "ආපසු ගෙවීම ඉල්ලීම",
   "form.repaymentRequestSubmitted": "ආපසු ගෙවීමේ ඉල්ලීම සාර්ථකව ඉදිරිපත් කරන ලදී!",
   "form.errorSubmittingRepaymentRequest": "ආපසු ගෙවීමේ ඉල්ලීම ඉදිරිපත් කිරීමේ දෝෂය",

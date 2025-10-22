@@ -209,8 +209,6 @@ export const updateLoan = async (regId, loanId, loanData, loanType = 'RF') => {
   }
 }
 
-
-
 /**
  * Get pending loans from SearchElements
  */
@@ -241,7 +239,6 @@ export const getPendingLoans = async () => {
     return { success: false, message: 'Failed to get pending loans', error }
   }
 }
-
 
 /**
  * Add system log

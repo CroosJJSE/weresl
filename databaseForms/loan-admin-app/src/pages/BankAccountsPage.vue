@@ -173,7 +173,7 @@
             <p class="text-sm text-gray-500 mb-2">
               Showing {{ filteredTransactions.length }} of {{ transactionHistory.length }} total transactions.
             </p>
-            <div v-for="transaction in filteredTransactions" :key="transaction.id" class="transaction-item">
+            <div v-for="transaction in filteredTransactions" :key="transaction.id" class="transaction-item" @click="openTransactionModal(transaction)">
               <div class="transaction-main">
                 <div class="transaction-line">
                   <span class="transaction-type-tag" :class="getTransactionTypeClass(transaction.type)">
@@ -189,6 +189,109 @@
                   </span>
                   <span class="transaction-amount">{{ formatAmountWithCommas(transaction.amount) }}</span>
                   <span v-if="transaction.loanId" class="transaction-regid">{{ transaction.loanId }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transaction Details Modal -->
+    <div v-if="showTransactionModal" class="modal-overlay" @click="closeTransactionModal">
+      <div class="modal-content transaction-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Transaction Details</h3>
+          <button class="modal-close" @click="closeTransactionModal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        
+        <div v-if="selectedTransaction" class="modal-body">
+          <!-- Transaction Type Badge -->
+          <div class="transaction-type-section">
+            <div class="type-badge" :class="getTransactionTypeClass(selectedTransaction.type)">
+              {{ getTransactionTypeLabel(selectedTransaction.type) }}
+            </div>
+            <div class="transaction-id">ID: {{ selectedTransaction.id }}</div>
+          </div>
+
+          <!-- Money Flow Visualization -->
+          <div class="money-flow-section">
+            <div class="flow-container">
+              <div class="account-box sender">
+                <div class="account-name">{{ getTransactionSender(selectedTransaction) }}</div>
+                <div class="account-label">Sender</div>
+              </div>
+              
+              <div class="flow-arrow">
+                <div class="arrow-line"></div>
+                <div class="arrow-head"></div>
+                <div class="amount-badge">Rs. {{ formatAmountWithCommas(selectedTransaction.amount) }}</div>
+              </div>
+              
+              <div class="account-box receiver">
+                <div class="account-name">{{ getTransactionReceiver(selectedTransaction) }}</div>
+                <div class="account-label">Receiver</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Details Grid -->
+          <div class="details-grid">
+            <div class="detail-item">
+              <div class="detail-label">Date & Time</div>
+              <div class="detail-value">{{ formatDateTime(selectedTransaction.timestamp) }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">Amount</div>
+              <div class="detail-value amount-value">Rs. {{ formatAmountWithCommas(selectedTransaction.amount) }}</div>
+            </div>
+            
+            <div v-if="selectedTransaction.regId" class="detail-item">
+              <div class="detail-label">Registration ID</div>
+              <div class="detail-value">{{ selectedTransaction.regId }}</div>
+            </div>
+            
+            <div v-if="selectedTransaction.loanId" class="detail-item">
+              <div class="detail-label">Loan ID</div>
+              <div class="detail-value">{{ selectedTransaction.loanId }}</div>
+            </div>
+            
+            <div v-if="selectedTransaction.paymentId" class="detail-item">
+              <div class="detail-label">Payment ID</div>
+              <div class="detail-value">{{ selectedTransaction.paymentId }}</div>
+            </div>
+            
+            <div v-if="selectedTransaction.description" class="detail-item full-width">
+              <div class="detail-label">Description</div>
+              <div class="detail-value">{{ selectedTransaction.description }}</div>
+            </div>
+          </div>
+
+          <!-- Balance Changes (if available) -->
+          <div v-if="selectedTransaction.sourceAccountPreviousBalance !== undefined || selectedTransaction.receiverAccountPreviousBalance !== undefined" class="balance-changes">
+            <h4>Balance Changes</h4>
+            <div class="balance-grid">
+              <div v-if="selectedTransaction.sourceAccountPreviousBalance !== undefined" class="balance-item">
+                <div class="balance-label">{{ getTransactionSender(selectedTransaction) }}</div>
+                <div class="balance-change">
+                  <span class="previous-balance">Rs. {{ formatAmountWithCommas(selectedTransaction.sourceAccountPreviousBalance) }}</span>
+                  <span class="balance-arrow">→</span>
+                  <span class="new-balance">Rs. {{ formatAmountWithCommas(selectedTransaction.sourceAccountNewBalance) }}</span>
+                </div>
+              </div>
+              
+              <div v-if="selectedTransaction.receiverAccountPreviousBalance !== undefined" class="balance-item">
+                <div class="balance-label">{{ getTransactionReceiver(selectedTransaction) }}</div>
+                <div class="balance-change">
+                  <span class="previous-balance">Rs. {{ formatAmountWithCommas(selectedTransaction.receiverAccountPreviousBalance) }}</span>
+                  <span class="balance-arrow">→</span>
+                  <span class="new-balance">Rs. {{ formatAmountWithCommas(selectedTransaction.receiverAccountNewBalance) }}</span>
                 </div>
               </div>
             </div>
@@ -238,6 +341,10 @@ export default {
       type: ''
     })
 
+    // Transaction details modal
+    const showTransactionModal = ref(false)
+    const selectedTransaction = ref(null)
+
     // Date range filter
     const dateRange = ref({
       from: '',
@@ -255,7 +362,7 @@ export default {
     const filteredTransactions = computed(() => {
       let filtered = transactionHistory.value;
       
-      console.log('🔍 Starting with', filtered.length, 'transactions');
+      console.log('🔍 Starting with', filtered.length, 'transactions')
       
       // Filter by account
       if (transactionFilter.value.account) {
@@ -355,71 +462,37 @@ export default {
 
     const loadBankAccounts = async () => {
       try {
-        console.log('🔄 Loading bank accounts...')
         const result = await adminDbService.getAllBankAccounts()
-        console.log('📊 Bank accounts result:', result)
         
         if (result.success) {
           bankAccounts.value = result.data
-          console.log('✅ Loaded bank accounts:', result.data)
-          
-          // Debug: Log each bank account structure
-          result.data.forEach((account, index) => {
-            console.log(`🏦 Bank account ${index}:`, account)
-            console.log(`   - name: ${account.name}`)
-            console.log(`   - currentBankBalance: ${account.currentBankBalance}`)
-            console.log(`   - balance: ${account.balance}`)
-            console.log(`   - All fields:`, Object.keys(account))
-          })
           
           // Find wereSL account and set balance
           const wereSLAccount = result.data.find(account => account.name === 'wereSL')
           if (wereSLAccount) {
             wereSLBalance.value = wereSLAccount.currentBankBalance || wereSLAccount.balance || 0
-            console.log('💰 wereSL balance:', wereSLBalance.value)
-          } else {
-            console.log('⚠️ wereSL account not found')
           }
         } else {
-          console.error('❌ Failed to load bank accounts:', result.message)
+          console.error('Failed to load bank accounts:', result.message)
           bankAccounts.value = []
         }
       } catch (error) {
-        console.error('❌ Error loading bank accounts:', error)
+        console.error('Error loading bank accounts:', error)
       }
     }
 
     const loadTransactionHistory = async () => {
       try {
-        console.log('🔄 Loading transaction history...')
         loadingTransactions.value = true
         const transactions = await adminDbService.getWereSLTransactionHistory()
-        console.log('📊 Transaction history result:', transactions)
         
         if (Array.isArray(transactions)) {
           transactionHistory.value = transactions
-          console.log('✅ Loaded transactions:', transactions.length, 'transactions')
-          if (transactions.length > 0) {
-            console.log('🔍 Sample transaction:', transactions[0])
-            
-            // Debug: Log all unique transaction types
-            const types = [...new Set(transactions.map(t => t.type))]
-            console.log('🏷️ Available transaction types:', types)
-            
-            // Debug: Log sample transactions of each type
-            types.forEach(type => {
-              const sampleOfType = transactions.find(t => t.type === type)
-              if (sampleOfType) {
-                console.log(`🔍 Sample of type '${type}':`, sampleOfType)
-              }
-            })
-          }
         } else {
-          console.log('⚠️ Transactions is not an array:', typeof transactions, transactions)
           transactionHistory.value = []
         }
       } catch (error) {
-        console.error('❌ Error loading transaction history:', error)
+        console.error('Error loading transaction history:', error)
         transactionHistory.value = []
       } finally {
         loadingTransactions.value = false
@@ -569,10 +642,12 @@ export default {
         if (transaction.fromAccount) return transaction.fromAccount
         if (transaction.sourceAccount) return transaction.sourceAccount
       } else if (transaction.type === 'loan_approval') {
-        // Loan approvals typically come from wereSL
+        // Loan approval: sourceAccount → regId (money flows from sourceAccount to regId)
+        if (transaction.sourceAccount) return transaction.sourceAccount
         return 'wereSL'
       } else if (transaction.type === 'payment_approval') {
-        // Payment approvals typically come from wereSL
+        // Payment approval: regId → receiverAccount (money flows from regId to receiverAccount)
+        if (transaction.regId) return transaction.regId
         return 'wereSL'
       } else if (transaction.type === 'balance_update') {
         // Balance updates are typically to wereSL
@@ -594,12 +669,12 @@ export default {
         if (transaction.toAccount) return transaction.toAccount
         if (transaction.receiverAccount) return transaction.receiverAccount
       } else if (transaction.type === 'loan_approval') {
-        // Show regID directly for loan approvals
+        // Loan approval: sourceAccount → regId (money flows from sourceAccount to regId)
         if (transaction.regId) return transaction.regId
         return 'Loan Recipient'
       } else if (transaction.type === 'payment_approval') {
-        // Show regID directly for payment approvals
-        if (transaction.regId) return transaction.regId
+        // Payment approval: regId → receiverAccount (money flows from regId to receiverAccount)
+        if (transaction.receiverAccount) return transaction.receiverAccount
         return 'Payment Recipient'
       } else if (transaction.type === 'balance_update') {
         // Balance updates are typically to wereSL
@@ -654,6 +729,43 @@ export default {
       })
     }
 
+    const formatDateTime = (timestamp) => {
+      if (!timestamp) return '-'
+      
+      let date;
+      
+      // Handle different timestamp formats
+      if (timestamp && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp && timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      } else if (timestamp) {
+        date = new Date(timestamp);
+      } else {
+        return '-';
+      }
+      
+      return date.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }
+
+    // Transaction modal functions
+    const openTransactionModal = (transaction) => {
+      selectedTransaction.value = transaction
+      showTransactionModal.value = true
+    }
+
+    const closeTransactionModal = () => {
+      showTransactionModal.value = false
+      selectedTransaction.value = null
+    }
+
     // Lifecycle
     onMounted(async () => {
       await loadBankAccounts()
@@ -681,6 +793,8 @@ export default {
       transactionFilter,
       dateRange,
       successMessage,
+      showTransactionModal,
+      selectedTransaction,
       
       // Computed
       totalBankBalance,
@@ -709,7 +823,10 @@ export default {
       formatAmount,
       formatAmountWithCommas,
       formatAmountInMillions,
-      formatDate
+      formatDate,
+      formatDateTime,
+      openTransactionModal,
+      closeTransactionModal
     }
   }
 }
@@ -1007,6 +1124,16 @@ export default {
   background: #f8f9fa;
   border-radius: 8px;
   padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.transaction-item:hover {
+  background: #e9ecef;
+  border-color: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .transaction-main {
@@ -1116,5 +1243,304 @@ export default {
   padding: 20px;
   color: #666;
   font-size: 16px;
+}
+
+/* Transaction Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.transaction-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #1565c0;
+  font-size: 1.5rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: #f8f9fa;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* Transaction Type Section */
+.transaction-type-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.type-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  color: white;
+}
+
+.transaction-id {
+  font-size: 12px;
+  color: #666;
+  font-family: monospace;
+}
+
+/* Money Flow Section */
+.money-flow-section {
+  margin-bottom: 24px;
+}
+
+.flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  position: relative;
+}
+
+.account-box {
+  flex: 1;
+  text-align: center;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.account-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.account-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.flow-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-width: 120px;
+}
+
+.arrow-line {
+  width: 60px;
+  height: 2px;
+  background: #1565c0;
+  position: relative;
+}
+
+.arrow-head {
+  width: 0;
+  height: 0;
+  border-left: 8px solid #1565c0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  position: absolute;
+  right: 0;
+  top: -5px;
+}
+
+.amount-badge {
+  background: #1565c0;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 8px;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.3);
+}
+
+/* Details Grid */
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.detail-item {
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #1565c0;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.amount-value {
+  color: #28a745;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Balance Changes */
+.balance-changes {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.balance-changes h4 {
+  margin: 0 0 16px 0;
+  color: #1565c0;
+  font-size: 16px;
+}
+
+.balance-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.balance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+}
+
+.balance-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.balance-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.previous-balance {
+  color: #666;
+  font-size: 14px;
+}
+
+.balance-arrow {
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.new-balance {
+  color: #28a745;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transaction-modal {
+    width: 95%;
+    margin: 10px;
+  }
+  
+  .flow-container {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .arrow-line {
+    width: 2px;
+    height: 40px;
+  }
+  
+  .arrow-head {
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #1565c0;
+    border-bottom: none;
+    right: -5px;
+    top: 32px;
+  }
+  
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -43,6 +43,7 @@ export const ProfileField = {
   OCCUPATION: 'occupation',
   PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
   RF_BILL_DRIVE_FOLDER: 'rfBillDriveFolder',
+  COORDINATOR: 'coordinator', // References bank account document ID
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
   GIF: 'GIF', // Give It Forward
@@ -66,6 +67,7 @@ export const ProfileFieldTypes = {
   OCCUPATION: 'string',
   PROFILE_IMAGE_DRIVE_ID: 'string',
   RF_BILL_DRIVE_FOLDER: 'string',
+  COORDINATOR: 'string', // References bank account document ID
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
   GIF: 'array', //{timestamp : description}
@@ -279,8 +281,13 @@ export const BANK_ACCOUNT_FIELD = {
   CURRENT_BANK_BALANCE: 'currentBankBalance',
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
-  RF_LOANS: 'RF_LOANS'
+  RF_LOANS: 'RF_LOANS',
+  PROFILES: 'profiles', // Array of profile objects assigned to this coordinator
+  ACTIVE_RF_LOAN: 'activeRF_loan' // Array of active RF loan objects with payment history
 }
+// PROFILES array structure: [{ regId: string, assignedAt: Date }]
+// ACTIVE_RF_LOAN array structure: [{ regId: string, rfLoanId: string, profileName: string, paymentHistory: array }]
+// paymentHistory format: ["DD-MM-YYYY-MIN-HH : amount", ...] (not Firebase timestamp format)
 //RF_LOANS is a map where Field is regId, Value is a map of field(DDMMYYYY:amount) and value is boolean
 
 // Bank Account Field Types Enum
@@ -293,7 +300,9 @@ export const BANK_ACCOUNT_FIELD_TYPES = {
   POSITION: 'string',
   CURRENT_BANK_BALANCE: 'number',
   CREATED_AT: 'date',
-  LAST_UPDATED: 'date'
+  LAST_UPDATED: 'date',
+  PROFILES: 'array', // Array of profile objects assigned to this coordinator
+  ACTIVE_RF_LOAN: 'array' // Array of active RF loan objects with payment history
 }
 
 

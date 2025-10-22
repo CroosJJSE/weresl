@@ -57,6 +57,7 @@ export const ProfileField = {
   PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
+  BACKED_UP: 'backedUp', // Google Sheets backup status
   GIF: 'GIF', // Give It Forward
   RF_RETURN_HISTORY: 'RF_return_history',
   RF_LOANS: 'RF_Loans',
@@ -80,6 +81,7 @@ export const ProfileFieldTypes = {
   PROFILE_IMAGE_DRIVE_ID: 'string',
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
+  BACKED_UP: 'boolean', // Google Sheets backup status
   GIF: 'object', //{will have the documents as the name of the GIF}
   RF_RETURN_HISTORY: 'object', //{RRH_ID: RRH_Object} - Map of RRH objects
   RF_LOANS: 'collection', //{will have the documents as the name of the loan}

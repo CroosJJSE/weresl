@@ -52,6 +52,8 @@
   "form.selectReceiver": "பெறுநரைத் தேர்ந்தெடுக்கவும்",
   "form.pleaseSelectReceiver": "தயவுசெய்து பெறுநரைத் தேர்ந்தெடுக்கவும்",
   "form.errorLoadingReceivers": "பெறுநர்களை ஏற்றுவதில் பிழை",
+  "form.enterReceiverName": "பெறுநர் பெயரை உள்ளிடவும்",
+  "form.pleaseEnterReceiverName": "தயவுசெய்து பெறுநர் பெயரை உள்ளிடவும்",
   "form.requestRepayment": "திருப்பத்தைக் கோரவும்",
   "form.repaymentRequestSubmitted": "திருப்பக் கோரிக்கை வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது!",
   "form.errorSubmittingRepaymentRequest": "திருப்பக் கோரிக்கையை சமர்ப்பிப்பதில் பிழை",
