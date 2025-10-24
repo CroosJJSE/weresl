@@ -580,6 +580,15 @@
               <span v-if="savingPayment" class="loader"></span>
               {{ savingPayment ? 'Processing...' : 'Approve Payment' }}
             </button>
+            <button 
+              type="button"
+              @click="rejectPayment" 
+              class="btn btn-danger"
+              :disabled="savingPayment"
+            >
+              <span v-if="savingPayment" class="loader"></span>
+              {{ savingPayment ? 'Processing...' : 'Reject Payment' }}
+            </button>
             <button type="button" @click="closeEditPaymentModal" class="btn btn-secondary">Cancel</button>
           </div>
         </form>
@@ -1337,6 +1346,45 @@ export default {
       }
     }
 
+    // Reject payment (remove from system)
+    const rejectPayment = async () => {
+      try {
+        // Show confirmation dialog
+        const confirmed = confirm(
+          `Are you sure you want to reject this payment?\n\n` +
+          `Reg ID: ${editingPayment.value.regId}\n` +
+          `Amount: ${formatAmount(editingPayment.value.paidAmount)}\n\n` +
+          `This will permanently remove the payment from the system.`
+        )
+        
+        if (!confirmed) {
+          return
+        }
+        
+        savingPayment.value = true
+        
+        // Call the reject payment service
+        await adminDbService.rejectPayment(editingPayment.value.id)
+        
+        closeEditPaymentModal()
+        await loadPendingPayments()
+        
+        // Refresh bank accounts and transaction history if shown
+        await loadBankAccounts()
+        if (showTransactionHistory.value) {
+          await loadTransactionHistory()
+        }
+        
+        showSuccessMessage('Payment rejected and removed from system successfully!')
+        
+      } catch (error) {
+        console.error('❌ Error rejecting payment:', error)
+        showSuccessMessage('Error rejecting payment. Please try again.', 'error')
+      } finally {
+        savingPayment.value = false
+      }
+    }
+
     // Close edit payment modal
     const closeEditPaymentModal = () => {
       showEditPaymentModal.value = false
@@ -1977,6 +2025,7 @@ export default {
         editPaymentForApproval,
         approveEditedPayment,
         savePaymentEdit,
+        rejectPayment,
         closeEditPaymentModal,
         showSuccessMessage,
         clearSuccessMessage,
@@ -2441,6 +2490,15 @@ export default {
 
 .btn-primary:hover:not(:disabled) {
   background-color: #0d47a1;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
 }
 
 /* Loader */

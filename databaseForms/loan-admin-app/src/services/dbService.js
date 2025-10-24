@@ -495,6 +495,26 @@ export const adminDbService = {
     }
   },
 
+  // Reject payment (remove from system)
+  async rejectPayment(paymentId) {
+    try {
+      console.log('🗑️ Rejecting payment:', paymentId)
+      
+      // Get payment document reference
+      const paymentRef = doc(db, RootCollection.RF_RETURN_RECORD, paymentId)
+      
+      // Delete the payment document
+      await deleteDoc(paymentRef)
+      
+      console.log('✅ Payment rejected and removed successfully:', paymentId)
+      return { success: true, message: 'Payment rejected successfully' }
+      
+    } catch (error) {
+      console.error('❌ Error rejecting payment:', error)
+      return { success: false, message: error.message }
+    }
+  },
+
   // Helper function to add payment history to coordinator's activeRF_loan
   async addPaymentHistoryToCoordinator(regId, loanId, paidAmount) {
     try {
@@ -675,15 +695,17 @@ export const adminDbService = {
               contact: profileData.phoneNumber || profileData.contact || 'Not provided',
               amount: paymentData.amount || 0,
               totalBalance: paymentData.totalBalance || 0,
-              paidAmount: paymentData.PAID_AMOUNT || paymentData[RF_RETURN_RECORD_FIELD.PAID_AMOUNT] || 0,
+              paidAmount: paymentData.paidAmount || paymentData.PAID_AMOUNT || paymentData[RF_RETURN_RECORD_FIELD.PAID_AMOUNT] || 0,
               receiver: paymentData.receiver || '',
               status: paymentData.status || 'pending',
               timestamp: paymentData.timestamp || paymentData.createdAt,
               createdAt: paymentData.timestamp || paymentData.createdAt,
               activeLoans: activeLoans.length,
-              receiptDriveLinkId: paymentData.DRIVE_LINK_ID || paymentData[RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID] || null
+              receiptDriveLinkId: paymentData.receiptDriveLinkId || paymentData.DRIVE_LINK_ID || paymentData[RF_RETURN_RECORD_FIELD.RECEIPT_DRIVE_LINK_ID] || null
             }
             
+            console.log('📋 Payment data fields:', Object.keys(paymentData))
+            console.log('📋 Payment data values:', paymentData)
             console.log('✅ Created payment object:', paymentObject)
             pendingPayments.push(paymentObject)
           } catch (error) {
