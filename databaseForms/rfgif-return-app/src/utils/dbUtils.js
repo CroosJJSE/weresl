@@ -189,14 +189,18 @@ export const updateLoan = async (regId, loanId, loanData, loanType = LoanType.RF
  */
 export const getPendingLoans = async () => {
   try {
-    const pendingRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN)
-    const pendingDoc = await getDoc(pendingRef)
+    const pendingLoanRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.PENDING_LOAN)
+    const pendingLoanDoc = await getDoc(pendingLoanRef)
     
-    if (!pendingDoc.exists()) {
+    if (!pendingLoanDoc.exists()) {
       return { success: true, data: [] }
     }
     
-    return { success: true, data: pendingDoc.data() }
+    const pendingData = pendingLoanDoc.data()
+    // Extract regIds from the loan objects (each loan has a regId field)
+    const pendingRegIds = Object.values(pendingData).map(loan => loan.regId).filter(Boolean)
+    
+    return { success: true, data: pendingRegIds }
   } catch (error) {
     console.error('Error getting pending loans:', error)
     return { success: false, message: 'Failed to get pending loans', error }
@@ -227,18 +231,107 @@ export const addSystemLog = async (logData) => {
  */
 export const searchProfilesByNIC = async (nic) => {
   try {
-    const q = query(collection(db, RootCollection.PROFILES), where(ProfileField.NIC, '==', nic))
-    const snapshot = await getDocs(q)
+    console.log('🔍 [searchProfilesByNIC] Starting search for NIC:', nic)
     
-    const profiles = snapshot.docs.map(doc => ({
+    // Search in the SearchElements collection, NIC_data document
+    // The NIC_data document has fields where field name = NIC and field value = Reg_ID
+    const nicDataDocRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
+    const nicDataDoc = await getDoc(nicDataDocRef)
+    
+    console.log('📊 [searchProfilesByNIC] NIC data document exists:', nicDataDoc.exists())
+    
+    if (!nicDataDoc.exists()) {
+      console.log('❌ [searchProfilesByNIC] NIC_data document not found')
+      return { success: false, message: 'NIC search data not available', data: null }
+    }
+    
+    const nicData = nicDataDoc.data()
+    console.log('📋 [searchProfilesByNIC] NIC data fields:', Object.keys(nicData))
+    
+    // Look for the NIC in the document fields
+    const regId = nicData[nic]
+    console.log('🔍 [searchProfilesByNIC] Found RegID for NIC', nic, ':', regId)
+    
+    if (!regId) {
+      console.log('❌ [searchProfilesByNIC] No RegID found for NIC:', nic)
+      return { success: false, message: 'No profile found with that NIC', data: null }
+    }
+    
+    // Get the profile using the Reg_ID
+    console.log('🔍 [searchProfilesByNIC] Fetching profile for RegID:', regId)
+    const profileResult = await getProfileByRegId(regId)
+    
+    if (profileResult.success && profileResult.data) {
+      console.log('✅ [searchProfilesByNIC] Profile found:', profileResult.data[ProfileField.FULL_NAME] || profileResult.data.Name || 'N/A')
+      return { success: true, data: profileResult.data }
+    } else {
+      console.log('❌ [searchProfilesByNIC] Profile not found for RegID:', regId)
+      return { success: false, message: 'Profile not found', data: null }
+    }
+    
+  } catch (error) {
+    console.error('❌ [searchProfilesByNIC] Error searching profiles by NIC:', error)
+    return { success: false, message: 'Failed to search profiles by NIC', error }
+  }
+}
+
+/**
+ * Search profiles by name (partial match) - returns all matching profiles
+ */
+export const searchProfilesByName = async (name) => {
+  try {
+    console.log('🔍 [searchProfilesByName] Starting search for name:', name)
+    
+    if (!name || name.trim().length < 2) {
+      console.log('❌ [searchProfilesByName] Name too short:', name)
+      return { success: false, message: 'Name must be at least 2 characters long', data: null }
+    }
+
+    const searchTerm = name.trim().toLowerCase()
+    console.log('🔍 [searchProfilesByName] Search term:', searchTerm)
+    
+    // Get all profiles and filter client-side for partial matches
+    // This is necessary because Firestore doesn't support case-insensitive partial matching
+    console.log('🔍 [searchProfilesByName] Fetching all profiles for client-side filtering...')
+    const q = query(collection(db, RootCollection.PROFILES))
+    const snapshot = await getDocs(q)
+    console.log('📊 [searchProfilesByName] Total profiles fetched:', snapshot.size)
+    
+    if (snapshot.empty) {
+      console.log('❌ [searchProfilesByName] No profiles in database')
+      return { success: false, message: 'No profiles found in database', data: null }
+    }
+
+    // Filter profiles client-side for partial name matches
+    const allProfiles = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }))
     
-    return { success: true, data: profiles }
+    console.log('🔍 [searchProfilesByName] Filtering profiles for partial match...')
+    const matchingProfiles = allProfiles.filter(profile => {
+      const profileName = (profile[ProfileField.FULL_NAME] || profile.Name || '').toLowerCase()
+      const matches = profileName.includes(searchTerm)
+      if (matches) {
+        console.log('✅ [searchProfilesByName] Match found:', profileName, 'contains', searchTerm)
+      }
+      return matches
+    })
+    
+    console.log('📊 [searchProfilesByName] Filtering completed. Found matches:', matchingProfiles.length)
+    
+    if (matchingProfiles.length === 0) {
+      console.log('❌ [searchProfilesByName] No profiles found with name:', searchTerm)
+      return { success: false, message: 'No profiles found with that name', data: null }
+    }
+
+    console.log('✅ [searchProfilesByName] Found profiles:', matchingProfiles.length)
+    console.log('📋 [searchProfilesByName] Profile names:', matchingProfiles.map(p => p[ProfileField.FULL_NAME] || p.Name || 'N/A'))
+    
+    return { success: true, data: matchingProfiles }
   } catch (error) {
-    console.error('Error searching profiles by NIC:', error)
-    return { success: false, message: 'Failed to search profiles', error }
+    console.error('❌ [searchProfilesByName] Error searching profiles by name:', error)
+    return { success: false, message: 'Failed to search profiles by name', error }
   }
 }
 

@@ -17,25 +17,58 @@
       <div class="section">
         <h2>{{ t('form.searchApplicant') }}</h2>
         <div class="search-section">
+          <!-- Search Type Toggle -->
           <div class="form-group">
-            <label for="searchInput">{{ t('form.enterNICOrRegID') }}</label>
+            <label>{{ t('form.searchType') }}</label>
+            <div class="search-type-toggle">
+              <button 
+                @click="searchType = 'regid'" 
+                :class="['btn', searchType === 'regid' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="loading"
+              >
+                {{ t('form.searchByRegID') }}
+              </button>
+              <button 
+                @click="searchType = 'nic'" 
+                :class="['btn', searchType === 'nic' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="loading"
+              >
+                {{ t('form.searchByNIC') }}
+              </button>
+              <button 
+                @click="searchType = 'name'" 
+                :class="['btn', searchType === 'name' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="loading"
+              >
+                {{ t('form.searchByName') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label :for="searchType === 'regid' ? 'regidSearch' : searchType === 'nic' ? 'nicSearch' : 'nameSearch'">
+              {{ searchType === 'regid' ? t('form.enterRegID') : searchType === 'nic' ? t('form.enterNIC') : t('form.enterName') }}
+            </label>
             <div class="search-container">
               <input 
                 type="text" 
-                id="searchInput" 
-                v-model="searchInput" 
-                :placeholder="t('form.enterNICOrRegID')"
+                :id="searchType === 'regid' ? 'regidSearch' : searchType === 'nic' ? 'nicSearch' : 'nameSearch'"
+                v-model="searchValue" 
+                :placeholder="searchType === 'regid' ? t('form.enterRegID') : searchType === 'nic' ? t('form.enterNIC') : t('form.enterName')"
                 class="form-control"
+                :disabled="loading"
                 @keyup.enter="searchProfile"
               />
-              <button @click="searchProfile" class="btn btn-primary" :disabled="loading">
+              <button @click="searchProfile" class="btn btn-primary" :disabled="loading || !searchValue.trim()">
+                <span v-if="loading" class="loading-spinner"></span>
                 {{ loading ? t('form.searching') : t('form.search') }}
               </button>
             </div>
           </div>
           
           <div v-if="searchResult" class="search-result">
-            <div v-if="searchResult.found" class="alert alert-success">
+            <!-- Single profile found -->
+            <div v-if="searchResult.found && !Array.isArray(searchResult.profile)" class="alert alert-success">
               <strong>{{ t('form.applicantFound') }}</strong> 
               <div class="profile-info">
                 <div class="profile-image-container">
@@ -56,6 +89,41 @@
                 <p><strong>{{ t('form.district') }}</strong> {{ searchResult.profile.district || searchResult.profile.basicInfo?.district || 'N/A' }}</p>
               </div>
             </div>
+
+            <!-- Multiple profiles found -->
+            <div v-else-if="Array.isArray(searchResult.profile)" class="multiple-profiles">
+              <div class="profiles-list">
+                <div 
+                  v-for="(profile, index) in searchResult.profile" 
+                  :key="profile.id || index"
+                  class="profile-item"
+                  @click="selectProfile(profile)"
+                >
+                  <div class="profile-image-container-small">
+                    <img 
+                      v-if="profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl" 
+                      :src="profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] ? convertToImageUrl(profile[ProfileField.PROFILE_IMAGE_DRIVE_ID]) : profile.Image || profile.profileImageUrl || profile.imageUrl" 
+                      alt="Profile Photo" 
+                      class="profile-image-small"
+                    />
+                    <div v-else class="profile-placeholder-small">
+                      <span>{{ t('form.noPhoto') }}</span>
+                    </div>
+                  </div>
+                  <div class="profile-details">
+                    <h4>{{ profile[ProfileField.FULL_NAME] || profile.Name || 'N/A' }}</h4>
+                    <p><strong>{{ t('form.nic') }}:</strong> {{ profile[ProfileField.NIC] || profile.NIC || 'N/A' }}</p>
+                    <p><strong>{{ t('form.regid') }}:</strong> {{ profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id || 'N/A' }}</p>
+                    <p><strong>{{ t('form.district') }}:</strong> {{ profile[ProfileField.DISTRICT] || profile.District || 'N/A' }}</p>
+                    <p v-if="profile.hasPendingLoan" class="pending-loan-warning">
+                      {{ t('form.hasPendingLoan') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- No profiles found -->
             <div v-else class="alert alert-warning">
               {{ t('form.noProfileFound') }}
             </div>
@@ -266,7 +334,7 @@ import {
   GIF_RETURN_RECORD_FIELD
 } from '../enums/db.js'
 import { LoanStatus, ReturnRecordStatus } from '../enums/loans.js'
-import { getRFLoans, getGrantLoans } from '../utils/dbUtils.js'
+import { getRFLoans, getGrantLoans, getProfileByRegId, searchProfilesByNIC, searchProfilesByName, getPendingLoans } from '../utils/dbUtils.js'
 import { convertGoogleDriveUrl, extractFileId } from '../utils/driveUtils.js'
 import { createTimestamp } from '../utils/regIdUtils.js'
 import { sendRepaymentRequestEmail, sendGIFReturnRequestEmail, logActivity } from '../utils/gasUtils.js'
@@ -279,7 +347,8 @@ export default {
   },
   setup() {
     const loading = ref(false)
-    const searchInput = ref('')
+    const searchValue = ref('')
+    const searchType = ref('regid')
     const searchResult = ref(null)
     const returnType = ref('')
     const successMessage = ref('')
@@ -330,50 +399,135 @@ export default {
 
     // Methods
     const searchProfile = async () => {
-      if (!searchInput.value.trim()) {
+      console.log('🔍 [RFGIFReturnForm] Starting profile search...')
+      console.log('📝 [RFGIFReturnForm] Search type:', searchType.value)
+      console.log('📝 [RFGIFReturnForm] Search value:', searchValue.value)
+      
+      if (!searchValue.value.trim()) {
+        console.log('❌ [RFGIFReturnForm] Empty search value')
         errorMessage.value = t('form.pleaseEnterNICOrRegID')
         return
       }
 
       loading.value = true
+      console.log('⏳ [RFGIFReturnForm] Search started, setting loading state')
       errorMessage.value = ''
       successMessage.value = ''
 
       try {
-        // Search by Reg_ID first using dbOperations function
-        let profile = await dbOperations.getProfileByRegId(searchInput.value.trim())
+        let profileResult
         
-        if (!profile) {
-          // If not found, search by NIC
-          const q = query(collection(db, RootCollection.PROFILES), where(ProfileField.NIC, '==', searchInput.value.trim()))
-          const querySnapshot = await getDocs(q)
-          if (!querySnapshot.empty) {
-            const doc = querySnapshot.docs[0]
-            profile = await dbOperations.getProfileByRegId(doc.id)
-          }
-        }
-
-        if (profile) {
-          searchResult.value = { found: true, profile }
-          currentProfile.value = profile
-          
-          // Load profile image using drive utils
-          await loadProfileImage(profile)
-          
-          // Load RF loans using utils function
-          await loadLoans(profile[ProfileField.REG_ID])
+        if (searchType.value === 'regid') {
+          console.log('🔍 [RFGIFReturnForm] Searching by RegID:', searchValue.value)
+          // Search by Reg_ID (case-insensitive)
+          profileResult = await getProfileByRegId(searchValue.value)
+        } else if (searchType.value === 'nic') {
+          console.log('🔍 [RFGIFReturnForm] Searching by NIC:', searchValue.value)
+          // Search by NIC
+          profileResult = await searchProfilesByNIC(searchValue.value)
+        } else if (searchType.value === 'name') {
+          console.log('🔍 [RFGIFReturnForm] Searching by Name:', searchValue.value)
+          // Search by Name
+          profileResult = await searchProfilesByName(searchValue.value)
         } else {
+          console.log('❌ [RFGIFReturnForm] Invalid search type:', searchType.value)
+          errorMessage.value = t('form.invalidSearchType')
+          return
+        }
+        
+        console.log('📊 [RFGIFReturnForm] Search result:', profileResult)
+        
+        if (profileResult.success && profileResult.data) {
+          const profileData = profileResult.data
+          console.log('✅ [RFGIFReturnForm] Search successful, processing results...')
+          
+          // Handle both single profile and multiple profiles
+          if (Array.isArray(profileData)) {
+            console.log('📋 [RFGIFReturnForm] Multiple profiles found:', profileData.length)
+            // Multiple profiles - check pending loan status for each
+            const pendingLoansResult = await getPendingLoans()
+            console.log('🔍 [RFGIFReturnForm] Checking pending loans for', profileData.length, 'profiles')
+            
+            const profilesWithPendingStatus = profileData.map(profile => {
+              const regId = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id
+              const hasPendingLoan = pendingLoansResult.success && 
+                pendingLoansResult.data.includes(regId)
+              console.log('📝 [RFGIFReturnForm] Profile', regId, 'has pending loan:', hasPendingLoan)
+              return {
+                ...profile,
+                hasPendingLoan: hasPendingLoan
+              }
+            })
+            
+            searchResult.value = {
+              found: true,
+              profile: profilesWithPendingStatus
+            }
+            console.log('✅ [RFGIFReturnForm] Multiple profiles processed:', profilesWithPendingStatus.length)
+          } else {
+            console.log('👤 [RFGIFReturnForm] Single profile found')
+            // Single profile - check pending loan status
+            const regId = profileData[ProfileField.REG_ID] || profileData.Reg_ID || profileData.id
+            console.log('🔍 [RFGIFReturnForm] Checking pending loan for RegID:', regId)
+            
+            const pendingLoansResult = await getPendingLoans()
+            const hasPendingLoan = pendingLoansResult.success && 
+              pendingLoansResult.data.includes(regId)
+            
+            console.log('📝 [RFGIFReturnForm] Profile', regId, 'has pending loan:', hasPendingLoan)
+            
+            searchResult.value = {
+              found: true,
+              profile: {
+                ...profileData,
+                hasPendingLoan: hasPendingLoan
+              }
+            }
+            console.log('✅ [RFGIFReturnForm] Single profile processed')
+            
+            // Set current profile and load data
+            currentProfile.value = profileData
+            await loadProfileImage(profileData)
+            await loadLoans(regId)
+          }
+          
+        } else {
+          console.log('❌ [RFGIFReturnForm] No profiles found')
           searchResult.value = { found: false }
           currentProfile.value = null
           activeRFLoans.value = []
+          grantLoans.value = []
           profileImageUrl.value = ''
         }
       } catch (error) {
-        console.error('Error searching profile:', error)
+        console.error('❌ [RFGIFReturnForm] Search error:', error)
         errorMessage.value = t('form.errorSearchingProfile')
       } finally {
         loading.value = false
+        console.log('✅ [RFGIFReturnForm] Search completed, loading state cleared')
       }
+    }
+
+    const selectProfile = (profile) => {
+      console.log('👆 [RFGIFReturnForm] Profile selected:', profile[ProfileField.FULL_NAME] || profile.Name || 'N/A')
+      console.log('📝 [RFGIFReturnForm] Selected profile RegID:', profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id)
+      
+      // Set the selected profile as the single profile result
+      searchResult.value = {
+        found: true,
+        profile: profile
+      }
+      
+      // Set current profile and load data
+      currentProfile.value = profile
+      loadProfileImage(profile)
+      loadLoans(profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id)
+      
+      console.log('✅ [RFGIFReturnForm] Profile selection completed')
+    }
+
+    const convertToImageUrl = (driveId) => {
+      return convertGoogleDriveUrl(driveId)
     }
 
     const loadProfileImage = async (profile) => {
@@ -767,7 +921,8 @@ export default {
 
     return {
       loading,
-      searchInput,
+      searchValue,
+      searchType,
       searchResult,
       returnType,
       gifData,
@@ -786,6 +941,8 @@ export default {
       LoanStatus,
       ReturnRecordStatus,
       searchProfile,
+      selectProfile,
+      convertToImageUrl,
       setReturnType,
       handleBillUpload,
       submitGIFReturn,
@@ -1300,5 +1457,106 @@ export default {
     padding: 12px 20px;
     font-size: 1rem;
   }
+}
+
+/* Search type toggle styles */
+.search-type-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.search-type-toggle .btn {
+  flex: 1;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+/* Multiple profiles styles */
+.multiple-profiles {
+  margin-top: 15px;
+}
+
+.profiles-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.profile-item:hover {
+  background-color: #e3f2fd;
+  border-left: 4px solid #1565c0;
+}
+
+.profile-item:last-child {
+  border-bottom: none;
+}
+
+.profile-image-container-small {
+  margin-right: 15px;
+}
+
+.profile-image-small {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #1565c0;
+}
+
+.profile-placeholder-small {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ddd;
+  color: #666;
+  font-size: 12px;
+  text-align: center;
+}
+
+.profile-details {
+  flex: 1;
+}
+
+.profile-details h4 {
+  margin: 0 0 8px 0;
+  color: #1565c0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.profile-details p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.pending-loan-warning {
+  color: #f57c00;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background-color: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 4px;
+  text-align: center;
 }
 </style> 
