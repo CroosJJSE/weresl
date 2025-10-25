@@ -59,19 +59,26 @@
               >
                 {{ t('form.searchByNIC') }}
               </button>
+              <button 
+                @click="searchType = 'name'" 
+                :class="['btn', searchType === 'name' ? 'btn-primary' : 'btn-secondary']"
+                :disabled="searching"
+              >
+                {{ t('form.searchByName') }}
+              </button>
             </div>
           </div>
 
           <div class="form-group">
-            <label :for="searchType === 'regid' ? 'regidSearch' : 'nicSearch'">
-              {{ searchType === 'regid' ? t('form.enterRegID') : t('form.enterNIC') }}
+            <label :for="searchType === 'regid' ? 'regidSearch' : searchType === 'nic' ? 'nicSearch' : 'nameSearch'">
+              {{ searchType === 'regid' ? t('form.enterRegID') : searchType === 'nic' ? t('form.enterNIC') : t('form.enterName') }}
             </label>
             <div class="search-container">
               <input 
                 type="text" 
-                :id="searchType === 'regid' ? 'regidSearch' : 'nicSearch'"
+                :id="searchType === 'regid' ? 'regidSearch' : searchType === 'nic' ? 'nicSearch' : 'nameSearch'"
                 v-model="searchValue" 
-                :placeholder="searchType === 'regid' ? t('form.enterRegID') : t('form.enterNIC')"
+                :placeholder="searchType === 'regid' ? t('form.enterRegID') : searchType === 'nic' ? t('form.enterNIC') : t('form.enterName')"
                 class="form-control"
                 :disabled="searching"
               />
@@ -85,7 +92,9 @@
           <div v-if="searchResult" class="search-result">
             <div v-if="searchResult.found" class="alert alert-success">
               <strong>{{ t('form.foundApplicant') }}</strong> 
-              <div class="profile-info">
+              
+              <!-- Single profile result -->
+              <div v-if="!Array.isArray(searchResult.profile)" class="profile-info">
                 <div class="profile-image-container">
                   <img 
                     v-if="profileImageUrl || searchResult.profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || searchResult.profile.profileImageUrl || searchResult.profile.imageUrl" 
@@ -105,11 +114,45 @@
                 <p v-if="searchResult.profile.hasPendingLoan" class="pending-loan-warning">
                   <strong>⚠️ Pending Loan:</strong> This user has a pending loan request
                 </p>
+                <button @click="useExistingProfile" class="btn btn-primary" :disabled="loading">
+                  <span v-if="loading" class="loading-spinner"></span>
+                  {{ t('form.useThisProfile') }}
+                </button>
               </div>
-              <button @click="useExistingProfile" class="btn btn-primary" :disabled="loading">
-                <span v-if="loading" class="loading-spinner"></span>
-                {{ t('form.useThisProfile') }}
-              </button>
+
+              <!-- Multiple profiles result -->
+              <div v-else class="multiple-profiles">
+                <div class="profiles-list">
+                  <div 
+                    v-for="(profile, index) in searchResult.profile" 
+                    :key="profile.id || index"
+                    class="profile-item"
+                    @click="selectProfile(profile)"
+                  >
+                    <div class="profile-image-container-small">
+                      <img 
+                        v-if="profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl" 
+                        :src="(profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] ? convertToImageUrl(profile[ProfileField.PROFILE_IMAGE_DRIVE_ID]) : null) || profile.Image || profile.profileImageUrl || profile.imageUrl" 
+                        alt="Profile Photo" 
+                        class="profile-image-small"
+                        @error="handleImageError"
+                      />
+                      <div v-else class="profile-placeholder-small">
+                        <span>{{ t('form.noProfilePhoto') }}</span>
+                      </div>
+                    </div>
+                    <div class="profile-details">
+                      <p class="profile-name"><strong>{{ profile[ProfileField.FULL_NAME] || profile.Name || 'N/A' }}</strong></p>
+                      <p class="profile-regid">{{ t('form.regid') }} {{ profile[ProfileField.REG_ID] || profile.Reg_ID || 'N/A' }}</p>
+                      <p class="profile-nic">{{ t('form.nic') }} {{ profile[ProfileField.NIC] || profile.NIC || 'N/A' }}</p>
+                      <p class="profile-district">{{ t('form.district') }} {{ profile[ProfileField.DISTRICT] || profile.district || profile.District || 'N/A' }}</p>
+                      <p v-if="profile.hasPendingLoan" class="pending-loan-warning-small">
+                        ⚠️ {{ t('form.hasPendingLoan') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div v-else class="alert alert-warning">
               {{ t('form.noProfileFound') }}
@@ -339,7 +382,8 @@ import {
   getPendingLoans,
   generateRFLoanId,
   generateGrantLoanId,
-  searchProfilesByNIC
+  searchProfilesByNIC,
+  searchProfilesByName
 } from '@/utils/dbUtils.js'
 import { generateRegIdFromDistrict } from '@/utils/regIdUtils.js'
 import { DISTRICT_MAPPING } from '@/enums/districts.js'
@@ -432,56 +476,125 @@ const generateRegID = async () => {
 }
 
 const searchProfile = async () => {
+  console.log('🔍 [LoanInitForm] Starting profile search...')
+  console.log('📝 [LoanInitForm] Search type:', searchType.value)
+  console.log('📝 [LoanInitForm] Search value:', searchValue.value)
+  
   if (!searchValue.value.trim()) {
+    console.log('❌ [LoanInitForm] Empty search value')
     showMessage('Please enter a value to search', 'error')
     return
   }
 
   searching.value = true
+  console.log('⏳ [LoanInitForm] Search started, setting loading state')
+  
   try {
     let profileResult
     
     if (searchType.value === 'regid') {
+      console.log('🔍 [LoanInitForm] Searching by RegID:', searchValue.value)
       // Search by Reg_ID (case-insensitive)
       profileResult = await getProfileByRegId(searchValue.value)
     } else if (searchType.value === 'nic') {
+      console.log('🔍 [LoanInitForm] Searching by NIC:', searchValue.value)
       // Search by NIC
       profileResult = await searchProfilesByNIC(searchValue.value)
+    } else if (searchType.value === 'name') {
+      console.log('🔍 [LoanInitForm] Searching by Name:', searchValue.value)
+      // Search by Name
+      profileResult = await searchProfilesByName(searchValue.value)
     } else {
+      console.log('❌ [LoanInitForm] Invalid search type:', searchType.value)
       showMessage('Invalid search type', 'error')
       return
     }
     
+    console.log('📊 [LoanInitForm] Search result:', profileResult)
+    
     if (profileResult.success && profileResult.data) {
       const profileData = profileResult.data
+      console.log('✅ [LoanInitForm] Search successful, processing results...')
       
-      // Check pending loan status using the Reg_ID
-      const regId = profileData[ProfileField.REG_ID] || profileData.Reg_ID || profileData.id
-      const pendingLoansResult = await getPendingLoans()
-      const hasPendingLoan = pendingLoansResult.success && 
-        pendingLoansResult.data.includes(regId)
-      
-      searchResult.value = {
-        found: true,
-        profile: {
-          ...profileData,
-          hasPendingLoan: hasPendingLoan
+      // Handle both single profile and multiple profiles
+      if (Array.isArray(profileData)) {
+        console.log('📋 [LoanInitForm] Multiple profiles found:', profileData.length)
+        // Multiple profiles - check pending loan status for each
+        const pendingLoansResult = await getPendingLoans()
+        console.log('🔍 [LoanInitForm] Checking pending loans for', profileData.length, 'profiles')
+        
+        const profilesWithPendingStatus = profileData.map(profile => {
+          const regId = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id
+          const hasPendingLoan = pendingLoansResult.success && 
+            pendingLoansResult.data.includes(regId)
+          console.log('📝 [LoanInitForm] Profile', regId, 'has pending loan:', hasPendingLoan)
+          return {
+            ...profile,
+            hasPendingLoan: hasPendingLoan
+          }
+        })
+        
+        searchResult.value = {
+          found: true,
+          profile: profilesWithPendingStatus
         }
+        console.log('✅ [LoanInitForm] Multiple profiles processed:', profilesWithPendingStatus.length)
+      } else {
+        console.log('👤 [LoanInitForm] Single profile found')
+        // Single profile - check pending loan status
+        const regId = profileData[ProfileField.REG_ID] || profileData.Reg_ID || profileData.id
+        console.log('🔍 [LoanInitForm] Checking pending loan for RegID:', regId)
+        
+        const pendingLoansResult = await getPendingLoans()
+        const hasPendingLoan = pendingLoansResult.success && 
+          pendingLoansResult.data.includes(regId)
+        
+        console.log('📝 [LoanInitForm] Profile', regId, 'has pending loan:', hasPendingLoan)
+        
+        searchResult.value = {
+          found: true,
+          profile: {
+            ...profileData,
+            hasPendingLoan: hasPendingLoan
+          }
+        }
+        console.log('✅ [LoanInitForm] Single profile processed')
       }
       
     } else {
+      console.log('❌ [LoanInitForm] No profiles found')
       searchResult.value = { found: false }
     }
   } catch (error) {
+    console.error('❌ [LoanInitForm] Search error:', error)
     showMessage('Error searching for profile: ' + error.message, 'error')
   } finally {
     searching.value = false
+    console.log('✅ [LoanInitForm] Search completed, loading state cleared')
   }
 }
 
+const selectProfile = (profile) => {
+  console.log('👆 [LoanInitForm] Profile selected:', profile[ProfileField.FULL_NAME] || profile.Name || 'N/A')
+  console.log('📝 [LoanInitForm] Selected profile RegID:', profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id)
+  
+  // Set the selected profile as the single profile result
+  searchResult.value = {
+    found: true,
+    profile: profile
+  }
+  
+  console.log('✅ [LoanInitForm] Profile selection completed')
+}
+
 const useExistingProfile = () => {
+  console.log('🔄 [LoanInitForm] Using existing profile...')
+  
   if (searchResult.value?.profile) {
     const profile = searchResult.value.profile
+    console.log('📝 [LoanInitForm] Profile data:', profile[ProfileField.FULL_NAME] || profile.Name || 'N/A')
+    console.log('📝 [LoanInitForm] Profile RegID:', profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id)
+    
     // Map existing data to form fields, handling different field Names and providing defaults
     formData.Name = profile[ProfileField.FULL_NAME] || profile.Name || ''
     formData.yearOfBirth = profile[ProfileField.YEAR_OF_BIRTH] || profile.yearOfBirth || profile.YearOfBirth || ''
@@ -492,14 +605,24 @@ const useExistingProfile = () => {
     formData.occupation = profile[ProfileField.OCCUPATION] || profile.occupation || profile.Occupation || ''
     formData.district = profile[ProfileField.DISTRICT] || profile.district || profile.District || ''
     formData.Reg_ID = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.reg_id || profile.id || ''
+    
+    console.log('✅ [LoanInitForm] Form data populated from existing profile')
+    
     // If there's an existing profile image, use it
     if (profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl) {
       uploadedImageUrl.value = profile[ProfileField.PROFILE_IMAGE_DRIVE_ID] || profile.Image || profile.profileImageUrl || profile.imageUrl
+      console.log('🖼️ [LoanInitForm] Profile image loaded:', uploadedImageUrl.value)
     } else {
       uploadedImageUrl.value = null
+      console.log('🖼️ [LoanInitForm] No profile image found')
     }
+    
     useExisting.value = true
+    console.log('✅ [LoanInitForm] Existing profile loaded successfully')
     showMessage('Using existing profile data', 'success')
+  } else {
+    console.log('❌ [LoanInitForm] No profile data available')
+    showMessage('No profile data available', 'error')
   }
 }
 
@@ -1211,6 +1334,98 @@ h1 {
   border: 1px solid #ffe58f;
   border-radius: 8px;
   text-align: center;
+}
+
+/* Multiple profiles styles */
+.multiple-profiles {
+  margin-top: 15px;
+}
+
+.profiles-count {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1565c0;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.profiles-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.profile-item:hover {
+  background-color: #e3f2fd;
+}
+
+.profile-item:last-child {
+  border-bottom: none;
+}
+
+.profile-image-container-small {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #f5f5f5;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.profile-image-small {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-placeholder-small {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  font-size: 10px;
+  text-align: center;
+  padding: 5px;
+}
+
+.profile-details {
+  flex: 1;
+}
+
+.profile-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.profile-regid,
+.profile-nic,
+.profile-district {
+  font-size: 13px;
+  color: #666;
+  margin: 2px 0;
+}
+
+.pending-loan-warning-small {
+  color: #f57c00;
+  font-size: 12px;
+  font-weight: bold;
+  margin: 4px 0 0 0;
 }
 
 .loading-spinner {
