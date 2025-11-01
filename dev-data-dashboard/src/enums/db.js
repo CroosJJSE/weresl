@@ -1,6 +1,6 @@
 /**
  * Firestore Collection Enums and Types
- * Collection names and document types
+ * Updated to match migrate-csv-data.js structure
  */
 
 export const RootCollection = {
@@ -27,7 +27,8 @@ export const DistrictMappingField = {
     DISTRICT_MAPPINGS : 'districtMapping',
     DISTRICT_CODES : 'districtCodes'
 }
-// fields in all profile documents
+
+// fields in all profile documents - Updated to match migrate-csv-data.js
 export const ProfileField = {
   REG_ID: 'Reg_ID',
   FULL_NAME: 'fullName',
@@ -42,8 +43,7 @@ export const ProfileField = {
   DESCRIPTION: 'description',
   OCCUPATION: 'occupation',
   PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
-  RF_BILL_DRIVE_FOLDER: 'rfBillDriveFolder',
-  COORDINATOR: 'coordinator', // References bank account document ID
+  RECEIPT_FOLDER: 'receiptFolder',
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
   GIF: 'GIF', // Give It Forward
@@ -66,37 +66,15 @@ export const ProfileFieldTypes = {
   DESCRIPTION: 'string',
   OCCUPATION: 'string',
   PROFILE_IMAGE_DRIVE_ID: 'string',
-  RF_BILL_DRIVE_FOLDER: 'string',
-  COORDINATOR: 'string', // References bank account document ID
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
   GIF: 'array', //{timestamp : description}
-  RF_RETURN_HISTORY: 'object', //{RRH_ID: RRH_Object} - Map of RRH objects
+  RF_RETURN_HISTORY: 'object', //{RRH_ID: RRH_OBJECT}
   RF_LOANS: 'collection', //{will have the documents as the name of the loan}
   GRANT: 'collection' //{will have the documents as the name of the grant}
 }
 
-// Collection constants for backward compatibility
-export const ROOT_COLLECTIONS = {
-  [RootCollection.PROFILES]: 'profiles',
-  [RootCollection.BANK_ACCOUNTS]: 'bank_accounts',
-  [RootCollection.SEARCH_ELEMENTS]: 'SearchElements',
-  [RootCollection.RF_RETURN_RECORD]: 'RF_return_record',
-  [RootCollection.GIF_RETURN_RECORD]: 'GIF_return_record',
-  [RootCollection.TOPVIEW_LINKS]: 'topview-links',
-  [RootCollection.CONFIG]: 'config',
-  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages',
-  [RootCollection.LOANS]: 'loans'
-}
-
-// Search element document constants for backward compatibility
-export const SEARCH_ELEMENT_DOCS = {
-  [SearchElementDoc.PENDING_LOAN]: 'pending-loan',
-  [SearchElementDoc.NIC_DATA]: 'NIC_data'
-}
-
-
-
+// RF Loan Field - Updated to match migrate-csv-data.js
 export const RF_LOAN_FIELD = {
   AMOUNT : 'amount',
   APPROVED_AT : 'approvedAt',
@@ -111,8 +89,11 @@ export const RF_LOAN_FIELD = {
   STATUS : 'status',
   TYPE : 'type',
   ARMS : 'arms',
-  PAYMENT_INTEGRITY : 'paymentIntegrity'
+  PAYMENT_INTEGRITY : 'paymentIntegrity',
+  LOAN_ID : 'loanId',
+  LOAN_HISTORY : 'loanHistory'
 }
+
 export const RF_LOAN_FIELD_TYPES = {
   AMOUNT : 'number',
   APPROVED_AT : 'date',
@@ -127,48 +108,53 @@ export const RF_LOAN_FIELD_TYPES = {
   STATUS : 'string',
   TYPE : 'string',
   ARMS : 'string',
-  PAYMENT_INTEGRITY : 'boolean'
+  PAYMENT_INTEGRITY : 'boolean',
+  LOAN_ID : 'string',
+  LOAN_HISTORY : 'array'
 }
+
+// Grant Field - Updated to match migrate-csv-data.js
 export const GRANT_FIELD = { 
-  AMOUNT : 'approvedAmount', // Updated to match actual database field
   APPROVED_AMOUNT : 'approvedAmount',
+  AMOUNT : 'amount', // For backward compatibility
   APPROVED_AT : 'approvedAt',
   CREATED_AT : 'createdAt',
   REQUESTED_DATE : 'requestedDate',
-  INITIATION_DATE : 'requestedDate', // Map initiation date to requested date
   LAST_UPDATED : 'lastUpdated',
   PROJECT_DESCRIPTION : 'projectDescription',
   PURPOSE : 'purpose',
   REG_ID : 'Reg_ID',
   SOURCE : 'source',
   STATUS : 'status',
-  TYPE : 'type',
+  GRANT_TYPE : 'grantType',
   ARMS : 'arms',
-  PAYMENT_INTEGRITY : 'paymentIntegrity'
+  GRANT_ID : 'grantId',
+  CONDITIONS : 'conditions',
+  VERIFICATION_STATUS : 'verificationStatus',
+  NOTES : 'notes'
 }
+
 export const GRANT_FIELD_TYPES = {
-  AMOUNT : 'number', // Updated to match actual database field
   APPROVED_AMOUNT : 'number',
+  AMOUNT : 'number', // For backward compatibility
   APPROVED_AT : 'date',
   CREATED_AT : 'date',
   REQUESTED_DATE : 'date',
-  INITIATION_DATE : 'date', // Map initiation date to requested date
   LAST_UPDATED : 'date',
-    PROJECT_DESCRIPTION : 'string',
+  PROJECT_DESCRIPTION : 'string',
   PURPOSE : 'string',
   REG_ID : 'string',
   SOURCE : 'string',
   STATUS : 'string',
-  TYPE : 'string',
+  GRANT_TYPE : 'string',
   ARMS : 'string',
-  PAYMENT_INTEGRITY : 'boolean'
+  GRANT_ID : 'string',
+  CONDITIONS : 'array',
+  VERIFICATION_STATUS : 'string',
+  NOTES : 'string'
 }
-export const SystemLogField = {
-  LOG_ACTION : 'logAction',
-  LOG_USER_ID : 'logUserId',
-  LOG_TIMESTAMP : 'logTimestamp',
-  LOG_DETAILS : 'logDetails'
-}
+
+// RF Return Record Field - Updated to match migrate-csv-data.js
 export const RF_RETURN_RECORD_FIELD = {
   RECEIPT_DRIVE_LINK_ID : 'receiptDriveLinkId',// use extractFileId from driveUtils
   LAST_UPDATED : 'lastUpdated',
@@ -179,9 +165,7 @@ export const RF_RETURN_RECORD_FIELD = {
   TIMESTAMP : 'timestamp',
   TOTAL_BALANCE : 'totalBalance',
   PAID_AMOUNT : 'paidAmount', // amount that was paid in this repayment
-  // RRH-specific fields
-  RRH_ID : 'RRH_ID',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
+  RRH_ID : 'RRH_ID' // RRH ID for the return record
 }
 
 export const RF_RETURN_RECORD_FIELD_TYPES = {
@@ -194,32 +178,26 @@ export const RF_RETURN_RECORD_FIELD_TYPES = {
   TIMESTAMP : 'date',
   TOTAL_BALANCE : 'number',
   PAID_AMOUNT : 'number',
-  // RRH-specific field types
-  RRH_ID : 'string',
-  DRIVE_LINK_ID : 'string'
+  RRH_ID : 'string'
 }
 
-// RRH Object structure for profile's RF_RETURN_HISTORY field
+// RRH Object Field - For RF_return_history in profiles
 export const RRH_OBJECT_FIELD = {
   RRH_ID : 'RRH_ID',
-  APPROVED_DATE : 'approvedDate',
-  AMOUNT : 'amount',
-  RECEIVER : 'receiver',
   REG_ID : 'regID',
-  DRIVE_LINK_ID : 'DRIVE_LINK_ID',
-  TARGET_LOAN : 'targetLoan',
-  CHANGE : 'change'
+  AMOUNT : 'amount',
+  APPROVED_DATE : 'approvedDate',
+  RECEIVER : 'receiver',
+  DRIVE_LINK_ID : 'DRIVE_LINK_ID'
 }
 
 export const RRH_OBJECT_FIELD_TYPES = {
   RRH_ID : 'string',
-  APPROVED_DATE : 'date',
-  AMOUNT : 'number',
-  RECEIVER : 'string',
   REG_ID : 'string',
-  DRIVE_LINK_ID : 'string',
-  TARGET_LOAN : 'string',
-  CHANGE : 'string'
+  AMOUNT : 'number',
+  APPROVED_DATE : 'date',
+  RECEIVER : 'string',
+  DRIVE_LINK_ID : 'string'
 }
 
 // Loan fields for root/loans collection
@@ -236,7 +214,9 @@ export const LOAN_FIELD = {
   SOURCE : 'source',
   STATUS : 'status',
   TYPE : 'type',
-  PAYMENT_INTEGRITY : 'paymentIntegrity'
+  PAYMENT_INTEGRITY : 'paymentIntegrity',
+  CURRENT_BALANCE : 'currentBalance',
+  LAST_UPDATED : 'lastUpdated'
 }
 
 export const LOAN_FIELD_TYPES = {
@@ -252,8 +232,11 @@ export const LOAN_FIELD_TYPES = {
   SOURCE : 'string',
   STATUS : 'string',
   TYPE : 'string',
-  PAYMENT_INTEGRITY : 'boolean'
+  PAYMENT_INTEGRITY : 'boolean',
+  CURRENT_BALANCE : 'number',
+  LAST_UPDATED : 'date'
 }
+
 export const GIF_RETURN_RECORD_FIELD = {
   REG_ID : 'regId',
   TIMESTAMP : 'timestamp',
@@ -281,14 +264,8 @@ export const BANK_ACCOUNT_FIELD = {
   CURRENT_BANK_BALANCE: 'currentBankBalance',
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
-  RF_LOANS: 'RF_LOANS',
-  PROFILES: 'profiles', // Array of profile objects assigned to this coordinator
-  ACTIVE_RF_LOAN: 'activeRF_loan' // Array of active RF loan objects with payment history
+  RF_LOANS: 'RF_LOANS'
 }
-// PROFILES array structure: [{ regId: string, assignedAt: Date }]
-// ACTIVE_RF_LOAN array structure: [{ regId: string, rfLoanId: string, profileName: string, paymentHistory: array }]
-// paymentHistory format: ["DD-MM-YYYY-MIN-HH : amount", ...] (not Firebase timestamp format)
-//RF_LOANS is a map where Field is regId, Value is a map of field(DDMMYYYY:amount) and value is boolean
 
 // Bank Account Field Types Enum
 export const BANK_ACCOUNT_FIELD_TYPES = {
@@ -300,25 +277,41 @@ export const BANK_ACCOUNT_FIELD_TYPES = {
   POSITION: 'string',
   CURRENT_BANK_BALANCE: 'number',
   CREATED_AT: 'date',
-  LAST_UPDATED: 'date',
-  PROFILES: 'array', // Array of profile objects assigned to this coordinator
-  ACTIVE_RF_LOAN: 'array' // Array of active RF loan objects with payment history
+  LAST_UPDATED: 'date'
 }
-
-
 
 export const ARMS = {
-  Eden : 'EDEN',
-  Ark : 'ARK',
-  Metamorphosis : 'Metamorphosis',
-  Keystone : 'Keystone'
+  EDEN: 'EDEN',
+  ARK: 'ARK',
+  METAMORPHOSIS: 'Metamorphosis',
+  KEYSTONE: 'Keystone'
 }
 
-// Return Record Status constants
-export const ReturnRecordStatus = {
-  PENDING: 'pending',
-  APPROVED: 'approved',
-  FAILED: 'failed'
+// ARMS values array for dropdowns
+export const ARMS_VALUES = [
+  ARMS.EDEN,
+  ARMS.ARK,
+  ARMS.METAMORPHOSIS,
+  ARMS.KEYSTONE
+]
+
+// Collection constants for backward compatibility
+export const ROOT_COLLECTIONS = {
+  [RootCollection.PROFILES]: 'profiles',
+  [RootCollection.BANK_ACCOUNTS]: 'bank_accounts',
+  [RootCollection.SEARCH_ELEMENTS]: 'SearchElements',
+  [RootCollection.RF_RETURN_RECORD]: 'RF_return_record',
+  [RootCollection.GIF_RETURN_RECORD]: 'GIF_return_record',
+  [RootCollection.TOPVIEW_LINKS]: 'topview-links',
+  [RootCollection.CONFIG]: 'config',
+  [RootCollection.UPLOADED_IMAGES]: 'uploadedImages',
+  [RootCollection.LOANS]: 'loans'
+}
+
+// Search element document constants for backward compatibility
+export const SEARCH_ELEMENT_DOCS = {
+  [SearchElementDoc.PENDING_LOAN]: 'pending-loan',
+  [SearchElementDoc.NIC_DATA]: 'NIC_data'
 }
 
 // Helper functions

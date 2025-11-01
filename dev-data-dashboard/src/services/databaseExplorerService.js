@@ -11,7 +11,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 import { db } from '../firebase-config.js'
-import { RootCollection } from '../enums/db.js'
+import { RootCollection, ProfileField, ARMS_VALUES } from '../enums/db.js'
 
 export class DatabaseExplorerService {
   constructor() {
@@ -70,7 +70,7 @@ export class DatabaseExplorerService {
   }
 
   // Get documents from a collection
-  async getCollectionDocuments(collectionPath, limitCount = 50) {
+  async getCollectionDocuments(collectionPath, limitCount = 1000) {
     try {
       console.log('DatabaseExplorerService: Fetching documents from collection:', collectionPath)
       
@@ -120,7 +120,12 @@ export class DatabaseExplorerService {
       }
       
       // Try to get subcollections by attempting to access common ones
-      const commonSubcollections = ['RF_Loans', 'GRANT', 'loans', 'payments', 'history', 'bank_accounts', 'documents', 'attachments']
+      // Use enum values for subcollection names from ProfileField
+      const commonSubcollections = [
+        ProfileField.RF_LOANS, // 'RF_Loans'
+        ProfileField.GRANT,    // 'Grant'
+        'loans', 'payments', 'history', 'bank_accounts', 'documents', 'attachments'
+      ]
       const subcollections = []
       
       for (const subcollectionName of commonSubcollections) {
@@ -163,10 +168,24 @@ export class DatabaseExplorerService {
         throw new Error('Invalid document path')
       }
       
-      const collectionName = pathParts[0]
-      const documentId = pathParts[1]
+      let docRef
       
-      const docRef = doc(this.db, collectionName, documentId)
+      if (pathParts.length === 2) {
+        // Root collection document: collection/document
+        const collectionName = pathParts[0]
+        const documentId = pathParts[1]
+        docRef = doc(this.db, collectionName, documentId)
+      } else if (pathParts.length === 4) {
+        // Subcollection document: collection/document/subcollection/subdocument
+        const collectionName = pathParts[0]
+        const documentId = pathParts[1]
+        const subcollectionName = pathParts[2]
+        const subdocumentId = pathParts[3]
+        docRef = doc(this.db, collectionName, documentId, subcollectionName, subdocumentId)
+      } else {
+        throw new Error(`Unsupported document path format: ${documentPath}`)
+      }
+      
       const docSnap = await getDoc(docRef)
       
       if (docSnap.exists()) {
@@ -180,8 +199,8 @@ export class DatabaseExplorerService {
         }
       } else {
         return {
-          id: documentId,
-          name: documentId,
+          id: pathParts[pathParts.length - 1],
+          name: pathParts[pathParts.length - 1],
           type: 'document',
           path: documentPath,
           data: null,
@@ -260,10 +279,24 @@ export class DatabaseExplorerService {
         throw new Error('Invalid document path')
       }
       
-      const collectionName = pathParts[0]
-      const documentId = pathParts[1]
+      let docRef
       
-      const docRef = doc(this.db, collectionName, documentId)
+      if (pathParts.length === 2) {
+        // Root collection document: collection/document
+        const collectionName = pathParts[0]
+        const documentId = pathParts[1]
+        docRef = doc(this.db, collectionName, documentId)
+      } else if (pathParts.length === 4) {
+        // Subcollection document: collection/document/subcollection/subdocument
+        const collectionName = pathParts[0]
+        const documentId = pathParts[1]
+        const subcollectionName = pathParts[2]
+        const subdocumentId = pathParts[3]
+        docRef = doc(this.db, collectionName, documentId, subcollectionName, subdocumentId)
+      } else {
+        throw new Error(`Unsupported document path format: ${documentPath}`)
+      }
+      
       await updateDoc(docRef, {
         ...data,
         lastUpdated: serverTimestamp()
@@ -298,6 +331,34 @@ export class DatabaseExplorerService {
     } catch (error) {
       console.error('DatabaseExplorerService: Error deleting document:', error)
       throw error
+    }
+  }
+
+  // Get ARMS and status data from config collection
+  async getConfigData() {
+    try {
+      console.log('DatabaseExplorerService: Fetching config data')
+      
+      // Fetch district mappings
+      const districtConfigRef = doc(this.db, 'config', 'districtMappings')
+      const districtConfigSnap = await getDoc(districtConfigRef)
+      
+      const configData = {}
+      
+      if (districtConfigSnap.exists()) {
+        configData.districtMapping = districtConfigSnap.data().districtMapping || {}
+        console.log('DatabaseExplorerService: District mappings loaded')
+      }
+      
+      // Use ARMS enum values instead of fetching from database
+      configData.arms = ARMS_VALUES
+      console.log('DatabaseExplorerService: ARMS data loaded from enum:', ARMS_VALUES)
+      
+      console.log('DatabaseExplorerService: Complete config data loaded:', configData)
+      return configData
+    } catch (error) {
+      console.error('DatabaseExplorerService: Error fetching config data:', error)
+      return {}
     }
   }
 

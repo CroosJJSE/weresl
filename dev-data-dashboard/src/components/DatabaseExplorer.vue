@@ -1,494 +1,377 @@
 <template>
-  <div class="database-explorer">
-    <!-- Mobile Header with Back Navigation -->
-    <div class="mb-6">
-      <div class="flex items-center justify-between mb-4">
+  <div class="mobile-database-editor min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between">
+          <h1 class="text-lg font-bold text-gray-900">WERESL Database Editor</h1>
         <button
-          v-if="currentPath.value || selectedDocument"
+            v-if="selectedProfile"
           @click="goBack"
-          class="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            class="flex items-center px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
         >
-          <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
           Back
         </button>
-        <h2 v-else class="text-lg font-semibold text-gray-900">Database Explorer</h2>
-        
-        <!-- Current Path Display -->
-        <div v-if="currentPath.value || selectedDocument" class="text-sm text-gray-600 truncate max-w-48">
-          {{ getCurrentPathDisplay() }}
         </div>
       </div>
-      
-      <!-- Breadcrumb Navigation (Hidden on mobile, shown on larger screens) -->
-      <nav class="hidden md:flex" aria-label="Breadcrumb">
-        <ol class="flex items-center space-x-2">
-          <li>
-            <button
-              @click="navigateToPath('')"
-              class="text-blue-600 hover:text-blue-800 font-medium"
-              :class="{ 'text-gray-900': currentPath.value === '' }"
-            >
-              Root
-            </button>
-          </li>
-          <template v-for="(segment, index) in pathSegments" :key="index">
-            <li>
-              <div class="flex items-center">
-                <svg class="w-4 h-4 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                </svg>
-                <button
-                  @click="navigateToPath(getPathUpTo(index))"
-                  class="text-blue-600 hover:text-blue-800 font-medium"
-                  :class="{ 'text-gray-900': getPathUpTo(index) === currentPath.value }"
-                >
-                  {{ segment }}
-                </button>
-              </div>
-            </li>
-          </template>
-        </ol>
-      </nav>
     </div>
 
-    <!-- Single Panel Layout -->
-    <div class="w-full">
-
         <!-- Loading State -->
-        <div v-if="loading" class="flex justify-center items-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span class="ml-3 text-gray-600">Loading...</span>
+    <div v-if="loading" class="flex flex-col items-center justify-center py-16">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600"></div>
+      <p class="mt-4 text-gray-600">Loading...</p>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+    <div v-else-if="error" class="p-4">
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
           <div class="flex">
-            <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          <svg class="w-5 h-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
+          <div>
+            <h3 class="text-sm font-medium text-red-800">Error</h3>
+            <p class="text-sm text-red-700 mt-1">{{ error }}</p>
             </div>
-            <div class="ml-3">
-              <h3 class="text-sm font-medium text-red-800">Error loading data</h3>
-              <div class="mt-2 text-sm text-red-700">{{ error }}</div>
             </div>
           </div>
         </div>
 
-      <!-- Content -->
-      <div v-else>
-        <!-- Document Details View -->
-        <div v-if="selectedDocument" class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-          <!-- Document Header -->
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-medium text-gray-900">
-              {{ selectedDocument.name }}
-            </h3>
-            <div class="flex space-x-2">
-              <button
-                @click="toggleEditMode"
-                class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-              >
-                {{ isEditing ? 'Cancel' : 'Edit' }}
-              </button>
-              <button
-                @click="selectedDocument = null"
-                class="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
-              >
-                Close
-              </button>
+    <!-- Profile List View -->
+    <div v-else-if="!selectedProfile" class="p-4">
+      <div class="mb-4">
+        <div class="relative">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search by Reg ID or Name..."
+            class="w-full px-4 py-3 pl-10 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <svg class="absolute left-3 top-3.5 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
             </div>
           </div>
           
-          <!-- Subcollections Section -->
-          <div v-if="selectedDocument.subcollections && selectedDocument.subcollections.length > 0" class="mb-6">
-            <h4 class="text-md font-medium text-gray-800 mb-3">Subcollections:</h4>
-            <div class="grid grid-cols-1 gap-2">
-              <div
-                v-for="subcollection in selectedDocument.subcollections"
-                :key="subcollection.id"
-                @click="navigateToPath(subcollection.path)"
-                class="bg-blue-50 border border-blue-200 rounded-lg p-3 hover:bg-blue-100 cursor-pointer transition-colors"
+      <div class="space-y-3">
+        <div
+          v-for="profile in filteredProfiles"
+          :key="profile.id"
+          @click="selectProfile(profile)"
+          class="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <div>
-                      <p class="text-sm font-medium text-blue-900">{{ subcollection.name }}</p>
-                      <p class="text-xs text-blue-600">{{ subcollection.documentCount }} documents</p>
+            <div class="flex-1">
+              <h3 class="text-sm font-semibold text-gray-900">{{ profile.data.fullName || profile.id }}</h3>
+              <p class="text-xs text-gray-500 mt-1">{{ profile.id }} • {{ profile.data.district || 'No District' }}</p>
+              <div class="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+                <span v-if="profile.data.nic">NIC: {{ profile.data.nic }}</span>
+                <span v-if="profile.data.phoneNumber">Phone: {{ profile.data.phoneNumber }}</span>
                     </div>
                   </div>
-                  <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
               </div>
             </div>
+
+      <div v-if="filteredProfiles.length === 0" class="text-center py-8">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No profiles found</h3>
+        <p class="mt-1 text-sm text-gray-500">Try adjusting your search criteria.</p>
           </div>
-          
-          <!-- Document Data Section -->
-          <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-            <div v-if="isEditing" class="space-y-4">
-              <div v-for="(value, key) in editData" :key="key" class="flex flex-col">
-                <label class="text-sm font-medium text-gray-700 mb-1">{{ key }}</label>
-                <textarea
-                  v-if="typeof value === 'object'"
-                  v-model="editData[key]"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  rows="3"
-                >{{ JSON.stringify(value, null, 2) }}</textarea>
-                <input
-                  v-else
-                  v-model="editData[key]"
-                  type="text"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-              <div class="flex space-x-3 pt-4">
-                <button
-                  @click="saveDocument"
-                  :disabled="saving"
-                  class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                >
-                  {{ saving ? 'Saving...' : 'Save Changes' }}
-                </button>
-                <button
-                  @click="deleteDocument"
-                  :disabled="saving"
-                  class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  Delete Document
-                </button>
-              </div>
-            </div>
-            <pre v-else class="text-sm text-gray-800 whitespace-pre-wrap">{{ JSON.stringify(selectedDocument.data, null, 2) }}</pre>
+                  </div>
+                  
+    <!-- Profile Detail View -->
+    <div v-else class="flex flex-col h-full">
+      <!-- Profile Header -->
+      <div class="bg-white border-b border-gray-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">{{ selectedProfile.data.fullName || selectedProfile.id }}</h2>
+            <p class="text-sm text-gray-500">{{ selectedProfile.id }} • {{ selectedProfile.data.district || 'No District' }}</p>
+                  </div>
+          <div class="flex items-center space-x-2">
+            <!-- Add Entry Button - Always visible for RF Returns, RF Loans, and Grant Loans -->
+                          <button
+              v-if="showAddButton"
+              @click="handleAddEntry"
+              class="flex items-center px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Entry
+                          </button>
+            
+            <!-- Edit/Cancel Button -->
+                          <button
+              @click="toggleEditMode"
+              class="flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+              <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              {{ isEditing ? 'Cancel' : 'Edit' }}
+                          </button>
           </div>
+                        </div>
+                      </div>
+                      
+      <!-- Tab Navigation -->
+      <div class="bg-white border-b border-gray-200">
+        <div class="flex">
+                            <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            @click="activeTab = tab.id"
+            :class="[
+              'flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-600 bg-blue-50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+          >
+            {{ tab.label }}
+                            </button>
+                  </div>
+                </div>
+                
+      <!-- Tab Content -->
+      <div class="flex-1 overflow-y-auto">
+        <!-- Profile Information Tab -->
+        <div v-if="activeTab === 'profile'" class="p-4">
+          <ProfileInfoEditor
+            ref="profileEditorRef"
+            :profile="selectedProfile"
+            :is-editing="isEditing"
+            @save="saveProfile"
+            @update="updateProfileData"
+          />
+                </div>
+                
+        <!-- RF Return History Tab -->
+        <div v-if="activeTab === 'rf-returns'" class="p-4">
+          <RFReturnEditor
+            ref="rfReturnEditorRef"
+            :profile="selectedProfile"
+            :is-editing="isEditing"
+            :show-add-modal="showAddModal && activeTab === 'rf-returns'"
+            @save="saveProfile"
+            @update="updateProfileData"
+            @close-add-modal="showAddModal = false"
+          />
+        </div>
+              
+        <!-- RF Loans Tab -->
+        <div v-if="activeTab === 'rf-loans'" class="p-4">
+          <RFLoansEditor
+            ref="rfLoansEditorRef"
+            :profile="selectedProfile"
+            :is-editing="isEditing"
+            :show-add-modal="showAddModal && activeTab === 'rf-loans'"
+            @save="saveProfile"
+            @update="updateProfileData"
+            @close-add-modal="showAddModal = false"
+          />
         </div>
 
-        <!-- Items List View -->
-        <div v-else>
-          <!-- Empty State -->
-          <div v-if="items.length === 0" class="text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No items found</h3>
-            <p class="mt-1 text-sm text-gray-500">This location appears to be empty.</p>
-          </div>
-
-          <!-- Items Grid -->
-          <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div
-              v-for="item in items"
-              :key="item.id"
-              @click="handleItemClick(item)"
-              class="relative bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer group"
-            >
-              <!-- Item Icon -->
-              <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-gray-100 group-hover:bg-blue-100 transition-colors duration-200">
-                <svg v-if="item.type === 'collection'" class="w-6 h-6 text-gray-600 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <svg v-else-if="item.type === 'subcollection'" class="w-6 h-6 text-gray-600 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <svg v-else class="w-6 h-6 text-gray-600 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-
-              <!-- Item Details -->
-              <div class="mt-3">
-                <h3 class="text-sm font-medium text-gray-900 group-hover:text-blue-600 truncate">
-                  {{ item.name }}
-                </h3>
-                <p class="text-xs text-gray-500 capitalize">
-                  {{ item.type }}
-                  <span v-if="item.documentCount !== undefined" class="ml-1">
-                    ({{ item.documentCount }})
-                  </span>
-                </p>
-                <!-- Subcollections indicator for documents -->
-                <div v-if="item.type === 'document' && item.subcollections" class="mt-1">
-                  <span class="text-xs text-blue-600">
-                    {{ item.subcollections.length }} subcollection(s)
-                  </span>
-                </div>
-              </div>
-
-              <!-- Click Indicator -->
-              <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-          </div>
+        <!-- Grant Loans Tab -->
+        <div v-if="activeTab === 'grant-loans'" class="p-4">
+          <GrantLoansEditor
+            ref="grantLoansEditorRef"
+            :profile="selectedProfile"
+            :is-editing="isEditing"
+            :show-add-modal="showAddModal && activeTab === 'grant-loans'"
+            @save="saveProfile"
+            @update="updateProfileData"
+            @close-add-modal="showAddModal = false"
+          />
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { DatabaseExplorerService } from '../services/databaseExplorerService.js'
+import { ref, computed, onMounted } from 'vue'
+import { 
+  RootCollection, 
+  ProfileField, 
+  RF_LOAN_FIELD, 
+  GRANT_FIELD,
+  RRH_OBJECT_FIELD,
+  ARMS_VALUES 
+} from '../enums/db.js'
+import ProfileInfoEditor from './ProfileInfoEditor.vue'
+import RFReturnEditor from './RFReturnEditor.vue'
+import RFLoansEditor from './RFLoansEditor.vue'
+import GrantLoansEditor from './GrantLoansEditor.vue'
 
 // Reactive state
 const loading = ref(false)
 const error = ref(null)
-const items = ref([])
-const currentPath = ref('')
-const selectedDocument = ref(null)
+const profiles = ref([])
+const selectedProfile = ref(null)
 const isEditing = ref(false)
-const editData = ref({})
-const saving = ref(false)
+const searchQuery = ref('')
+const activeTab = ref('profile')
+const showAddModal = ref(false)
 
-// Service instance
-const explorerService = new DatabaseExplorerService()
+// Tabs configuration
+const tabs = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'rf-returns', label: 'RF Returns' },
+  { id: 'rf-loans', label: 'RF Loans' },
+  { id: 'grant-loans', label: 'Grant Loans' }
+]
+
+// Template refs for child components
+const rfReturnEditorRef = ref(null)
+const rfLoansEditorRef = ref(null)
+const grantLoansEditorRef = ref(null)
 
 // Computed properties
-const pathSegments = computed(() => {
-  if (!currentPath.value || typeof currentPath.value !== 'string') return []
-  return currentPath.value.split('/')
+const filteredProfiles = computed(() => {
+  if (!searchQuery.value) return profiles.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return profiles.value.filter(profile => 
+    profile.id.toLowerCase().includes(query) ||
+    (profile.data.fullName && profile.data.fullName.toLowerCase().includes(query)) ||
+    (profile.data.nic && profile.data.nic.toLowerCase().includes(query))
+  )
+})
+
+// Show Add Entry button only for RF Returns, RF Loans, and Grant Loans tabs
+const showAddButton = computed(() => {
+  return activeTab.value === 'rf-returns' || 
+         activeTab.value === 'rf-loans' || 
+         activeTab.value === 'grant-loans'
 })
 
 // Methods
-const loadItems = async (path = '') => {
+const loadProfiles = async () => {
   try {
     loading.value = true
     error.value = null
     
-    console.log('Loading items for path:', path)
-    const result = await explorerService.explorePath(path)
-    items.value = result
+    // Import Firebase dynamically to avoid SSR issues
+    const { getFirestore, collection, getDocs } = await import('firebase/firestore')
+    const { initializeApp } = await import('firebase/app')
     
-    console.log('Loaded items:', result)
-    console.log('First item details:', result[0])
-    if (result[0]) {
-      console.log('First item type:', result[0].type)
-      console.log('First item data:', result[0].data)
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBVUVyDTnOwMmYR1ybOLYv9i_B19aox1Lg",
+      authDomain: "weresldatabase.firebaseapp.com",
+      projectId: "weresldatabase",
+      storageBucket: "weresldatabase.firebasestorage.app",
+      messagingSenderId: "148662033996",
+      appId: "1:148662033996:web:f9b5ea903b9cc5a24d9ee9"
     }
+    
+    const app = initializeApp(firebaseConfig)
+    const db = getFirestore(app)
+    
+    const profilesRef = collection(db, RootCollection.PROFILES)
+    const snapshot = await getDocs(profilesRef)
+    
+    profiles.value = snapshot.docs.map(doc => ({
+      id: doc.id,
+      data: doc.data(),
+      ref: doc.ref
+    }))
+    
+    console.log(`Loaded ${profiles.value.length} profiles`)
   } catch (err) {
-    console.error('Error loading items:', err)
-    error.value = err.message || 'Failed to load items'
+    console.error('Error loading profiles:', err)
+    error.value = err.message
   } finally {
     loading.value = false
   }
 }
 
-const navigateToPath = async (path) => {
-  console.log('Navigating to path:', path)
-  currentPath.value = path
-  // Clear selected document when navigating
-  selectedDocument.value = null
+const selectProfile = (profile) => {
+  selectedProfile.value = profile
   isEditing.value = false
-  editData.value = {}
-  await loadItems(path)
+  activeTab.value = 'profile'
 }
 
-const handleItemClick = async (item) => {
-  console.log('Item clicked:', item)
-  console.log('Item type:', item.type)
-  console.log('Item path:', item.path)
-  
-  if (item.type === 'collection' || item.type === 'subcollection') {
-    // Navigate into the collection/subcollection
-    console.log('Navigating to collection/subcollection:', item.path)
-    await navigateToPath(item.path)
-  } else if (item.type === 'document') {
-    // Show document data in modal with subcollections
-    console.log('Loading document details for:', item.name)
-    console.log('Document data:', item.data)
-    await loadDocumentWithSubcollections(item)
-  } else {
-    console.log('Unknown item type:', item.type)
-  }
-}
-
-const getPathUpTo = (index) => {
-  return pathSegments.value.slice(0, index + 1).join('/')
-}
-
-// Mobile navigation methods
 const goBack = () => {
-  if (selectedDocument.value) {
-    // If viewing a document, go back to the items list
-    selectedDocument.value = null
+  selectedProfile.value = null
     isEditing.value = false
-    editData.value = {}
-  } else if (currentPath.value) {
-    // If in a subdirectory, go back to parent
-    const pathParts = currentPath.value.split('/')
-    if (pathParts.length > 1) {
-      const parentPath = pathParts.slice(0, -1).join('/')
-      navigateToPath(parentPath)
-    } else {
-      navigateToPath('')
-    }
+  activeTab.value = 'profile'
+}
+
+const toggleEditMode = () => {
+  isEditing.value = !isEditing.value
+}
+
+const handleAddEntry = () => {
+  console.log('🔘 DatabaseExplorer: Add Entry clicked for tab:', activeTab.value)
+  showAddModal.value = true
+}
+
+const updateProfileData = (updatedData) => {
+  if (selectedProfile.value) {
+    selectedProfile.value.data = { ...selectedProfile.value.data, ...updatedData }
   }
 }
 
-const getCurrentPathDisplay = () => {
-  if (!currentPath.value) return ''
-  const pathParts = currentPath.value.split('/')
-  if (pathParts.length === 1) {
-    return pathParts[0]
-  } else if (pathParts.length === 2) {
-    return `${pathParts[0]} > ${pathParts[1]}`
-  } else if (pathParts.length === 3) {
-    return `${pathParts[0]} > ${pathParts[1]} > ${pathParts[2]}`
-  }
-  return pathParts.join(' > ')
-}
-
-// Load document with its subcollections
-const loadDocumentWithSubcollections = async (item) => {
+const saveProfile = async (updatedData) => {
   try {
     loading.value = true
-    console.log('Loading document with subcollections for:', item)
     
-    const subcollections = await explorerService.getDocumentSubcollections(item.path)
-    console.log('Found subcollections:', subcollections)
+    // Import Firebase dynamically
+    const { getFirestore, doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+    const { initializeApp } = await import('firebase/app')
     
-    selectedDocument.value = {
-      ...item,
-      subcollections: subcollections
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBVUVyDTnOwMmYR1ybOLYv9i_B19aox1Lg",
+      authDomain: "weresldatabase.firebaseapp.com",
+      projectId: "weresldatabase",
+      storageBucket: "weresldatabase.firebasestorage.app",
+      messagingSenderId: "148662033996",
+      appId: "1:148662033996:web:f9b5ea903b9cc5a24d9ee9"
     }
     
-    console.log('Selected document set to:', selectedDocument.value)
-  } catch (error) {
-    console.error('Error loading document subcollections:', error)
-    // Even if subcollections fail, still show the document
-    selectedDocument.value = {
-      ...item,
-      subcollections: []
-    }
-    console.log('Selected document set to (fallback):', selectedDocument.value)
+    const app = initializeApp(firebaseConfig)
+    const db = getFirestore(app)
+    
+    const profileRef = doc(db, RootCollection.PROFILES, selectedProfile.value.id)
+    await updateDoc(profileRef, {
+      ...updatedData,
+      [ProfileField.LAST_UPDATED]: serverTimestamp()
+    })
+    
+    // Update local data
+    selectedProfile.value.data = { ...selectedProfile.value.data, ...updatedData }
+    isEditing.value = false
+    
+    console.log('Profile updated successfully')
+  } catch (err) {
+    console.error('Error saving profile:', err)
+    error.value = err.message
   } finally {
     loading.value = false
-  }
-}
-
-// Toggle edit mode
-const toggleEditMode = () => {
-  if (isEditing.value) {
-    // Cancel editing
-    isEditing.value = false
-    editData.value = {}
-  } else {
-    // Start editing
-    isEditing.value = true
-    editData.value = { ...selectedDocument.value.data }
-  }
-}
-
-// Save document changes
-const saveDocument = async () => {
-  try {
-    saving.value = true
-    
-    // Parse JSON strings back to objects
-    const processedData = {}
-    for (const [key, value] of Object.entries(editData.value)) {
-      if (typeof value === 'string' && value.trim().startsWith('{')) {
-        try {
-          processedData[key] = JSON.parse(value)
-        } catch {
-          processedData[key] = value
-        }
-      } else {
-        processedData[key] = value
-      }
-    }
-    
-    await explorerService.updateDocument(selectedDocument.value.path, processedData)
-    
-    // Update the selected document
-    selectedDocument.value.data = processedData
-    isEditing.value = false
-    editData.value = {}
-    
-    // Refresh the current view
-    await loadItems(currentPath.value)
-    
-    alert('Document updated successfully!')
-  } catch (error) {
-    console.error('Error saving document:', error)
-    alert('Error saving document: ' + error.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-// Delete document
-const deleteDocument = async () => {
-  if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-    return
-  }
-  
-  try {
-    saving.value = true
-    await explorerService.deleteDocument(selectedDocument.value.path)
-    
-    selectedDocument.value = null
-    isEditing.value = false
-    editData.value = {}
-    
-    // Refresh the current view
-    await loadItems(currentPath.value)
-    
-    alert('Document deleted successfully!')
-  } catch (error) {
-    console.error('Error deleting document:', error)
-    alert('Error deleting document: ' + error.message)
-  } finally {
-    saving.value = false
   }
 }
 
 // Lifecycle
-onMounted(async () => {
-  console.log('DatabaseExplorer mounted, loading root items')
-  await loadItems('')
-})
-
-// Watch for path changes
-watch(currentPath, (newPath) => {
-  console.log('Path changed to:', newPath)
+onMounted(() => {
+  loadProfiles()
 })
 </script>
 
 <style scoped>
-.database-explorer {
-  @apply w-full;
-}
-
-/* Custom scrollbar for document modal */
-pre::-webkit-scrollbar {
-  width: 8px;
-}
-
-pre::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-pre::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-pre::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+.mobile-database-editor {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 </style>
-
-
-
-
