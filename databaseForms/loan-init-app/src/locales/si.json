@@ -37,6 +37,7 @@
   "form.phoneNumber": "දුරකථන අංකය *",
   "form.totalChildren": "සම්පූර්ණ දරුවන් ගණන *",
   "form.familyBackground": "පවුල් පසුබිම *",
+  "form.familyBackgroundPlaceholder": "පවුලේ තත්ත්වය, රැඳී සිටින පුද්ගලයින් ගණන, දරුවන්ගේ අධ්‍යාපනය වැනි සිද්ධාන්ත විස්තර කරන්න.",
   "form.occupation": "රැකියාව *",
   "form.district": "දිස්ත්‍රික්කය *",
   "form.selectDistrict": "දිස්ත්‍රික්කය තෝරන්න",

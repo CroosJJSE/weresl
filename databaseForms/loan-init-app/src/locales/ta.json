@@ -37,6 +37,7 @@
 "form.phoneNumber": "தொலைபேசி எண் *",
 "form.totalChildren": "மொத்த பிள்ளைகளின் எண்ணிக்கை *",
 "form.familyBackground": "குடும்ப பின்னணி *",
+"form.familyBackgroundPlaceholder": "குடும்ப நிலை, சார்ந்துள்ளவர்களின் எண்ணிக்கை, குழந்தைகளின் கல்வி போன்றவற்றை விவரிக்கவும்.",
 "form.occupation": "தொழில் *",
 "form.district": "மாவட்டம் *",
 "form.selectDistrict": "மாவட்டத்தை தேர்ந்தெடுக்கவும்",

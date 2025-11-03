@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow read/write access to all profiles
+    match /profiles/{profileId} {
+      allow read, write: if true;
+      
+      // RF_Loans subcollection
+      match /RF_Loans/{loanId} {
+        allow read, write: if true;
+      }
+      
+      // Grant subcollection
+      match /Grant/{grantId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // Bank accounts collection
+    match /bank_accounts/{accountId} {
+      allow read, write: if true;
+    }
+    
+    // SearchElements collection
+    match /SearchElements/{docId} {
+      allow read, write: if true;
+    }
+    
+    // RF_return_record collection
+    match /RF_return_record/{recordId} {
+      allow read, write: if true;
+    }
+    
+    // GIF_return_record collection
+    match /GIF_return_record/{recordId} {
+      allow read, write: if true;
+    }
+    
+    // topview-links collection
+    match /topview-links/{linkId} {
+      allow read, write: if true;
+    }
+    
+    // config collection
+    match /config/{docId} {
+      allow read, write: if true;
+    }
+    
+    // uploadedImages collection
+    match /uploadedImages/{imageId} {
+      allow read, write: if true;
+    }
+    
+    // loans collection
+    match /loans/{loanId} {
+      allow read, write: if true;
+    }
+    
+    // Default rule for any other collections
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

@@ -35,6 +35,7 @@
   "form.phoneNumber": "Phone Number *",
   "form.totalChildren": "Total Number of Children *",
   "form.familyBackground": "Family Background *",
+  "form.familyBackgroundPlaceholder": "Describe family situation, number of dependents, children's education, etc.",
   "form.occupation": "Occupation *",
   "form.yearOfBirth": "Year of Birth *",
   "form.address": "Address *",

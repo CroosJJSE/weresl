@@ -247,7 +247,27 @@
         <div class="form-row">
           <div class="form-group">
             <label for="NIC">{{ t('form.nicNumber') }}</label>
-            <input type="text" id="NIC" v-model="formData.NIC" class="form-control" required />
+            <div class="nic-input-container">
+              <input 
+                type="text" 
+                id="NIC" 
+                v-model="formData.NIC" 
+                @input="validateNIC"
+                :class="['form-control', nicError ? 'error' : '', nicExistsInDb !== null ? (nicExistsInDb ? 'nic-exists' : 'nic-new') : '']"
+                required 
+              />
+              <div class="nic-status-icon" v-if="formData.NIC && !nicCheckInProgress && !nicError">
+                <span v-if="nicExistsInDb === true" class="icon-error">❌</span>
+                <span v-if="nicExistsInDb === false" class="icon-success">✅</span>
+              </div>
+              <div class="nic-status-icon" v-if="nicCheckInProgress">
+                <span class="loading-spinner-small"></span>
+              </div>
+            </div>
+            <span v-if="nicError" class="error-message">{{ nicError }}</span>
+            <span v-if="nicExistsInDb && !nicError" class="nic-exists-message">
+              This NIC already belongs to RegID: {{ nicRegId }}
+            </span>
           </div>
           <div class="form-group">
             <label for="contact">{{ t('form.phoneNumber') }}</label>
@@ -405,6 +425,10 @@ const registrationStatus = ref('') // 'existing', 'new', ''
 const yearOfBirthError = ref('')
 const phoneError = ref('')
 const imageError = ref('')
+const nicError = ref('')
+const nicExistsInDb = ref(null)
+const nicRegId = ref('')
+const nicCheckInProgress = ref(false)
 const receivers = ref([])
 const searchType = ref('regid') // 'regid' or 'nic'
 const searchValue = ref('')
@@ -705,6 +729,78 @@ const onlyNumbers = (event) => {
   }
 };
 
+// Validate NIC format
+const validateNIC = () => {
+  const nic = formData.NIC;
+  nicError.value = '';
+  nicExistsInDb.value = null;
+  nicRegId.value = '';
+  
+  if (!nic) {
+    return false;
+  }
+  
+  // Remove any whitespace
+  const cleanedNIC = nic.trim();
+  
+  // Type 1: 10 chars (9 numbers + 'v' at the end, case insensitive)
+  const type1Pattern = /^\d{9}[vV]$/;
+  // Type 2: 12 chars (all numbers)
+  const type2Pattern = /^\d{12}$/;
+  
+  if (cleanedNIC.length === 10 && !type1Pattern.test(cleanedNIC)) {
+    nicError.value = 'NIC must be 9 digits followed by "v" or "V" (e.g., 123456789v)';
+    return false;
+  } else if (cleanedNIC.length === 12 && !type2Pattern.test(cleanedNIC)) {
+    nicError.value = 'NIC must be exactly 12 digits (e.g., 012345678901)';
+    return false;
+  } else if (cleanedNIC.length !== 10 && cleanedNIC.length !== 12) {
+    nicError.value = 'NIC must be either 10 characters (9 digits + v) or 12 digits';
+    return false;
+  }
+  
+  // If validation passes, check in database
+  if (!useExisting.value && cleanedNIC.length >= 10) {
+    checkNICInDatabase(cleanedNIC);
+  }
+  
+  return true;
+};
+
+// Check if NIC exists in database
+const checkNICInDatabase = async (nic) => {
+  if (!nic) return;
+  
+  nicCheckInProgress.value = true;
+  nicExistsInDb.value = null;
+  
+  try {
+    const nicDataRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA);
+    const nicDataSnap = await getDoc(nicDataRef);
+    
+    if (nicDataSnap.exists()) {
+      const nicData = nicDataSnap.data();
+      const regId = nicData[nic];
+      
+      if (regId) {
+        nicExistsInDb.value = true;
+        nicRegId.value = regId;
+        console.log(`NIC ${nic} already exists with RegID: ${regId}`);
+      } else {
+        nicExistsInDb.value = false;
+        console.log(`NIC ${nic} is available (new user)`);
+      }
+    } else {
+      nicExistsInDb.value = false;
+    }
+  } catch (error) {
+    console.error('Error checking NIC in database:', error);
+    nicExistsInDb.value = null;
+  } finally {
+    nicCheckInProgress.value = false;
+  }
+};
+
 // Update validation to show which field is missing
 const validateForm = () => {
   if (useExisting.value) {
@@ -764,6 +860,17 @@ const validateForm = () => {
     return false
   }
 
+  // Validate NIC format
+  if (!validateNIC()) {
+    return false
+  }
+
+  // Check if NIC already exists (only for new users)
+  if (!useExisting.value && nicExistsInDb.value === true) {
+    showMessage(`A profile with this NIC already exists (RegID: ${nicRegId.value}). Please use the "Existing User" option.`, 'error')
+    return false
+  }
+
 
   if (!formData.loanType || !formData.initialAmount || !formData.purpose) {
     showMessage('Please fill in all loan details', 'error')
@@ -791,12 +898,14 @@ const submitForm = async () => {
       profileRef = formData.Reg_ID;
     } else {
       // New profile flow
+      // Use trimmed NIC for all operations
+      const trimmedNIC = formData.NIC.trim()
       // 1. Check NIC uniqueness in NIC_data BEFORE RegID generation
       const nicDataRef = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap = await getDoc(nicDataRef)
       let nicData = nicDataSnap.exists() ? nicDataSnap.data() : {}
-      if (nicData[formData.NIC]) {
-        showMessage('A profile with this NIC already exists (RegID: ' + nicData[formData.NIC] + ')', 'error')
+      if (nicData[trimmedNIC]) {
+        showMessage('A profile with this NIC already exists (RegID: ' + nicData[trimmedNIC] + ')', 'error')
         loading.value = false
         return
       }
@@ -807,7 +916,7 @@ const submitForm = async () => {
         [ProfileField.FULL_NAME]: formData.Name,
         [ProfileField.YEAR_OF_BIRTH]: parseInt(formData.yearOfBirth),
         [ProfileField.ADDRESS]: formData.address,
-        [ProfileField.NIC]: formData.NIC,
+        [ProfileField.NIC]: trimmedNIC,
         [ProfileField.PHONE_NUMBER]: formData.contact,
         [ProfileField.DESCRIPTION]: formData.familyBackground,
         [ProfileField.OCCUPATION]: formData.occupation,
@@ -822,7 +931,7 @@ const submitForm = async () => {
       const nicDataRef2 = doc(db, RootCollection.SEARCH_ELEMENTS, SearchElementDoc.NIC_DATA)
       const nicDataSnap2 = await getDoc(nicDataRef2)
       let nicData2 = nicDataSnap2.exists() ? nicDataSnap2.data() : {}
-      nicData2[formData.NIC] = formData.Reg_ID
+      nicData2[trimmedNIC] = formData.Reg_ID
       await setDoc(nicDataRef2, nicData2)
     }
 
@@ -896,6 +1005,10 @@ const resetForm = () => {
   imagePreview.value = null
   uploadedImageUrl.value = null
   imageError.value = ''; // Reset image error
+  nicError.value = ''
+  nicExistsInDb.value = null
+  nicRegId.value = ''
+  nicCheckInProgress.value = false
   message.value = ''
   registrationStatus.value = '' // Reset registration status
   yearOfBirthError.value = ''
@@ -1041,6 +1154,70 @@ h1 {
   font-size: 12px;
   margin-top: 5px;
   display: block;
+}
+
+/* NIC Input Container */
+.nic-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nic-input-container .form-control {
+  padding-right: 40px;
+}
+
+.nic-status-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  font-size: 1.2rem;
+}
+
+.icon-error {
+  color: #dc3545;
+}
+
+.icon-success {
+  color: #28a745;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.nic-exists-message {
+  color: #856404;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+.form-control.nic-exists {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15);
+}
+
+.form-control.nic-new {
+  border-color: #28a745;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15);
 }
 
 .file-size-limit {

@@ -238,3 +238,4 @@ watch(() => props.profile, () => {
   max-width: 100%;
 }
 </style>
+
