@@ -351,18 +351,75 @@ export const adminDbService = {
       if (loanType === 'RF' && coordinatorId) {
         console.log('📝 Step 6: Assigning coordinator and creating activeRF_loan entry...')
         
-        // Get coordinator bank account data by name (coordinatorId is the bank account name)
-        const coordinatorRef = doc(db, RootCollection.BANK_ACCOUNTS, coordinatorId)
-        const coordinatorDoc = await getDoc(coordinatorRef)
+        // Helper function to find bank account by coordinator name
+        const findBankAccountByName = async (coordinatorName) => {
+          try {
+            console.log(`🔍 Looking up bank account for coordinator: "${coordinatorName}"`)
+            
+            // First try to get by document ID (in case document ID matches the name)
+            const coordinatorRef = doc(db, RootCollection.BANK_ACCOUNTS, coordinatorName)
+            const coordinatorDoc = await getDoc(coordinatorRef)
+            
+            if (coordinatorDoc.exists()) {
+              console.log(`✅ Found bank account by document ID: ${coordinatorDoc.id}`)
+              return { docId: coordinatorDoc.id, data: coordinatorDoc.data() }
+            }
+            
+            // If not found by ID, search all bank accounts by full name
+            console.log(`🔍 Searching all bank accounts by full name...`)
+            const bankAccountsRef = collection(db, RootCollection.BANK_ACCOUNTS)
+            const bankAccountsSnapshot = await getDocs(bankAccountsRef)
+            
+            console.log(`📊 Found ${bankAccountsSnapshot.docs.length} bank accounts to search`)
+            
+            for (const docSnapshot of bankAccountsSnapshot.docs) {
+              const bankAccountData = docSnapshot.data()
+              const fullName = `${bankAccountData[BANK_ACCOUNT_FIELD.FIRST_NAME] || ''} ${bankAccountData[BANK_ACCOUNT_FIELD.LAST_NAME] || ''}`.trim()
+              
+              console.log(`  Checking: "${fullName}" (docId: ${docSnapshot.id}) vs "${coordinatorName}"`)
+              
+              if (fullName === coordinatorName) {
+                console.log(`✅ Found bank account by full name: ${docSnapshot.id} (${fullName})`)
+                return { docId: docSnapshot.id, data: bankAccountData }
+              }
+            }
+            
+            console.log(`❌ Bank account not found for coordinator: "${coordinatorName}"`)
+            return null
+          } catch (error) {
+            console.error('❌ Error finding bank account:', error)
+            return null
+          }
+        }
         
-        if (coordinatorDoc.exists()) {
-          const coordinatorData = coordinatorDoc.data()
-          const profileName = `${coordinatorData.firstName} ${coordinatorData.lastName}`
+        // Find the bank account by coordinator name
+        const bankAccountResult = await findBankAccountByName(coordinatorId)
+        
+        if (bankAccountResult) {
+          const { docId: bankAccountDocId, data: coordinatorData } = bankAccountResult
+          const coordinatorName = `${coordinatorData[BANK_ACCOUNT_FIELD.FIRST_NAME] || ''} ${coordinatorData[BANK_ACCOUNT_FIELD.LAST_NAME] || ''}`.trim()
           
-          // Update profile's coordinator field
+          console.log(`📝 Setting coordinator for profile ${regId}: Bank Account ID = "${bankAccountDocId}" (Coordinator Name: ${coordinatorName})`)
+          
+          // Get the actual profile to get the profile's name (not the coordinator's name)
           const profileRef = doc(db, RootCollection.PROFILES, regId)
+          const profileDoc = await getDoc(profileRef)
+          
+          let actualProfileName = regId // Default to regId if profile not found
+          if (profileDoc.exists()) {
+            const profileData = profileDoc.data()
+            actualProfileName = profileData[ProfileField.FULL_NAME] || profileData.fullName || profileData.Name || regId
+            console.log(`📝 Actual profile name for ${regId}: "${actualProfileName}"`)
+          } else {
+            console.warn(`⚠️ Profile not found for ${regId}, using regId as name`)
+          }
+          
+          // Get the bank account document reference using the found document ID
+          const coordinatorRef = doc(db, RootCollection.BANK_ACCOUNTS, bankAccountDocId)
+          
+          // Update profile's coordinator field with the bank account document ID (not the name)
           batch.update(profileRef, {
-            [ProfileField.COORDINATOR]: coordinatorId,
+            [ProfileField.COORDINATOR]: bankAccountDocId, // Use document ID, not name
             [ProfileField.LAST_UPDATED]: serverTimestamp()
           })
           
@@ -382,7 +439,7 @@ export const adminDbService = {
             })
           }
           
-          // Create activeRF_loan entry
+          // Create activeRF_loan entry with the ACTUAL profile name (not coordinator name)
           const currentActiveLoans = coordinatorData[BANK_ACCOUNT_FIELD.ACTIVE_RF_LOAN] || []
           const loanExists = currentActiveLoans.some(loan => loan.regId === regId && loan.rfLoanId === loanId)
           
@@ -390,7 +447,7 @@ export const adminDbService = {
             const updatedActiveLoans = [...currentActiveLoans, {
               regId: regId,
               rfLoanId: loanId,
-              profileName: profileName,
+              profileName: actualProfileName, // Use actual profile name, not coordinator name
               paymentHistory: []
             }]
             
@@ -400,9 +457,12 @@ export const adminDbService = {
             })
           }
           
-          console.log('✅ Coordinator assignment and activeRF_loan entry created')
+          console.log(`✅ Coordinator assignment and activeRF_loan entry created (Bank Account ID: ${bankAccountDocId})`)
         } else {
-          console.log('⚠️ Coordinator bank account not found:', coordinatorId)
+          console.error(`❌ CRITICAL: Coordinator bank account not found for: "${coordinatorId}"`)
+          console.error(`   Profile ${regId} will NOT have coordinator field set.`)
+          console.error(`   Please verify that bank account exists with name: "${coordinatorId}"`)
+          // Don't set coordinator field if bank account not found - this prevents storing the name
         }
       }
       

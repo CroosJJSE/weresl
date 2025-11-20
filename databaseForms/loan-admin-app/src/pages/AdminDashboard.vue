@@ -1040,8 +1040,8 @@ export default {
           amount: parseFloat(loan.amount),
           purpose: loan.purpose,
           source: loan.source,
-          arms: loan.arms,
-          coordinator: loan.source // Set coordinator = source
+          arms: loan.arms
+          // Note: coordinator is set on the profile during approval, not on the loan
         })
         
         if (!updateResult.success) {
@@ -1710,8 +1710,6 @@ export default {
         
         // Process activeRF_loan entries
         for (const loanEntry of activeRFLoans) {
-          console.log('📊 Processing loan entry:', loanEntry)
-          
           if (loanEntry && loanEntry.regId) {
             try {
               // Get profile data
@@ -1721,11 +1719,10 @@ export default {
                 
                 // Process payment data from activeRF_loan paymentHistory
                 const payments = {}
+                let totalCurrentMonthAmount = 0
                 
                 // Check paymentHistory for current month payments
                 if (loanEntry.paymentHistory && Array.isArray(loanEntry.paymentHistory)) {
-                  console.log('📊 Processing payment history for', loanEntry.regId, ':', loanEntry.paymentHistory)
-                  let totalCurrentMonthAmount = 0
                   
                   for (const paymentEntry of loanEntry.paymentHistory) {
                     if (paymentEntry && typeof paymentEntry === 'string') {
@@ -1755,33 +1752,108 @@ export default {
                       }
                     }
                   }
+                }
+                
+                // Also check RF_return_history from profile for current month payments
+                const rfReturnHistory = profile[ProfileField.RF_RETURN_HISTORY] || {}
+                if (rfReturnHistory && typeof rfReturnHistory === 'object' && Object.keys(rfReturnHistory).length > 0) {
+                  console.log('📊 Processing RF_return_history for', loanEntry.regId, ':', rfReturnHistory)
                   
-                  if (totalCurrentMonthAmount > 0) {
-                    payments[currentMonth] = {
-                      paid: true,
-                      amount: totalCurrentMonthAmount
+                  // Check if it's the new RRH object format or legacy format
+                  const firstKey = Object.keys(rfReturnHistory)[0]
+                  const isRRHFormat = firstKey && firstKey.startsWith('RRH_')
+                  
+                  if (isRRHFormat) {
+                    // New RRH object format: {RRH_ID: RRH_Object}
+                    for (const [rrhId, rrhObject] of Object.entries(rfReturnHistory)) {
+                      if (rrhObject && rrhObject.approvedDate && rrhObject.amount) {
+                        try {
+                          // Handle Firebase timestamp or Date object
+                          let paymentDate
+                          if (rrhObject.approvedDate.toDate) {
+                            // Firebase timestamp
+                            paymentDate = rrhObject.approvedDate.toDate()
+                          } else if (rrhObject.approvedDate instanceof Date) {
+                            // Already a Date object
+                            paymentDate = rrhObject.approvedDate
+                          } else if (typeof rrhObject.approvedDate === 'string' || typeof rrhObject.approvedDate === 'number') {
+                            // String or timestamp number
+                            paymentDate = new Date(rrhObject.approvedDate)
+                          } else {
+                            continue
+                          }
+                          
+                          const paymentMonth = paymentDate.toLocaleString('en-US', { month: 'long' })
+                          const paymentYear = paymentDate.getFullYear()
+                          
+                          // Only process current month and year payments
+                          if (paymentMonth === currentMonth && paymentYear === currentYear) {
+                            const amount = parseFloat(rrhObject.amount) || 0
+                            totalCurrentMonthAmount += amount
+                            console.log('📊 Found current month payment from RF_return_history:', amount, 'for', loanEntry.regId)
+                          }
+                        } catch (error) {
+                          console.error('❌ Error parsing RRH object date:', rrhObject, error)
+                        }
+                      }
                     }
-                    console.log('📊 Total current month amount for', loanEntry.regId, ':', totalCurrentMonthAmount)
+                  } else {
+                    // Legacy format: {timestampKey: amount}
+                    for (const [timestampKey, amount] of Object.entries(rfReturnHistory)) {
+                      if (timestampKey && amount) {
+                        try {
+                          // Parse the timestamp (YYYY-MM-DD-HH-MIN format)
+                          const parts = timestampKey.split('-')
+                          if (parts.length >= 5) {
+                            const year = parseInt(parts[0])
+                            const month = parseInt(parts[1]) - 1 // Month is 0-indexed
+                            const day = parseInt(parts[2])
+                            
+                            const paymentDate = new Date(year, month, day)
+                            const paymentMonth = paymentDate.toLocaleString('en-US', { month: 'long' })
+                            
+                            // Only process current month and year payments
+                            if (paymentMonth === currentMonth && year === currentYear) {
+                              const paymentAmount = parseFloat(amount) || 0
+                              totalCurrentMonthAmount += paymentAmount
+                              console.log('📊 Found current month payment from legacy RF_return_history:', paymentAmount, 'for', loanEntry.regId)
+                            }
+                          }
+                        } catch (error) {
+                          console.error('❌ Error parsing legacy timestamp:', timestampKey, error)
+                        }
+                      }
+                    }
                   }
                 }
                 
-                // Add current month if not paid
-                if (!payments[currentMonth]) {
+                // Set payment status based on total amount
+                if (totalCurrentMonthAmount > 0) {
+                  payments[currentMonth] = {
+                    paid: true,
+                    amount: totalCurrentMonthAmount
+                  }
+                  console.log('📊 Total current month amount for', loanEntry.regId, ':', totalCurrentMonthAmount)
+                } else {
+                  // Add current month if not paid
                   payments[currentMonth] = {
                     paid: false,
                     amount: 0
                   }
                 }
                 
+                // Use actual profile name from fetched profile (not the stored profileName which might be wrong)
+                const actualProfileName = profile[ProfileField.FULL_NAME] || profile.fullName || profile.Name || loanEntry.profileName || 'Unknown'
+                
                 allLoans.push({
                   regId: loanEntry.regId,
-                  name: loanEntry.profileName || profile.fullName || profile.Name || 'Unknown',
+                  name: actualProfileName, // Always use the actual profile name from the profile document
                   payments,
                   bankAccount: selectedAccount.name,
                   rfLoanId: loanEntry.rfLoanId
                 })
                 
-                console.log('📊 Added loan to coordinator list:', loanEntry.regId, 'Payments:', payments)
+                // Loan added to coordinator list
               } else {
                 console.log('⚠️ Profile not found for regId:', loanEntry.regId)
                 // Add regId even if profile not found, with unknown name
@@ -1805,6 +1877,13 @@ export default {
             console.warn('⚠️ Invalid loan entry:', loanEntry)
           }
         }
+        
+        // Sort loans by RegID (alphabetically)
+        allLoans.sort((a, b) => {
+          if (a.regId < b.regId) return -1
+          if (a.regId > b.regId) return 1
+          return 0
+        })
         
         coordinatorLoans.value = allLoans
       } catch (error) {
@@ -1856,9 +1935,26 @@ export default {
             // New RRH object format: {RRH_ID: RRH_Object}
             for (const [rrhId, rrhObject] of Object.entries(rfReturnHistory)) {
               if (rrhObject && rrhObject.approvedDate && rrhObject.amount) {
+                // Handle Firebase timestamp conversion
+                let paymentDate
+                if (rrhObject.approvedDate.toDate) {
+                  // Firebase timestamp
+                  paymentDate = rrhObject.approvedDate.toDate()
+                } else if (rrhObject.approvedDate instanceof Date) {
+                  // Already a Date object
+                  paymentDate = rrhObject.approvedDate
+                } else if (typeof rrhObject.approvedDate === 'string' || typeof rrhObject.approvedDate === 'number') {
+                  // String or timestamp number
+                  paymentDate = new Date(rrhObject.approvedDate)
+                } else {
+                  // Skip invalid date
+                  console.warn('⚠️ Invalid approvedDate format for RRH:', rrhObject.RRH_ID, rrhObject.approvedDate)
+                  continue
+                }
+                
                 historyArray.push({
                   rrhId: rrhObject.RRH_ID,
-                  date: new Date(rrhObject.approvedDate),
+                  date: paymentDate,
                   amount: rrhObject.amount,
                   receiver: rrhObject.receiver || 'weresl',
                   driveLinkId: rrhObject.DRIVE_LINK_ID || '',

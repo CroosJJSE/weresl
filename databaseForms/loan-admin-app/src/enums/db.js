@@ -55,6 +55,7 @@ export const ProfileField = {
   DESCRIPTION: 'description',
   OCCUPATION: 'occupation',
   PROFILE_IMAGE_DRIVE_ID: 'profileImageDriveId',
+  COORDINATOR: 'coordinator', // References bank account document ID
   CREATED_AT: 'createdAt',
   LAST_UPDATED: 'lastUpdated',
   BACKED_UP: 'backedUp', // Google Sheets backup status
@@ -79,6 +80,7 @@ export const ProfileFieldTypes = {
   DESCRIPTION: 'string',
   OCCUPATION: 'string',
   PROFILE_IMAGE_DRIVE_ID: 'string',
+  COORDINATOR: 'string', // References bank account document ID
   CREATED_AT: 'date',
   LAST_UPDATED: 'date',
   BACKED_UP: 'boolean', // Google Sheets backup status

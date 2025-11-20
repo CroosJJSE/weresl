@@ -443,27 +443,57 @@ export default {
           
           // Handle both single profile and multiple profiles
           if (Array.isArray(profileData)) {
-            console.log('📋 [RFGIFReturnForm] Multiple profiles found:', profileData.length)
-            // Multiple profiles - check pending loan status for each
-            const pendingLoansResult = await getPendingLoans()
-            console.log('🔍 [RFGIFReturnForm] Checking pending loans for', profileData.length, 'profiles')
+            console.log('📋 [RFGIFReturnForm] Array of profiles found:', profileData.length)
             
-            const profilesWithPendingStatus = profileData.map(profile => {
-              const regId = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id
+            // If only one profile found, treat it as single profile and auto-load loans
+            if (profileData.length === 1) {
+              console.log('👤 [RFGIFReturnForm] Single profile in array, auto-selecting...')
+              const singleProfile = profileData[0]
+              const regId = singleProfile[ProfileField.REG_ID] || singleProfile.Reg_ID || singleProfile.id
+              console.log('🔍 [RFGIFReturnForm] Checking pending loan for RegID:', regId)
+              
+              const pendingLoansResult = await getPendingLoans()
               const hasPendingLoan = pendingLoansResult.success && 
                 pendingLoansResult.data.includes(regId)
+              
               console.log('📝 [RFGIFReturnForm] Profile', regId, 'has pending loan:', hasPendingLoan)
-              return {
-                ...profile,
-                hasPendingLoan: hasPendingLoan
+              
+              searchResult.value = {
+                found: true,
+                profile: {
+                  ...singleProfile,
+                  hasPendingLoan: hasPendingLoan
+                }
               }
-            })
-            
-            searchResult.value = {
-              found: true,
-              profile: profilesWithPendingStatus
+              console.log('✅ [RFGIFReturnForm] Single profile processed')
+              
+              // Set current profile and load data
+              currentProfile.value = singleProfile
+              await loadProfileImage(singleProfile)
+              await loadLoans(regId)
+            } else {
+              // Multiple profiles - check pending loan status for each
+              console.log('📋 [RFGIFReturnForm] Multiple profiles found:', profileData.length)
+              const pendingLoansResult = await getPendingLoans()
+              console.log('🔍 [RFGIFReturnForm] Checking pending loans for', profileData.length, 'profiles')
+              
+              const profilesWithPendingStatus = profileData.map(profile => {
+                const regId = profile[ProfileField.REG_ID] || profile.Reg_ID || profile.id
+                const hasPendingLoan = pendingLoansResult.success && 
+                  pendingLoansResult.data.includes(regId)
+                console.log('📝 [RFGIFReturnForm] Profile', regId, 'has pending loan:', hasPendingLoan)
+                return {
+                  ...profile,
+                  hasPendingLoan: hasPendingLoan
+                }
+              })
+              
+              searchResult.value = {
+                found: true,
+                profile: profilesWithPendingStatus
+              }
+              console.log('✅ [RFGIFReturnForm] Multiple profiles processed:', profilesWithPendingStatus.length)
             }
-            console.log('✅ [RFGIFReturnForm] Multiple profiles processed:', profilesWithPendingStatus.length)
           } else {
             console.log('👤 [RFGIFReturnForm] Single profile found')
             // Single profile - check pending loan status
